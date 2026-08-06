@@ -118,34 +118,33 @@ async function searchAdLibraryViaApify(
     }
 
     const items = (await itemsRes.json()) as Array<Record<string, unknown>>;
-    const ads: AdSnippet[] = items
-      .map((item) => {
-        const body = String(
-          item.adContent ?? item.bodyText ?? item.body ?? item.ad_creative_body ?? ""
-        ).slice(0, 800);
-        const pageName = String(item.pageName ?? item.page_name ?? item.advertiser ?? "").slice(
-          0,
-          120
-        );
-        if (!body && !pageName) return null;
-        const platforms = item.platforms ?? item.publisherPlatform ?? item.publisher_platforms;
-        return {
-          pageName: pageName || undefined,
-          body: body || undefined,
-          linkTitle: String(item.displayLink ?? item.linkTitle ?? "").slice(0, 160) || undefined,
-          cta: String(item.ctaText ?? item.cta ?? "").slice(0, 80) || undefined,
-          landingUrl: String(item.landingUrl ?? item.linkUrl ?? "").slice(0, 300) || undefined,
-          imageUrl: String(item.imageUrl ?? item.imageUrl1 ?? "").slice(0, 400) || undefined,
-          publisherPlatforms: Array.isArray(platforms)
-            ? platforms.map(String)
-            : typeof platforms === "string"
-              ? [platforms]
-              : undefined,
-          source: "apify" as const,
-        };
-      })
-      .filter((x): x is AdSnippet => Boolean(x))
-      .slice(0, maxAds);
+    const ads: AdSnippet[] = [];
+    for (const item of items) {
+      const body = String(
+        item.adContent ?? item.bodyText ?? item.body ?? item.ad_creative_body ?? ""
+      ).slice(0, 800);
+      const pageName = String(item.pageName ?? item.page_name ?? item.advertiser ?? "").slice(
+        0,
+        120
+      );
+      if (!body && !pageName) continue;
+      const platforms = item.platforms ?? item.publisherPlatform ?? item.publisher_platforms;
+      ads.push({
+        pageName: pageName || undefined,
+        body: body || undefined,
+        linkTitle: String(item.displayLink ?? item.linkTitle ?? "").slice(0, 160) || undefined,
+        cta: String(item.ctaText ?? item.cta ?? "").slice(0, 80) || undefined,
+        landingUrl: String(item.landingUrl ?? item.linkUrl ?? "").slice(0, 300) || undefined,
+        imageUrl: String(item.imageUrl ?? item.imageUrl1 ?? "").slice(0, 400) || undefined,
+        publisherPlatforms: Array.isArray(platforms)
+          ? platforms.map(String)
+          : typeof platforms === "string"
+            ? [platforms]
+            : undefined,
+        source: "apify",
+      });
+      if (ads.length >= maxAds) break;
+    }
 
     if (!ads.length) {
       return {
