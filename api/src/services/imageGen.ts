@@ -66,16 +66,18 @@ export async function gerarImagemViral(
   }
   const provider = (process.env.IMAGE_PROVIDER ?? "openai").toLowerCase();
   const enriched = [
-    "Instagram ad creative 4:5, scroll-stopping, vivid colors, emotional impact,",
+    "Instagram ad creative 4:5 FULL BLEED edge-to-edge, no letterboxing, no black bars, no outer frame, no fake polaroid border,",
+    "scroll-stopping, vivid colors, emotional impact,",
     "bold short Portuguese hook text in upper third, clean typography,",
     "photorealistic workplace / industrial safety scene with real people wearing EPI",
     "(hard hat, gloves, goggles) when relevant,",
     "FORBIDDEN: smartphone mockups, 3D phone clusters, fake generic app dashboards, invented UI screens,",
     "FORBIDDEN: upside-down phones, plastic stock marketing of floating devices,",
-    "leave small clean space bottom-left for logo overlay,",
+    "FORBIDDEN: dark mats, cinematic widescreen bars, picture-in-picture frames inside the image,",
+    "leave small clean space bottom-left for logo overlay only,",
     "no watermarks, no invented brand logos in the scene.",
     brandPromptBits(brand),
-    prompt.slice(0, 2400),
+    prompt.slice(0, 2300),
   ]
     .filter(Boolean)
     .join(" ");

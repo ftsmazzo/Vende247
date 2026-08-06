@@ -12,7 +12,7 @@ function normalizeCompetitors(raw: unknown): string[] {
   return raw
     .map((x) => String(x).replace(/^@/, "").trim().toLowerCase())
     .filter(Boolean)
-    .slice(0, 5);
+    .slice(0, 8);
 }
 
 export const workspaceRoutes: FastifyPluginAsync = async (app) => {

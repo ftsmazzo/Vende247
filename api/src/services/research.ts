@@ -44,7 +44,25 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
   report: ResearchReport;
 }> {
   const competitors = await scrapeCompetitors(ctx.concorrentes);
-  const ads = await searchAdLibrary(ctx.nicho || ctx.produto, 20);
+
+  const adQueries = [
+    ctx.nicho,
+    ctx.produto.split(/[—\-–]/).map((s) => s.trim()).find(Boolean) || "",
+    "gestão de EPI",
+    "software SST NR-6",
+  ].filter((q) => q.length > 3);
+
+  const adsNested = await Promise.all(
+    adQueries.slice(0, 3).map((q) => searchAdLibrary(q, 12))
+  );
+  const adsMap = new Map<string, AdSnippet>();
+  for (const list of adsNested) {
+    for (const ad of list) {
+      const key = `${ad.pageName}|${ad.body?.slice(0, 80)}`;
+      if (!adsMap.has(key)) adsMap.set(key, ad);
+    }
+  }
+  const ads = [...adsMap.values()].slice(0, 25);
   const apifyOk = competitors.some((c) => c.source === "apify" && c.posts.length > 0);
   const adOk = ads.length > 0;
   const degraded = !apifyOk;

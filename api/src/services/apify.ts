@@ -26,7 +26,7 @@ function normalizeHandle(h: string): string {
  * Sem APIFY_TOKEN, retorna perfil stub para a IA ainda gerar research (modo degradado).
  */
 export async function scrapeCompetitors(handles: string[]): Promise<CompetitorProfile[]> {
-  const list = handles.map(normalizeHandle).filter(Boolean).slice(0, 5);
+  const list = handles.map(normalizeHandle).filter(Boolean).slice(0, 8);
   const token = process.env.APIFY_TOKEN?.trim();
   if (!token || list.length === 0) {
     return list.map((username) => ({
@@ -46,7 +46,7 @@ export async function scrapeCompetitors(handles: string[]): Promise<CompetitorPr
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       usernames: list,
-      resultsLimit: 12,
+      resultsLimit: 24,
     }),
   });
 
