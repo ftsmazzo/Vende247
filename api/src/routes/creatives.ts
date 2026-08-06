@@ -104,8 +104,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             },
             post.cena_tipo || "trabalhador_epi"
           );
-          for (const slide of slides) {
-            const url = await gerarImagemViral(slide.visual_prompt, brand, {
+          for (let i = 0; i < slides.length; i++) {
+            const url = await gerarImagemViral(slides[i].visual_prompt, brand, {
               purpose: i === 0 ? "cover" : "volume",
               mode: "ad",
             });
