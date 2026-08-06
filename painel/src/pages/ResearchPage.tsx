@@ -112,14 +112,27 @@ export function ResearchPage() {
   );
 }
 
-function ListCard({ title, items }: { title: string; items?: string[] }) {
-  if (!items?.length) return null;
+function ListCard({ title, items }: { title: string; items?: unknown[] }) {
+  if (!Array.isArray(items) || !items.length) return null;
+  const lines = items.map((item, i) => {
+    if (typeof item === "string") return item;
+    if (item == null) return "";
+    if (typeof item === "object") {
+      try {
+        return JSON.stringify(item);
+      } catch {
+        return `item-${i}`;
+      }
+    }
+    return String(item);
+  }).filter(Boolean);
+  if (!lines.length) return null;
   return (
     <div className="card">
       <h2 className="font-display text-lg font-semibold mb-2">{title}</h2>
       <ul className="space-y-1.5">
-        {items.map((item) => (
-          <li key={item} className="text-white/75 text-sm flex gap-2">
+        {lines.map((item, i) => (
+          <li key={`${i}-${item.slice(0, 40)}`} className="text-white/75 text-sm flex gap-2">
             <span className="text-signal shrink-0">▸</span>
             <span>{item}</span>
           </li>

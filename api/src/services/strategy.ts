@@ -114,9 +114,19 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
 
   plan.dias = n;
   if (!Array.isArray(plan.posts)) plan.posts = [];
+  if (!Array.isArray(plan.pilares)) {
+    plan.pilares = typeof plan.pilares === "string" && plan.pilares
+      ? [plan.pilares]
+      : [];
+  } else {
+    plan.pilares = plan.pilares.map((x) => (typeof x === "string" ? x : String(x)));
+  }
+  plan.resumo = typeof plan.resumo === "string" ? plan.resumo : String(plan.resumo ?? "");
   plan.posts = plan.posts.slice(0, n).map((p, i) => {
     const cena = CENA_ROTATION[i % CENA_ROTATION.length];
-    let visual = (p.visual_prompt || "").trim();
+    const hook = coerceText(p.hook) || coerceText(p.titulo) || "Hook";
+    const titulo = coerceText(p.titulo) || `Dia ${i + 1}`;
+    let visual = coerceText(p.visual_prompt).trim();
     const lower = visual.toLowerCase();
     if (
       !visual ||
@@ -125,20 +135,27 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
       (lower.includes("smartphone") && lower.includes("dashboard")) ||
       (lower.match(/phone/g) || []).length >= 2
     ) {
-      visual = fallbackVisual(ctx, cena, p.hook || p.titulo);
+      visual = fallbackVisual(ctx, cena, hook);
     }
-    const formato = (["feed", "carrossel", "reels"].includes(p.formato)
+    const formato = (["feed", "carrossel", "reels"].includes(String(p.formato))
       ? p.formato
       : "feed") as CreativeBrief["formato"];
 
     let slides = Array.isArray(p.slides) ? p.slides : undefined;
     if (formato === "carrossel") {
-      slides = normalizeCarouselSlides(slides, visual, p.hook || p.titulo, ctx, cena);
+      slides = normalizeCarouselSlides(slides, visual, hook, ctx, cena);
     }
 
     return {
       ...p,
       day: i + 1,
+      titulo,
+      hook,
+      pilar: coerceText(p.pilar),
+      objetivo: p.objetivo,
+      estrutura: coerceText(p.estrutura),
+      caption: coerceText(p.caption),
+      cta: coerceText(p.cta),
       formato,
       cena_tipo: p.cena_tipo || cena,
       visual_prompt: visual,
@@ -147,6 +164,31 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
   });
 
   return plan;
+}
+
+function coerceText(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) {
+    return v
+      .map((x) => coerceText(x))
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    const parts = [o.titulo, o.texto, o.body, o.caption, o.hook]
+      .map((x) => coerceText(x))
+      .filter(Boolean);
+    if (parts.length) return parts.join(" — ");
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return "";
+    }
+  }
+  return "";
 }
 
 export function normalizeCarouselSlides(
