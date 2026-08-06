@@ -161,7 +161,8 @@ LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 IMAGE_PROVIDER=openai
 OPENAI_IMAGE_MODEL=gpt-image-1.5
-# Teste Nano Banana 2: IMAGE_PROVIDER=gemini + GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
+# OpenRouter (roteamento): IMAGE_PROVIDER=openrouter + OPENROUTER_API_KEY
+# volume=seedream-4.5 | cover=gemini-3-pro-image | photo=flux.2-pro
 META_ACCESS_TOKEN=
 META_AD_LIBRARY_SEARCH_COUNTRY=BR
 ALLOW_OPEN_REGISTER=false

@@ -105,12 +105,19 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             post.cena_tipo || "trabalhador_epi"
           );
           for (const slide of slides) {
-            const url = await gerarImagemViral(slide.visual_prompt, brand);
+            const url = await gerarImagemViral(slide.visual_prompt, brand, {
+              purpose: i === 0 ? "cover" : "volume",
+              mode: "ad",
+            });
             mediaUrls.push(url);
           }
           mediaUrl = mediaUrls[0] || "";
         } else {
-          mediaUrl = await gerarImagemViral(visual, brand);
+          mediaUrl = await gerarImagemViral(visual, brand, {
+            purpose: formato === "reels" ? "cover" : "cover",
+            mode: "ad",
+            aspectRatio: formato === "reels" ? "9:16" : "4:5",
+          });
           mediaUrls = mediaUrl ? [mediaUrl] : [];
         }
       } catch (err) {
@@ -216,11 +223,20 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             i === 0
               ? row.visual_prompt
               : `${row.visual_prompt}. Carousel slide ${i + 1} of ${count}, different angle, bold Portuguese text related to "${row.hook}"`;
-          mediaUrls.push(await gerarImagemViral(prompt, brand));
+          mediaUrls.push(
+            await gerarImagemViral(prompt, brand, {
+              purpose: i === 0 ? "cover" : "volume",
+              mode: "ad",
+            })
+          );
         }
         mediaUrl = mediaUrls[0] || "";
       } else {
-        mediaUrl = await gerarImagemViral(row.visual_prompt, brand);
+        mediaUrl = await gerarImagemViral(row.visual_prompt, brand, {
+          purpose: "cover",
+          mode: "ad",
+          aspectRatio: row.format === "reels" ? "9:16" : "4:5",
+        });
         mediaUrls = [mediaUrl];
       }
 
@@ -270,7 +286,10 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       try {
         const brand = (ws.brand_kit || {}) as BrandKit;
         const prompt = `${cur.rows[0].visual_prompt}. Carousel slide ${slideIndex + 1}, bold Portuguese hook "${cur.rows[0].hook}", unique composition`;
-        const newUrl = await gerarImagemViral(prompt, brand);
+        const newUrl = await gerarImagemViral(prompt, brand, {
+          purpose: "volume",
+          mode: "ad",
+        });
         const next = [...urls];
         if (next.length === 0) next.push(newUrl);
         else next[slideIndex] = newUrl;

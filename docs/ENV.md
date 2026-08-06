@@ -31,8 +31,13 @@ APIFY_TOKEN=
 | `GEMINI_API_KEY` | alt | — | Se `LLM_PROVIDER=gemini` ou `IMAGE_PROVIDER=gemini` |
 | `LLM_PROVIDER` | não | `openai` | `openai` ou `gemini` |
 | `LLM_MODEL` | não | `gpt-4o-mini` | Modelo de texto |
-| `IMAGE_PROVIDER` | não | `openai` | `openai` ou `gemini` |
-| `OPENAI_IMAGE_MODEL` | não | `gpt-image-1.5` | Ex.: `gpt-image-1.5` |
+| `IMAGE_PROVIDER` | não | `openai` | `openai`, `gemini` ou `openrouter` |
+| `OPENAI_IMAGE_MODEL` | não | `gpt-image-1.5` | Fallback / provider openai |
+| `OPENROUTER_API_KEY` | alt | — | Obrigatória se `IMAGE_PROVIDER=openrouter` |
+| `OR_MODEL_VOLUME` | não | `bytedance-seed/seedream-4.5` | Slides / volume |
+| `OR_MODEL_COVER` | não | `google/gemini-3-pro-image` | Feed / capa |
+| `OR_MODEL_PHOTO` | não | `black-forest-labs/flux.2-pro` | Hero landing |
+| `OR_MODEL_DRAFT` | não | `google/gemini-3.1-flash-image` | Rascunhos |
 | `GEMINI_IMAGE_MODEL` | não | `gemini-3.1-flash-image` | Nano Banana 2; ou `imagen-4.0-generate-001` |
 | `APIFY_TOKEN` | recomendado | — | Scrape de perfis concorrentes |
 | `APIFY_IG_ACTOR` | não | `apify/instagram-profile-scraper` | Actor Apify |

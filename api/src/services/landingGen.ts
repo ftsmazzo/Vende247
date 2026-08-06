@@ -826,7 +826,7 @@ JSON estrito.`,
           `Mood for product: ${ctx.produto.slice(0, 120)}`,
         ].join(" "),
         brand,
-        { mode: "photo", overlayLogo: false }
+        { mode: "photo", purpose: "photo", overlayLogo: false, aspectRatio: "4:5" }
       );
     } catch {
       heroUrl = brand?.og_image_url || undefined;
