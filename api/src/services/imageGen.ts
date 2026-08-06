@@ -57,7 +57,7 @@ export async function gerarImagemViral(prompt: string): Promise<string> {
   } else {
     if (!OPENAI_API_KEY?.trim()) throw new Error("OPENAI_API_KEY não configurada.");
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY.trim() });
-    const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "dall-e-3";
+    const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1.5";
     const gptImage = model.toLowerCase().includes("gpt-image");
     const res = await openai.images.generate({
       model,
