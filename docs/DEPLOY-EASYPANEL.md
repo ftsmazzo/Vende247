@@ -173,7 +173,8 @@ META_AD_LIBRARY_SEARCH_COUNTRY=BR
 ALLOW_OPEN_REGISTER=false
 ```
 
-- `META_ACCESS_TOKEN`: opcional. **Atenção:** a API `ads_archive` da Meta **quase não devolve anúncios comerciais no Brasil** (só políticos/sociais; comerciais plenos via API costumam ser UE/UK). Research “Ad Library vazia” ≠ “nicho sem ads pagos”. Para ver ads comerciais, use [facebook.com/ads/library](https://www.facebook.com/ads/library) manualmente.
+- `META_ACCESS_TOKEN`: opcional e **quase inútil no BR** para ads comerciais (Graph só lista político/social ou UE/UK).
+- **Ads comerciais no research:** use `APIFY_TOKEN` + actor `APIFY_AD_LIBRARY_ACTOR=viralanalyzer/facebook-ads-library` (scrape da Ad Library pública). Custa créditos Apify por run de research.
 - `ALLOW_OPEN_REGISTER=true`: só se quiser permitir **novos** cadastros depois do primeiro usuário. No 1º deploy pode deixar `false` — o **primeiro** usuário ainda consegue se registrar.
 
 ---

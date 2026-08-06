@@ -40,10 +40,10 @@ APIFY_TOKEN=
 | `OR_MODEL_PHOTO` | não | `black-forest-labs/flux.2-pro` | Hero landing |
 | `OR_MODEL_DRAFT` | não | `google/gemini-3.1-flash-image` | Rascunhos |
 | `GEMINI_IMAGE_MODEL` | não | `gemini-3.1-flash-image` | Nano Banana 2; ou `imagen-4.0-generate-001` |
-| `APIFY_TOKEN` | recomendado | — | Scrape de perfis concorrentes |
-| `APIFY_IG_ACTOR` | não | `apify/instagram-profile-scraper` | Actor Apify |
-| `META_ACCESS_TOKEN` | não | — | Meta Ad Library |
-| `META_AD_LIBRARY_SEARCH_COUNTRY` | não | `BR` | País da busca de ads |
+| `APIFY_TOKEN` | recomendado | — | Scrape de perfis IG + Ad Library comercial |
+| `APIFY_IG_ACTOR` | não | `apify/instagram-profile-scraper` | Actor Instagram |
+| `APIFY_AD_LIBRARY_ACTOR` | não | `viralanalyzer/facebook-ads-library` | Ads comerciais BR (substitui Graph Meta) |
+| `META_ACCESS_TOKEN` | não | — | Fallback Graph; limitado no BR |
 | `STORAGE` | não | `local` | `local` ou `cloudinary` |
 | `MEDIA_BASE_URL` | se local | — | URL pública da API (HTTPS) |
 | `CLOUDINARY_CLOUD_NAME` | se cloudinary | — | Conta Cloudinary |

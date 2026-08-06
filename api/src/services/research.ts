@@ -1,18 +1,18 @@
 import { scrapeCompetitors, type CompetitorProfile } from "./apify.js";
-import { searchAdLibrary, type AdSnippet } from "./adLibrary.js";
+import { searchAdsForResearch, type AdSnippet } from "./adLibrary.js";
 import { chatJson } from "./llm.js";
 
 export type ResearchReport = {
   resumo: string;
-  /** O que os concorrentes fazem de concreto (não genérico) */
+  /** O que os concorrentes fazem de concreto (nao generico) */
   o_que_concorrentes_fazem_bem: string[];
-  /** Lacunas / ângulos que o produto pode dominar */
+  /** Lacunas / angulos que o produto pode dominar */
   oportunidades_unicas: string[];
   formatos_que_performam: string[];
   hooks_vencedores: string[];
   ctas_comuns: string[];
   pilares_conteudo: string[];
-  /** Direção visual: cenas humanas, EPI, fábrica — NÃO lista de mockups de celular */
+  /** Direcao visual: cenas humanas, EPI, fabrica — NAO lista de mockups de celular */
   direcao_visual: string[];
   padrao_perfil_engajador: {
     bio_sugerida: string;
@@ -26,7 +26,7 @@ export type ResearchReport = {
     apify: boolean;
     ad_library: boolean;
     modo_degradado: boolean;
-    /** Por que Meta veio vazia / limitada — honestidade com o usuário */
+    /** Como veio a Ad Library (Apify scrape vs Graph limitada) */
     ad_library_nota?: string;
   };
 };
@@ -49,40 +49,27 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
 
   const adQueries = [
     ctx.nicho,
-    ctx.produto.split(/[—\-–]/).map((s) => s.trim()).find(Boolean) || "",
-    "gestão de EPI",
+    ctx.produto.split(/[—\-–|/]/).map((s) => s.trim()).find(Boolean) || "",
+    "gestao de EPI",
     "software SST",
     "entrega de EPI",
-    "NR-6",
+    "EPI biometria",
   ].filter((q) => q.length > 3);
 
-  const adsNested = await Promise.all(
-    adQueries.slice(0, 4).map((q) => searchAdLibrary(q, 12))
-  );
-  const adsMap = new Map<string, AdSnippet>();
-  let adStatus = adsNested[0]?.status ?? "empty";
-  let adDetail = adsNested[0]?.detail;
-  for (const batch of adsNested) {
-    if (batch.status === "ok") adStatus = "ok";
-    else if (adStatus !== "ok" && batch.detail) {
-      adStatus = batch.status;
-      adDetail = batch.detail;
-    }
-    for (const ad of batch.ads) {
-      const key = `${ad.pageName}|${ad.body?.slice(0, 80)}`;
-      if (!adsMap.has(key)) adsMap.set(key, ad);
-    }
-  }
-  const ads = [...adsMap.values()].slice(0, 25);
+  // Preferencia: Apify scrape da Ad Library publica (ads comerciais BR).
+  // Graph META_ACCESS_TOKEN fica so como fallback (quase inutil no BR).
+  const adBatch = await searchAdsForResearch(adQueries, 20);
+  const ads = adBatch.ads;
+  const adStatus = adBatch.status;
+  const adLibraryNota =
+    adBatch.detail ||
+    (ads.length
+      ? "Ads da Ad Library via Apify."
+      : "Sem ads — confira APIFY_TOKEN / APIFY_AD_LIBRARY_ACTOR.");
+
   const apifyOk = competitors.some((c) => c.source === "apify" && c.posts.length > 0);
   const adOk = ads.length > 0;
   const degraded = !apifyOk;
-
-  const adLibraryNota =
-    adDetail ||
-    (adOk
-      ? "Ads retornados pela API (escopo limitado por país)."
-      : "Ad Library API sem resultados comerciais úteis para BR — não interprete como ‘nicho sem tráfego pago’.");
 
   const compactCompetitors = competitors.map((c) => ({
     username: c.username,
@@ -96,35 +83,33 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
         likes: p.likes,
         comments: p.comments,
         caption: p.caption.slice(0, 500),
-        // URL do post (não baixamos a foto — só inspira análise de formato/tema)
         postUrl: p.url?.slice(0, 120),
       })),
   }));
 
   const report = await chatJson<ResearchReport>(
-    `Você é estrategista de conteúdo B2B para Instagram no Brasil (SST / EPI / software industrial).
-Sua missão: insights DECISIVOS para vender ESTE produto — não platitudes de marketing.
+    `Voce e estrategista de conteudo B2B para Instagram no Brasil (SST / EPI / software industrial).
+Sua missao: insights DECISIVOS para vender ESTE produto — nao platitudes de marketing.
 
-PROIBIDO (genérico demais):
-- "segurança é compromisso", "vídeos e imagens", "saiba mais na bio" sem contexto
-- listas vagas tipo "formatos: vídeo, carrossel"
-- repetir o óbvio do nicho sem amarrar ao produto
+PROIBIDO (generico demais):
+- "seguranca e compromisso", "videos e imagens", "saiba mais na bio" sem contexto
+- listas vagas tipo "formatos: video, carrossel"
+- repetir o obvio do nicho sem amarrar ao produto
 
-OBRIGATÓRIO:
-- Citar padrões REAIS vistos nas captions/posts dos concorrentes (temas, ângulos, provas)
+OBRIGATORIO:
+- Citar padroes REAIS vistos nas captions/posts dos concorrentes (temas, angulos, provas)
 - Separar o que concorrentes fazem bem vs o que o produto pode ganhar (oportunidades_unicas)
 - Hooks concretos, no tom do produto (ex.: biometria na entrega, CA vencendo, consultor multi-cliente, planilha vs painel)
-- direcao_visual: 8–12 cenas HUMANAS / operação DIFERENTES entre si (trabalhador EPI, entrega facial, estoque, auditoria, gestor pátio, consultor, antes/depois documental, close de CA, equipe em checklist). Cada item = 1 frase de cena concreta. PROIBIDO: "mockup de celular", "dashboard genérico", "foto profissional genérica"
-- Inferir o que as mídias dos top posts sugerem pelo tipo (GraphImage/Video/Sidecar) + caption — mesmo sem ver o JPEG
-- Bio e pilares específicos do produto informado
+- direcao_visual: 8–12 cenas HUMANAS / operacao DIFERENTES entre si (trabalhador EPI, entrega facial, estoque, auditoria, gestor patio, consultor, antes/depois documental, close de CA, equipe em checklist). Cada item = 1 frase de cena concreta. PROIBIDO: "mockup de celular", "dashboard generico", "foto profissional generica"
+- Inferir o que as midias dos top posts sugerem pelo tipo (GraphImage/Video/Sidecar) + caption — mesmo sem ver o JPEG
+- Bio e pilares especificos do produto informado
 
-Se dados Apify estiverem vazios, diga isso em resumo e ainda proponha ângulos com base no produto (não invente likes).
+Se dados Apify (perfis) estiverem vazios, diga isso em resumo e ainda proponha angulos com base no produto (nao invente likes).
 
-Sobre Meta Ad Library (CRÍTICO):
-- Se ads_nicho estiver vazio OU flags.ad_library_limitacao indicar cobertura limitada no BR: NÃO diga que “o nicho não tem anúncios pagos” ou “Ad Library vazia = sem tráfego pago”.
-- Explique em 1 frase que a API oficial da Meta no Brasil quase não devolve ads comerciais (só políticos/sociais; comerciais plenos via API são tipicamente UE/UK).
-- Em insights_ads: foque em hipóteses a partir do Apify + produto; sugira validar ads manuais em facebook.com/ads/library se o usuário quiser.
-- Só afirme padrões de ads pagos se houver itens reais em ads_nicho.
+Sobre ads / Ad Library (CRITICO):
+- Se ads_nicho TIVER itens (fonte Apify scrape ou Graph): use copy, CTA, landing e paginas como evidencia real de trafego pago. Cite padroes em insights_ads.
+- Se ads_nicho estiver VAZIO: NAO diga que "o nicho nao tem anuncios pagos". Diga que a coleta nao retornou ads ativos para as queries e baseie insights_ads no organico Apify + produto.
+- Nao confunda ausencia de dados com ausencia de mercado.
 
 JSON com chaves:
 resumo, o_que_concorrentes_fazem_bem[], oportunidades_unicas[], formatos_que_performam[],
@@ -148,9 +133,9 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
           adOk,
           degraded,
           ad_library_status: adStatus,
-          ad_library_limitacao: adLibraryNota,
+          ad_library_nota: adLibraryNota,
         },
-        nota: "As imagens dos concorrentes NÃO são reutilizadas pixel a pixel; use captions+tipo para extrair padrões visuais e de mensagem.",
+        nota: "Imagens dos concorrentes NAO sao reutilizadas pixel a pixel; use captions+tipo+ads para padroes.",
       },
       null,
       2
