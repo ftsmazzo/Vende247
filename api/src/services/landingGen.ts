@@ -124,13 +124,38 @@ const ICONS = [
 const WARN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 17h.01"/><path d="M10.3 4.3L2.8 17a2 2 0 001.7 3h15a2 2 0 001.7-3L13.7 4.3a2 2 0 00-3.4 0z"/></svg>`;
 const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7L9 18l-5-5"/></svg>`;
 
+function isFakePhone(digits: string): boolean {
+  // exemplos inventados comuns pela LLM
+  return (
+    /^(55)?11912345678$/.test(digits) ||
+    /^(55)?11999999999$/.test(digits) ||
+    /^(55)?5511999999999$/.test(digits) ||
+    /^0+$/.test(digits) ||
+    /12345678/.test(digits)
+  );
+}
+
 function resolveCtaUrl(ctx: WorkspaceContext, copy: LandingCopy): string {
   for (const c of [copy.whatsapp_url, ctx.cta]) {
     const t = (c || "").trim();
-    if (/^https?:\/\//i.test(t)) return t;
-    if (/^wa\.me\//i.test(t)) return `https://${t}`;
+    if (!t) continue;
+    if (/^https?:\/\//i.test(t)) {
+      try {
+        const u = new URL(t);
+        const phone = (u.searchParams.get("phone") || u.pathname.replace(/\D/g, "")).replace(/\D/g, "");
+        if (phone && isFakePhone(phone)) continue;
+        return t;
+      } catch {
+        return t;
+      }
+    }
+    if (/^wa\.me\//i.test(t)) {
+      const digits = t.replace(/\D/g, "");
+      if (isFakePhone(digits)) continue;
+      return `https://${t}`;
+    }
     const digits = t.replace(/\D/g, "");
-    if (digits.length >= 10 && digits.length <= 13) {
+    if (digits.length >= 10 && digits.length <= 13 && !isFakePhone(digits)) {
       return `https://wa.me/${digits.startsWith("55") ? digits : `55${digits}`}`;
     }
   }
@@ -138,10 +163,82 @@ function resolveCtaUrl(ctx: WorkspaceContext, copy: LandingCopy): string {
 }
 
 function shortCta(label: string): string {
-  const t = label.trim();
-  if (t.length <= 36) return t;
-  if (/whatsapp|wa\.me|direct|demo|demonstra/i.test(t)) return "Quero uma demonstração";
-  return t.slice(0, 34) + "…";
+  const t = cleanPublicText(label).trim();
+  if (!t) return "Quero uma demonstração";
+  if (t.length <= 34) return t;
+  if (/whatsapp|wa\.me|direct|demo|demonstra|prontepi/i.test(t)) return "Quero uma demonstração";
+  return t.slice(0, 32) + "…";
+}
+
+function cleanPublicText(v: unknown): string {
+  let s = String(v ?? "");
+  s = s.replace(/[*_`#]+/g, "");
+  s = s.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "");
+  s = s.replace(/^["'«»]+|["'«»]+$/g, "");
+  s = s.replace(/\s+/g, " ").trim();
+  // remove linguagem interna do produto
+  s = s.replace(/\b(research|estratégia de conteúdo|ângulos da research|hooks validados|vende247)\b/gi, "");
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function pairFrom(raw: unknown): { title: string; body: string } | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const t = cleanPublicText(raw);
+    return t ? { title: t.slice(0, 48), body: t } : null;
+  }
+  if (typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const title = cleanPublicText(
+    o.title ?? o.titulo ?? o.name ?? o.nome ?? o.q ?? o.pergunta ?? o.question ?? ""
+  );
+  const body = cleanPublicText(
+    o.body ?? o.texto ?? o.descricao ?? o.description ?? o.a ?? o.resposta ?? o.answer ?? o.desc ?? ""
+  );
+  if (!title && !body) return null;
+  return { title: title || body.slice(0, 40), body: body || title };
+}
+
+function normalizePairs(raw: unknown): Array<{ title: string; body: string }> {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(pairFrom).filter((x): x is { title: string; body: string } => Boolean(x));
+}
+
+function normalizeFaq(raw: unknown): Array<{ q: string; a: string }> {
+  return normalizePairs(raw).map((p) => ({ q: p.title, a: p.body }));
+}
+
+function normalizeStrings(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((x) => {
+      if (typeof x === "string") return cleanPublicText(x);
+      if (x && typeof x === "object") {
+        const o = x as Record<string, unknown>;
+        return cleanPublicText(o.texto ?? o.title ?? o.titulo ?? o.hook ?? o.body ?? "");
+      }
+      return "";
+    })
+    .filter((s) => s.length > 2);
+}
+
+function shortTitle(s: string, max = 52): string {
+  const t = cleanPublicText(s);
+  if (t.length <= max) return t;
+  return t.slice(0, max - 1).trimEnd() + "…";
+}
+
+function splitHeadline(headline: string, accent: string): { main: string; accent: string } {
+  let main = cleanPublicText(headline);
+  let acc = cleanPublicText(accent);
+  // remove accent duplicado dentro do headline
+  if (acc && main.toLowerCase().includes(acc.toLowerCase())) {
+    main = main.replace(new RegExp(acc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), "").trim();
+    main = main.replace(/[\s*]+$/g, "").trim();
+  }
+  if (!main) main = "Menos papel. Mais controle.";
+  if (!acc) acc = "Na entrega de EPIs.";
+  return { main, accent: acc };
 }
 
 export function renderLandingHtml(
@@ -163,7 +260,11 @@ export function renderLandingHtml(
     ? `<img src="${esc(opts.logoUrl)}" alt="${esc(copy.brand_name)}" class="logo" />`
     : `<span class="logo-text">${esc(copy.brand_name)}</span>`;
 
+  const head = splitHeadline(copy.headline, copy.headline_accent);
+
   const pains = (copy.pains || [])
+    .map(cleanPublicText)
+    .filter(Boolean)
     .slice(0, 5)
     .map(
       (p, i) =>
@@ -171,8 +272,8 @@ export function renderLandingHtml(
     )
     .join("");
 
-  const benefits = (copy.benefits || [])
-    .slice(0, 4)
+  const benefitItems = (copy.benefits || []).filter((b) => b.title || b.body).slice(0, 4);
+  const benefits = benefitItems
     .map(
       (b, i) =>
         `<article class="card">
@@ -183,51 +284,49 @@ export function renderLandingHtml(
     )
     .join("");
 
-  const steps = (copy.how_steps || [])
-    .slice(0, 4)
+  const stepItems = (copy.how_steps || []).filter((s) => s.title || s.body).slice(0, 4);
+  const steps = stepItems
     .map(
       (s, i) =>
         `<li class="step"><span class="step-n">${i + 1}</span><div><h3>${esc(s.title)}</h3><p>${esc(s.body)}</p></div></li>`
     )
     .join("");
 
-  const pillars = (copy.pillars || [])
-    .slice(0, 4)
-    .map(
-      (p) =>
-        `<article class="pillar"><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p></article>`
-    )
+  const pillarItems = (copy.pillars || []).filter((p) => p.title || p.body).slice(0, 4);
+  const pillars = pillarItems
+    .map((p) => `<article class="pillar"><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p></article>`)
     .join("");
 
-  const angles = (copy.angles || [])
-    .slice(0, 6)
+  const angleItems = (copy.angles || []).map(cleanPublicText).filter(Boolean).slice(0, 6);
+  const angles = angleItems
     .map((a) => `<li><span class="ico">${CHECK}</span>${esc(a)}</li>`)
     .join("");
 
-  const proofs = (copy.proof_items || [])
-    .slice(0, 4)
+  const proofItems = (copy.proof_items || []).map(cleanPublicText).filter(Boolean).slice(0, 4);
+  const proofs = proofItems
     .map((p) => `<li class="proof"><span class="ico">${CHECK}</span>${esc(p)}</li>`)
     .join("");
 
-  const metrics = (copy.metrics || [])
-    .slice(0, 4)
+  const metricItems = (copy.metrics || [])
+    .map((m) => ({
+      value: cleanPublicText(m.value),
+      label: cleanPublicText(m.label),
+    }))
+    .filter((m) => m.value)
+    .slice(0, 4);
+  const metrics = metricItems
     .map(
       (m) =>
         `<div class="metric"><strong>${esc(m.value)}</strong><span>${esc(m.label)}</span></div>`
     )
     .join("");
 
-  const faq = (copy.faq || [])
-    .slice(0, 5)
+  const faqItems = (copy.faq || []).filter((f) => f.q || f.a).slice(0, 5);
+  const faq = faqItems
     .map(
       (f) =>
         `<details class="faq-item"><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`
     )
-    .join("");
-
-  const comps = (opts.concorrentes || [])
-    .slice(0, 6)
-    .map((c) => `<span class="chip">@${esc(c.replace(/^@/, ""))}</span>`)
     .join("");
 
   const heroMedia = opts.heroUrl
@@ -389,23 +488,21 @@ footer{padding:2rem 0 2.75rem;border-top:1px solid var(--line);color:var(--muted
 <header class="hero">
   ${heroMedia}
   <div class="wrap hero-inner">
-    ${copy.eyebrow ? `<div class="eyebrow">${esc(copy.eyebrow)}</div>` : ""}
-    <h1>${esc(copy.headline).replace(/\n/g, "<br/>")}${
-      copy.headline_accent
-        ? `<span class="accent-line">${esc(copy.headline_accent)}</span>`
-        : ""
-    }</h1>
-    <p class="lead">${esc(copy.subheadline)}</p>
+    ${copy.eyebrow ? `<div class="eyebrow">${esc(cleanPublicText(copy.eyebrow))}</div>` : ""}
+    <h1>${esc(head.main).replace(/\n/g, "<br/>")}<span class="accent-line">${esc(head.accent)}</span></h1>
+    <p class="lead">${esc(cleanPublicText(copy.subheadline))}</p>
     ${
       copy.audience || copy.differentiator
         ? `<p class="meta-line">${esc(
-            [copy.audience, copy.differentiator].filter(Boolean).join(" · ")
+            [cleanPublicText(copy.audience), cleanPublicText(copy.differentiator)]
+              .filter(Boolean)
+              .join(" · ")
           )}</p>`
         : ""
     }
     <div class="cta-row">
       <a class="btn" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a>
-      <a class="btn btn-ghost" href="#dor">${esc(copy.hero_cta_secondary || "Ver o problema")}</a>
+      <a class="btn btn-ghost" href="#dor">${esc(cleanPublicText(copy.hero_cta_secondary) || "Ver o problema")}</a>
     </div>
     ${metrics ? `<div class="metrics">${metrics}</div>` : ""}
   </div>
@@ -414,25 +511,29 @@ footer{padding:2rem 0 2.75rem;border-top:1px solid var(--line);color:var(--muted
 <section class="section pain" id="dor">
   <div class="wrap">
     <p class="section-kicker">O problema</p>
-    <h2 class="display">${esc(copy.pain_title)}</h2>
+    <h2 class="display">${esc(cleanPublicText(copy.pain_title) || "Isso ainda trava a sua operação?")}</h2>
     <ul class="pain-list">${pains}</ul>
   </div>
 </section>
 
-<section class="section" id="solucao">
+${
+  benefits
+    ? `<section class="section" id="solucao">
   <div class="wrap">
     <p class="section-kicker">A solução</p>
-    <h2 class="display">${esc(copy.solution_title)}</h2>
+    <h2 class="display">${esc(cleanPublicText(copy.solution_title) || "O que muda na prática")}</h2>
     <div class="grid-4">${benefits}</div>
   </div>
-</section>
+</section>`
+    : ""
+}
 
 ${
   steps
     ? `<section class="section" id="como">
   <div class="wrap">
     <p class="section-kicker">Como funciona</p>
-    <h2 class="display">${esc(copy.how_title || "Do caos ao controle")}</h2>
+    <h2 class="display">${esc(cleanPublicText(copy.how_title) || "Do caos ao controle")}</h2>
     <ol class="steps">${steps}</ol>
   </div>
 </section>`
@@ -443,8 +544,8 @@ ${
   pillars
     ? `<section class="section" id="pilares">
   <div class="wrap">
-    <p class="section-kicker">Pilares da estratégia</p>
-    <h2 class="display">${esc(copy.pillars_title || "Sobre o que vamos falar")}</h2>
+    <p class="section-kicker">Por que escolhem</p>
+    <h2 class="display">${esc(cleanPublicText(copy.pillars_title) || "Pilares do produto")}</h2>
     <div class="pillars">${pillars}</div>
   </div>
 </section>`
@@ -455,29 +556,32 @@ ${
   angles
     ? `<section class="section" id="angulos">
   <div class="wrap">
-    <p class="section-kicker">Ângulos que performam</p>
-    <h2 class="display">${esc(copy.angles_title || "Hooks validados na research")}</h2>
+    <p class="section-kicker">Mensagens que convertem</p>
+    <h2 class="display">${esc(cleanPublicText(copy.angles_title) || "O que o mercado responde")}</h2>
     <ul class="angle-list">${angles}</ul>
-    ${comps ? `<div class="chips">${comps}</div>` : ""}
   </div>
 </section>`
     : ""
 }
 
-<section class="section" id="prova">
+${
+  proofs
+    ? `<section class="section" id="prova">
   <div class="wrap">
     <p class="section-kicker">Por que agora</p>
-    <h2 class="display">${esc(copy.proof_title)}</h2>
+    <h2 class="display">${esc(cleanPublicText(copy.proof_title) || "Prova sem enrolação")}</h2>
     <ul class="proof-list">${proofs}</ul>
   </div>
-</section>
+</section>`
+    : ""
+}
 
 ${
   faq
     ? `<section class="section" id="faq">
   <div class="wrap">
     <p class="section-kicker">Dúvidas</p>
-    <h2 class="display">${esc(copy.faq_title || "Perguntas frequentes")}</h2>
+    <h2 class="display">${esc(cleanPublicText(copy.faq_title) || "Perguntas frequentes")}</h2>
     ${faq}
   </div>
 </section>`
@@ -487,27 +591,23 @@ ${
 <section class="section" style="padding-top:1rem" id="oferta">
   <div class="offer" id="contato">
     <p class="section-kicker">Próximo passo</p>
-    <h2 class="display">${esc(copy.offer_title)}</h2>
-    <p>${esc(copy.offer_body)}</p>
+    <h2 class="display">${esc(shortTitle(copy.offer_title, 48) || "Peça uma demonstração")}</h2>
+    <p>${esc(cleanPublicText(copy.offer_body))}</p>
     <a class="btn" href="${esc(ctaHref)}">${esc(ctaFinal)}</a>
-    <span class="hint">${esc(copy.whatsapp_hint)}</span>
+    <span class="hint">${esc(cleanPublicText(copy.whatsapp_hint))}</span>
   </div>
 </section>
 
 <section class="final">
   <div class="wrap">
     <h2 class="display">${esc(ctaFinal)}</h2>
-    <p class="sub">${esc(copy.final_sub)}</p>
+    <p class="sub">${esc(cleanPublicText(copy.final_sub))}</p>
     <a class="btn" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a>
   </div>
 </section>
-<footer><div class="wrap">${esc(copy.brand_name)} · montado com research, estratégia e brand no Vende247</div></footer>
+<footer><div class="wrap">${esc(copy.brand_name)}</div></footer>
 </body>
 </html>`;
-}
-
-function arr<T>(v: unknown): T[] {
-  return Array.isArray(v) ? (v as T[]) : [];
 }
 
 export async function generateLanding(opts: {
@@ -535,45 +635,27 @@ export async function generateLanding(opts: {
     : null;
 
   const copy = await chatJson<LandingCopy>(
-    `Você é diretor de copy de landing pages B2B de alta conversão (Brasil, 2026).
-Monte uma LP RICA usando research + estratégia + produto. Não invente métricas falsas (% ou "500 empresas").
-Métricas devem ser MECANISMOS curtos (ex.: value:"Biometria", label:"na entrega de EPI").
-
-Tom: sofisticado, direto, específico. PROIBIDO clichê SaaS ("revolucione", "otimize sua gestão", "solução completa").
-
-Campos:
-- eyebrow, headline (máx 9 palavras), headline_accent (2–6 palavras em itálico), subheadline
-- audience (para quem), differentiator (1 frase do que só este produto faz)
-- hero_cta curto (máx 32 chars), hero_cta_secondary
-- pains[4-5] bem concretas da research/gaps
-- benefits[4] do produto
-- how_steps[3-4] jornada do usuário
-- pillars[3-4] a partir dos pilares/estratégia
-- angles[4-6] hooks/ângulos da research (frases curtas)
-- proof_items[3-4] mecanismos de credibilidade (sem números inventados)
-- metrics[3-4] {value,label} mecanismos
-- faq[4] objeções reais B2B SST/EPI
-- offer_*, final_*, whatsapp_hint, whatsapp_url se houver número
-- seo_title, seo_description
-
-JSON estrito com todas as chaves acima.`,
+    `Você é diretor de copy de landing pages B2B (Brasil). Texto para o CLIENTE FINAL — nunca mencione research, estratégia interna, hooks, Vende247 ou concorrentes com @.
+Preencha TODOS os arrays com conteúdo real (title/body ou titulo/texto). Nunca devolva objetos vazios {}.
+PROIBIDO: markdown (*negrito*), emojis, métricas inventadas (% / "500 empresas"), telefone inventado.
+whatsapp_url: só se o workspace tiver número real; senão omita.
+hero_cta máx 32 caracteres. offer_title máx 8 palavras.
+benefits/how_steps/pillars/faq: use chaves title+body (ou titulo+texto / pergunta+resposta).
+angles: frases comerciais curtas SEM aspas e SEM emoji.
+JSON estrito.`,
     JSON.stringify(
       {
         workspace: ctx,
-        research: report
+        insights_produto: report
           ? {
-              resumo: report.resumo,
-              oportunidades_unicas: report.oportunidades_unicas,
-              o_que_concorrentes_fazem_bem: report.o_que_concorrentes_fazem_bem,
-              hooks_vencedores: report.hooks_vencedores,
-              pilares_conteudo: report.pilares_conteudo,
-              ctas_comuns: report.ctas_comuns,
-              gaps_do_seu_perfil: report.gaps_do_seu_perfil,
-              insights_ads: report.insights_ads,
-              direcao_visual: report.direcao_visual,
+              dores: report.gaps_do_seu_perfil,
+              oportunidades: report.oportunidades_unicas,
+              mensagens_fortes: report.hooks_vencedores,
+              pilares: report.pilares_conteudo,
+              prova: report.insights_ads,
             }
           : null,
-        strategy: strategyDigest,
+        plano_conteudo: strategyDigest,
         brand: brand
           ? { colors: brand.colors, visual_summary: brand.visual_summary }
           : null,
@@ -583,56 +665,113 @@ JSON estrito com todas as chaves acima.`,
     )
   );
 
-  copy.brand_name = copy.brand_name || ctx.produto.split(/[—\-–]/)[0]?.trim() || "Produto";
-  copy.pains = arr<string>(copy.pains);
-  copy.benefits = arr(copy.benefits);
-  copy.how_steps = arr(copy.how_steps);
-  copy.pillars = arr(copy.pillars);
-  copy.angles = arr<string>(copy.angles);
-  copy.proof_items = arr<string>(copy.proof_items);
-  copy.metrics = arr(copy.metrics);
-  copy.faq = arr(copy.faq);
-  copy.eyebrow = copy.eyebrow || "Gestão de EPI com prova real";
-  copy.headline = copy.headline || "Menos papel.";
-  copy.headline_accent = copy.headline_accent || "Mais controle na entrega.";
-  copy.subheadline =
-    copy.subheadline ||
-    "Biometria na entrega, CA sob alerta e operação multi-cliente em um fluxo só.";
-  copy.hero_cta = shortCta(copy.hero_cta || "Quero demonstração");
-  copy.hero_cta_secondary = copy.hero_cta_secondary || "Ver o problema";
-  copy.final_cta = shortCta(copy.final_cta || copy.hero_cta);
-  copy.pain_title = copy.pain_title || "Isso ainda trava a sua operação?";
-  copy.solution_title = copy.solution_title || "O que muda com o produto";
-  copy.how_title = copy.how_title || "Como funciona na prática";
-  copy.pillars_title = copy.pillars_title || "Pilares da narrativa";
-  copy.angles_title = copy.angles_title || "Ângulos da research";
-  copy.proof_title = copy.proof_title || "Credibilidade sem enrolação";
-  copy.faq_title = copy.faq_title || "Perguntas frequentes";
-  copy.offer_title = copy.offer_title || ctx.oferta || "Peça uma demonstração";
-  copy.offer_body =
-    copy.offer_body ||
-    ctx.oferta ||
-    "Veja o fluxo de entrega com biometria e o painel multi-cliente ao vivo.";
-  copy.final_sub = copy.final_sub || "Resposta rápida no WhatsApp para times SST.";
-  copy.whatsapp_hint =
-    copy.whatsapp_hint || ctx.cta || "Chama no WhatsApp e peça uma demo";
+  const brandName = cleanPublicText(copy.brand_name) || ctx.produto.split(/[—\-–]/)[0]?.trim() || "Produto";
 
-  // Fallbacks ricos se a LLM vier magra
-  if (!copy.how_steps.length) {
-    copy.how_steps = [
-      { title: "Cadastre operações", body: "Clientes, colaboradores e EPIs com CA no mesmo painel." },
-      { title: "Entregue com biometria", body: "Registro facial na hora da entrega — prova auditável." },
-      { title: "Receba alertas", body: "Validade de CA e vida útil antes da multa chegar." },
+  const defaultBenefits = [
+    {
+      title: "Biometria na entrega",
+      body: "Registro facial na hora de entregar EPI — prova auditável para auditoria.",
+    },
+    {
+      title: "Multi-cliente",
+      body: "Consultor SST gerencia várias empresas; cada uma com painel próprio.",
+    },
+    {
+      title: "Alertas de CA",
+      body: "Avisos de validade e vida útil antes da multa ou da falha na fiscalização.",
+    },
+    {
+      title: "Estoque e custo",
+      body: "Controle de EPI, consumo e custo sem planilha solta.",
+    },
+  ];
+  const defaultSteps = [
+    { title: "Cadastre a operação", body: "Clientes, colaboradores e EPIs com CA no mesmo fluxo." },
+    { title: "Entregue com biometria", body: "Confirme identidade na entrega e gere o histórico." },
+    { title: "Opere com alertas", body: "CA e vida útil sob controle — menos surpresa na auditoria." },
+  ];
+  const defaultFaq = [
+    {
+      q: "Serve para consultor com vários clientes?",
+      a: "Sim. O modelo multi-cliente foi feito para consultores SST acompanharem várias empresas.",
+    },
+    {
+      q: "A biometria substitui assinatura em papel?",
+      a: "Ela registra a entrega com identificação facial, gerando prova mais forte que planilha.",
+    },
+    {
+      q: "Como ajuda com CA vencido?",
+      a: "Alertas de validade e vida útil ajudam a agir antes da fiscalização.",
+    },
+    {
+      q: "Dá para ver demonstração?",
+      a: "Sim. Peça uma demo e veja o fluxo de entrega e o painel ao vivo.",
+    },
+  ];
+
+  copy.brand_name = brandName;
+  copy.pains = normalizeStrings(copy.pains);
+  copy.benefits = normalizePairs(copy.benefits);
+  copy.how_steps = normalizePairs(copy.how_steps);
+  copy.pillars = normalizePairs(copy.pillars);
+  copy.angles = normalizeStrings(copy.angles);
+  copy.proof_items = normalizeStrings(copy.proof_items);
+  copy.metrics = normalizePairs(copy.metrics).map((p) => ({ value: p.title, label: p.body }));
+  copy.faq = normalizeFaq(copy.faq);
+
+  if (!copy.pains.length) {
+    copy.pains = normalizeStrings(report?.gaps_do_seu_perfil).slice(0, 5);
+  }
+  if (!copy.pains.length) {
+    copy.pains = [
+      "Auditoria sem comprovação clara de entrega de EPI",
+      "CA vencido e risco de multa",
+      "Planilha que não escala para vários clientes",
+      "Estoque sem visibilidade de custo e consumo",
+      "Consultor sobrecarregado sem painel unificado",
     ];
   }
-  if (!copy.pillars.length && strategy?.pilares?.length) {
-    copy.pillars = strategy.pilares.slice(0, 4).map((t) => ({
-      title: String(t),
-      body: "Pilar da estratégia de conteúdo alinhado à oferta do produto.",
+  if (!copy.benefits.length) copy.benefits = defaultBenefits;
+  if (!copy.how_steps.length) copy.how_steps = defaultSteps;
+  if (!copy.faq.length) copy.faq = defaultFaq;
+
+  if (!copy.pillars.length) {
+    const fromStrategy = (strategy?.pilares || []).map((t) => ({
+      title: cleanPublicText(t).slice(0, 40) || "Pilar",
+      body: "Narrativa alinhada à oferta e às dores do nicho SST/EPI.",
     }));
+    const fromResearch = normalizeStrings(report?.pilares_conteudo).map((t) => ({
+      title: t.slice(0, 40),
+      body: "Tema forte para autoridade e conversão no Instagram e na LP.",
+    }));
+    copy.pillars = (fromStrategy.length ? fromStrategy : fromResearch).slice(0, 4);
   }
-  if (!copy.angles.length && report?.hooks_vencedores?.length) {
-    copy.angles = report.hooks_vencedores.slice(0, 6).map(String);
+  if (!copy.pillars.length) {
+    copy.pillars = [
+      { title: "Prova na entrega", body: "Biometria e histórico para aguentar auditoria." },
+      { title: "Operação multi-cliente", body: "Um consultor, vários painéis, menos caos." },
+      { title: "Prevenção de multa", body: "CA e vida útil com alerta — não no susto." },
+    ];
+  }
+
+  if (!copy.angles.length) {
+    copy.angles = normalizeStrings(report?.hooks_vencedores).slice(0, 6);
+  }
+  if (!copy.angles.length) {
+    copy.angles = [
+      "Auditoria sem prova de entrega é risco caro",
+      "Biometria na entrega muda o jogo da conformidade",
+      "CA vencido não pode ser surpresa",
+      "Multi-cliente sem planilha solta",
+    ];
+  }
+
+  if (!copy.proof_items.length) {
+    copy.proof_items = [
+      "Entrega com identificação facial e histórico",
+      "Alertas de CA e vida útil no fluxo operacional",
+      "Painel multi-cliente para consultores SST",
+    ];
   }
   if (!copy.metrics.length) {
     copy.metrics = [
@@ -641,6 +780,40 @@ JSON estrito com todas as chaves acima.`,
       { value: "Multi-cliente", label: "para consultores SST" },
     ];
   }
+
+  const head = splitHeadline(copy.headline || "Menos papel.", copy.headline_accent || "Mais controle.");
+  copy.headline = head.main;
+  copy.headline_accent = head.accent;
+  copy.eyebrow = cleanPublicText(copy.eyebrow) || "Gestão de EPI com prova real";
+  copy.subheadline =
+    cleanPublicText(copy.subheadline) ||
+    "Biometria na entrega, CA sob alerta e operação multi-cliente em um fluxo só.";
+  copy.audience = cleanPublicText(copy.audience);
+  copy.differentiator = cleanPublicText(copy.differentiator);
+  copy.hero_cta = shortCta(copy.hero_cta || "Quero demonstração");
+  copy.hero_cta_secondary = cleanPublicText(copy.hero_cta_secondary) || "Ver o problema";
+  copy.final_cta = shortCta(copy.final_cta || copy.hero_cta);
+  copy.pain_title = cleanPublicText(copy.pain_title) || "Isso ainda trava a sua operação?";
+  copy.solution_title = cleanPublicText(copy.solution_title) || "O que muda na prática";
+  copy.how_title = cleanPublicText(copy.how_title) || "Como funciona";
+  copy.pillars_title = cleanPublicText(copy.pillars_title) || "Pilares do produto";
+  copy.angles_title = cleanPublicText(copy.angles_title) || "O que o mercado responde";
+  copy.proof_title = cleanPublicText(copy.proof_title) || "Prova sem enrolação";
+  copy.faq_title = cleanPublicText(copy.faq_title) || "Perguntas frequentes";
+  copy.offer_title = shortTitle(copy.offer_title || ctx.oferta || "Peça uma demonstração", 48);
+  copy.offer_body =
+    cleanPublicText(copy.offer_body) ||
+    cleanPublicText(ctx.oferta) ||
+    "Veja o fluxo de entrega com biometria e o painel multi-cliente ao vivo.";
+  // se offer_title veio como parágrafo longo do produto, troca
+  if (copy.offer_title.length > 60 || copy.offer_title === copy.offer_body.slice(0, copy.offer_title.length)) {
+    copy.offer_title = "Peça uma demonstração";
+  }
+  copy.final_sub = cleanPublicText(copy.final_sub) || "Resposta rápida para times SST.";
+  copy.whatsapp_hint = cleanPublicText(copy.whatsapp_hint || ctx.cta) || "Chama no WhatsApp e peça uma demo";
+  copy.whatsapp_url = copy.whatsapp_url && !isFakePhone(String(copy.whatsapp_url).replace(/\D/g, ""))
+    ? copy.whatsapp_url
+    : undefined;
 
   let heroUrl: string | undefined;
   if (opts.withHeroImage !== false && isStorageConfigured()) {
@@ -667,7 +840,7 @@ JSON estrito com todas as chaves acima.`,
     logoUrl: brand?.logo_url,
     heroUrl,
     ctaUrl: resolveCtaUrl(ctx, copy),
-    concorrentes: ctx.concorrentes || [],
+    concorrentes: [],
   });
 
   return {
