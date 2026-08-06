@@ -50,6 +50,12 @@ npm install
 npm run dev
 ```
 
-## Deploy
+## Deploy (EasyPanel)
 
-Ver [docs/DEPLOY-EASYPANEL.md](docs/DEPLOY-EASYPANEL.md).
+Comece **pela API** (passo a passo completo):
+
+→ [docs/DEPLOY-EASYPANEL.md](docs/DEPLOY-EASYPANEL.md)
+
+Variáveis: [docs/ENV.md](docs/ENV.md).
+
+**Repo:** `ftsmazzo/Vende247` — não usar `instaragm-tools`.
