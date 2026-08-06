@@ -1,0 +1,4 @@
+# Vende247
+- Código commitado e push no GitHub deste repo.
+- Deploy EasyPanel via Dockerfile (painel na raiz; API em api/Dockerfile).
+- Não commitar secrets (.env).
