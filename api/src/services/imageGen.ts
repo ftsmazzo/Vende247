@@ -102,28 +102,43 @@ async function bufferFromGemini(prompt: string): Promise<Buffer> {
 
 export async function gerarImagemViral(
   prompt: string,
-  brand?: BrandKit | null
+  brand?: BrandKit | null,
+  opts?: { mode?: "ad" | "photo"; overlayLogo?: boolean }
 ): Promise<string> {
   if (!isStorageConfigured()) {
     throw new Error("Storage de mídia não configurado.");
   }
+  const mode = opts?.mode ?? "ad";
   const provider = (process.env.IMAGE_PROVIDER ?? "openai").toLowerCase();
-  const enriched = [
-    "Instagram ad creative 4:5 FULL BLEED edge-to-edge, no letterboxing, no black bars, no outer frame, no fake polaroid border,",
-    "scroll-stopping, vivid colors, emotional impact,",
-    "bold short Portuguese hook text in upper third, clean typography,",
-    "photorealistic workplace / industrial safety scene with real people wearing EPI",
-    "(hard hat, gloves, goggles) when relevant,",
-    "FORBIDDEN: smartphone mockups, 3D phone clusters, fake generic app dashboards, invented UI screens,",
-    "FORBIDDEN: upside-down phones, plastic stock marketing of floating devices,",
-    "FORBIDDEN: dark mats, cinematic widescreen bars, picture-in-picture frames inside the image,",
-    "leave small clean space bottom-left for logo overlay only,",
-    "no watermarks, no invented brand logos in the scene.",
-    brandPromptBits(brand),
-    prompt.slice(0, 2300),
-  ]
-    .filter(Boolean)
-    .join(" ");
+
+  const enriched =
+    mode === "photo"
+      ? [
+          "Premium photorealistic photograph, full bleed, no letterboxing, no frames,",
+          "ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO TYPOGRAPHY, NO CAPTIONS, NO LOGOS, NO WATERMARKS, NO UI,",
+          "cinematic lighting, editorial quality, clean composition with negative space on the left,",
+          "FORBIDDEN: smartphone mockups, fake dashboards, graphic overlays, stickers, banners.",
+          brandPromptBits(brand),
+          prompt.slice(0, 2300),
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : [
+          "Instagram ad creative 4:5 FULL BLEED edge-to-edge, no letterboxing, no black bars, no outer frame, no fake polaroid border,",
+          "scroll-stopping, vivid colors, emotional impact,",
+          "bold short Portuguese hook text in upper third, clean typography,",
+          "photorealistic workplace / industrial safety scene with real people wearing EPI",
+          "(hard hat, gloves, goggles) when relevant,",
+          "FORBIDDEN: smartphone mockups, 3D phone clusters, fake generic app dashboards, invented UI screens,",
+          "FORBIDDEN: upside-down phones, plastic stock marketing of floating devices,",
+          "FORBIDDEN: dark mats, cinematic widescreen bars, picture-in-picture frames inside the image,",
+          "leave small clean space bottom-left for logo overlay only,",
+          "no watermarks, no invented brand logos in the scene.",
+          brandPromptBits(brand),
+          prompt.slice(0, 2300),
+        ]
+          .filter(Boolean)
+          .join(" ");
 
   let buffer: Buffer;
   if (provider === "gemini") {
@@ -144,7 +159,8 @@ export async function gerarImagemViral(
   }
 
   let jpeg = await toFeedJpeg(buffer);
+  const doLogo = opts?.overlayLogo ?? mode === "ad";
   const logo = brand?.logo_url || brand?.og_image_url;
-  if (logo) jpeg = await overlayLogo(jpeg, logo);
+  if (doLogo && logo) jpeg = await overlayLogo(jpeg, logo);
   return uploadMedia(jpeg, "image/jpeg", ".jpg");
 }

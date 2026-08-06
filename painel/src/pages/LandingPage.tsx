@@ -61,7 +61,8 @@ export function LandingPage() {
         <div>
           <h1 className="font-display text-3xl font-bold">Landing</h1>
           <p className="text-white/55 mt-1 max-w-xl">
-            LP viral com glass, ícones e CTAs fortes. Use research + brand kit. Gere de novo se a anterior ficou fraca.
+            LP rica com research + estratégia + brand. Tipografia Fraunces/Outfit, hero sem texto na foto.
+            Rode research e estratégia antes para ficar poderosa.
           </p>
         </div>
         <button type="button" className="btn-primary" disabled={generating} onClick={() => void generate()}>

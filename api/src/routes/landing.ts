@@ -4,6 +4,7 @@ import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHel
 import type { BrandKit } from "../services/brandFromUrl.js";
 import { generateLanding } from "../services/landingGen.js";
 import type { ResearchReport } from "../services/research.js";
+import type { StrategyPlan } from "../services/strategy.js";
 
 export const landingRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", requireAuth);
@@ -37,6 +38,10 @@ export const landingRoutes: FastifyPluginAsync = async (app) => {
        ORDER BY id DESC LIMIT 1`,
       [ws.id]
     );
+    const strategy = await query<{ plan: StrategyPlan }>(
+      `SELECT plan FROM strategies WHERE workspace_id = $1 ORDER BY id DESC LIMIT 1`,
+      [ws.id]
+    );
 
     try {
       const result = await generateLanding({
@@ -50,6 +55,7 @@ export const landingRoutes: FastifyPluginAsync = async (app) => {
           ig_username: ws.ig_username,
         },
         report: research.rows[0]?.report ?? null,
+        strategy: strategy.rows[0]?.plan ?? null,
         brand: (ws.brand_kit || {}) as BrandKit,
         withHeroImage: req.body?.with_hero_image !== false,
       });
