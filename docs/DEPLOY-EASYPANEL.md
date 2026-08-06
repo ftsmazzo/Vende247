@@ -164,7 +164,8 @@ LLM_PROVIDER=anthropic
 LLM_MODEL=claude-sonnet-4-6
 # Voltar ao barato: LLM_PROVIDER=openai + LLM_MODEL=gpt-4o-mini
 IMAGE_PROVIDER=openai
-OPENAI_IMAGE_MODEL=gpt-image-1.5
+OPENAI_IMAGE_MODEL=gpt-image-2
+# gpt-image-2: size 4:5 nativo (menos corte de texto). Alt: gpt-image-1.5
 # OpenRouter (roteamento): IMAGE_PROVIDER=openrouter + OPENROUTER_API_KEY
 # volume=seedream-4.5 | cover=gemini-3-pro-image | photo=flux.2-pro
 META_ACCESS_TOKEN=

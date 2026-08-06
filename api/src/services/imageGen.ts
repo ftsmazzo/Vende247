@@ -23,16 +23,77 @@ export type ImageGenOpts = {
 };
 
 /**
- * gpt-image gera ~2:3 (1024x1536); feed IG é 4:5 (1080x1350).
- * Cover centrado corta o topo — onde fica o hook — e parece “texto fora da moldura”.
- * position:north preserva o terço superior.
+ * Normaliza para feed IG 4:5 (1080×1350).
+ * Se a origem já é ~4:5 (gpt-image-2 nativo), só redimensiona sem crop.
+ * Se veio 2:3 (gpt-image-1.x), crop pelo topo para não cortar o hook.
  */
 async function toFeedJpeg(buffer: Buffer): Promise<Buffer> {
+  const meta = await sharp(buffer).metadata();
+  const w = meta.width || 1024;
+  const h = meta.height || 1280;
+  const ratio = w / h;
+  const target = 1080 / 1350; // 0.8
+  const near45 = Math.abs(ratio - target) < 0.04;
+
   return sharp(buffer)
     .rotate()
-    .resize(1080, 1350, { fit: "cover", position: "north" })
+    .resize(
+      1080,
+      1350,
+      near45
+        ? { fit: "fill" }
+        : { fit: "cover", position: "north" }
+    )
     .jpeg({ quality: 88 })
     .toBuffer();
+}
+
+/** gpt-image-2: qualquer size com arestas múltiplas de 16. Usamos 4:5 / 9:16 exatos. */
+function openaiImageSize(model: string, aspect: ImageGenOpts["aspectRatio"]): string {
+  const m = model.toLowerCase();
+  const isV2 = m.includes("gpt-image-2");
+  if (isV2) {
+    if (aspect === "9:16") return "1152x2048";
+    if (aspect === "1:1") return "1024x1024";
+    if (aspect === "3:4") return "1152x1536";
+    return "1024x1280"; // 4:5 exato — sem letterbox/crop do hook
+  }
+  // gpt-image-1 / 1.5: tamanhos fixos da API
+  if (aspect === "1:1") return "1024x1024";
+  return "1024x1536";
+}
+
+function openaiImageQuality(
+  model: string,
+  purpose: ImagePurpose
+): "low" | "medium" | "high" | "auto" {
+  const m = model.toLowerCase();
+  if (!m.includes("gpt-image")) return "high";
+  if (purpose === "draft") return "low";
+  if (purpose === "volume") return "medium";
+  return "high";
+}
+
+async function bufferFromOpenAIGenerate(
+  prompt: string,
+  opts: { model: string; aspectRatio: ImageGenOpts["aspectRatio"]; purpose: ImagePurpose }
+): Promise<Buffer> {
+  if (!OPENAI_API_KEY?.trim()) throw new Error("OPENAI_API_KEY não configurada.");
+  const openai = new OpenAI({ apiKey: OPENAI_API_KEY.trim() });
+  const model = opts.model;
+  const gptImage = model.toLowerCase().includes("gpt-image");
+  const size = openaiImageSize(model, opts.aspectRatio ?? "4:5");
+  const res = await openai.images.generate({
+    model,
+    prompt: prompt.slice(0, 4000),
+    n: 1,
+    // gpt-image-2 aceita sizes custom (múltiplos de 16); SDK tipa só os clássicos
+    size: size as "1024x1024" | "1024x1536" | "1536x1024",
+    ...(gptImage
+      ? { quality: openaiImageQuality(model, opts.purpose) }
+      : { quality: "standard" as const }),
+  } as Parameters<typeof openai.images.generate>[0]);
+  return bufferFromOpenAI(res.data?.[0]);
 }
 
 /** Sufixos de diversidade (ângulo / luz / locação) — evita lote “tudo igual”. */
@@ -277,20 +338,14 @@ export async function gerarImagemViral(
     try {
       buffer = await tryOpenRouter();
     } catch (err) {
-      // fallback OpenAI se configurado
       if (OPENAI_API_KEY?.trim()) {
         console.warn("[imageGen] OpenRouter falhou, fallback OpenAI:", err);
-        const openai = new OpenAI({ apiKey: OPENAI_API_KEY.trim() });
-        const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1.5";
-        const gptImage = model.toLowerCase().includes("gpt-image");
-        const res = await openai.images.generate({
+        const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2";
+        buffer = await bufferFromOpenAIGenerate(enriched, {
           model,
-          prompt: enriched.slice(0, 4000),
-          n: 1,
-          size: gptImage ? "1024x1536" : "1024x1792",
-          ...(gptImage ? { quality: "high" as const } : { quality: "standard" as const }),
+          aspectRatio,
+          purpose,
         });
-        buffer = await bufferFromOpenAI(res.data?.[0]);
       } else {
         throw err;
       }
@@ -298,18 +353,12 @@ export async function gerarImagemViral(
   } else if (provider === "gemini") {
     buffer = await bufferFromGemini(enriched.slice(0, 4000), aspectRatio);
   } else {
-    if (!OPENAI_API_KEY?.trim()) throw new Error("OPENAI_API_KEY não configurada.");
-    const openai = new OpenAI({ apiKey: OPENAI_API_KEY.trim() });
-    const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-1.5";
-    const gptImage = model.toLowerCase().includes("gpt-image");
-    const res = await openai.images.generate({
+    const model = process.env.OPENAI_IMAGE_MODEL?.trim() || "gpt-image-2";
+    buffer = await bufferFromOpenAIGenerate(enriched, {
       model,
-      prompt: enriched.slice(0, 4000),
-      n: 1,
-      size: gptImage ? "1024x1536" : "1024x1792",
-      ...(gptImage ? { quality: "high" as const } : { quality: "standard" as const }),
+      aspectRatio,
+      purpose,
     });
-    buffer = await bufferFromOpenAI(res.data?.[0]);
   }
 
   let jpeg = await toFeedJpeg(buffer);

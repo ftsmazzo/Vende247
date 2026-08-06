@@ -33,7 +33,7 @@ APIFY_TOKEN=
 | `LLM_PROVIDER` | não | `openai` | `openai`, `gemini` ou `anthropic` |
 | `LLM_MODEL` | não | depende | Ex.: `gpt-4o-mini`, `claude-sonnet-4-6` |
 | `IMAGE_PROVIDER` | não | `openai` | `openai`, `gemini` ou `openrouter` |
-| `OPENAI_IMAGE_MODEL` | não | `gpt-image-1.5` | Fallback / provider openai |
+| `OPENAI_IMAGE_MODEL` | não | `gpt-image-2` | Preferir `gpt-image-2` (size 4:5 nativo). Alt: `gpt-image-1.5` |
 | `OPENROUTER_API_KEY` | alt | — | Obrigatória se `IMAGE_PROVIDER=openrouter` |
 | `OR_MODEL_VOLUME` | não | `bytedance-seed/seedream-4.5` | Slides / volume |
 | `OR_MODEL_COVER` | não | `google/gemini-3-pro-image` | Feed / capa |
