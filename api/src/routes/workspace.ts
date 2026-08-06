@@ -45,7 +45,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
     const b = req.body ?? {};
     const concorrentes = b.concorrentes !== undefined ? normalizeCompetitors(b.concorrentes) : ws.concorrentes;
 
-    const updated = await query(
+    await query(
       `UPDATE workspaces SET
          name = COALESCE($2, name),
          nicho = COALESCE($3, nicho),
@@ -60,8 +60,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
          brand_kit = COALESCE($12::jsonb, brand_kit),
          onboarding_done = COALESCE($13, onboarding_done),
          updated_at = NOW()
-       WHERE id = $1
-       RETURNING id`,
+       WHERE id = $1`,
       [
         ws.id,
         b.name ?? null,
