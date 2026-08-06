@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { getPool, query } from "../db/index.js";
-import { publishImage } from "./instagram.js";
+import { publishCarousel, publishImage } from "./instagram.js";
 
 export function startCronJob(app: FastifyInstance) {
   const tick = async () => {
@@ -11,10 +11,13 @@ export function startCronJob(app: FastifyInstance) {
         workspace_id: number;
         caption: string;
         media_url: string;
+        media_urls: unknown;
+        format: string;
         ig_user_id: string;
         ig_access_token: string;
       }>(
-        `SELECT c.id, c.workspace_id, c.caption, c.media_url,
+        `SELECT c.id, c.workspace_id, c.caption, c.media_url, c.format,
+                COALESCE(c.media_urls, '[]'::jsonb) AS media_urls,
                 w.ig_user_id, w.ig_access_token
          FROM creatives c
          JOIN workspaces w ON w.id = c.workspace_id
@@ -29,12 +32,23 @@ export function startCronJob(app: FastifyInstance) {
 
       for (const row of due.rows) {
         try {
-          const mediaId = await publishImage({
-            igUserId: row.ig_user_id,
-            accessToken: row.ig_access_token,
-            imageUrl: row.media_url,
-            caption: row.caption,
-          });
+          const urls = Array.isArray(row.media_urls)
+            ? (row.media_urls as string[]).filter(Boolean)
+            : [];
+          const mediaId =
+            row.format === "carrossel" && urls.length > 1
+              ? await publishCarousel({
+                  igUserId: row.ig_user_id,
+                  accessToken: row.ig_access_token,
+                  imageUrls: urls,
+                  caption: row.caption,
+                })
+              : await publishImage({
+                  igUserId: row.ig_user_id,
+                  accessToken: row.ig_access_token,
+                  imageUrl: row.media_url,
+                  caption: row.caption,
+                });
           await query(
             `UPDATE creatives SET status = 'published', published_at = NOW(), ig_media_id = $2, updated_at = NOW()
              WHERE id = $1`,

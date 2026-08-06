@@ -24,7 +24,7 @@ export function HomePage() {
       <div>
         <p className="text-signal text-sm font-medium mb-1">{BRAND.name}</p>
         <h1 className="font-display text-3xl md:text-4xl font-bold leading-tight">
-          Research → Estratégia → Criativos
+          Research → Estratégia → Criativos → Landing
         </h1>
         <p className="text-white/55 mt-2 max-w-xl">
           {ws?.nicho ? (
@@ -38,10 +38,11 @@ export function HomePage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StepCard n="1" title="Research" to="/research" desc="Concorrentes + ads → padrões" />
         <StepCard n="2" title="Estratégia" to="/estrategia" desc="Plano 7–14 dias com briefs" />
-        <StepCard n="3" title="Criativos" to="/criativos" desc="Lote viral → aprovar → postar" />
+        <StepCard n="3" title="Criativos" to="/criativos" desc="Feed, carrossel real → postar" />
+        <StepCard n="4" title="Landing" to="/landing" desc="LP viral → preview + HTML" />
       </div>
 
       {ws && (

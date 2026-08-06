@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { api, Creative } from "../api/client";
 import { StyleBits } from "./OnboardingPage";
 
+function formatBadge(format: string, slideCount: number): string {
+  if (format === "carrossel") {
+    return slideCount > 1 ? `carrossel · ${slideCount} slides` : "carrossel";
+  }
+  if (format === "reels") return "reels · imagem (vídeo em breve)";
+  return format || "feed";
+}
+
 export function CreativesPage() {
   const [items, setItems] = useState<Creative[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +41,7 @@ export function CreativesPage() {
     if (locked) return;
     setBatching(true);
     setError("");
-    setMsg("Gerando lote com Gemini… isso pode levar 1–3 min. Não clique de novo.");
+    setMsg("Gerando lote (carrosséis = várias imagens)… pode levar vários minutos.");
     try {
       const r = await api.creatives.batch();
       if (r.errors?.length) {
@@ -83,6 +91,23 @@ export function CreativesPage() {
       setError(err instanceof Error ? err.message : "Falha");
       setMsg("");
       await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function regenSlide(id: number, slideIndex: number) {
+    if (locked) return;
+    setBusyId(id);
+    setError("");
+    setMsg(`Regenerando slide ${slideIndex + 1}…`);
+    try {
+      await api.creatives.regenerateSlide(id, slideIndex);
+      setMsg(`Slide ${slideIndex + 1} atualizado.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha");
+      setMsg("");
     } finally {
       setBusyId(null);
     }
@@ -141,7 +166,7 @@ export function CreativesPage() {
         <div>
           <h1 className="font-display text-3xl font-bold">Criativos</h1>
           <p className="text-white/55 mt-1">
-            Um lote por vez. Regenerar espera a imagem — não clique várias vezes.
+            Carrossel gera vários slides e publica como carrossel no IG. Reels ainda é imagem.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -166,6 +191,7 @@ export function CreativesPage() {
             busy={busyId === c.id}
             locked={locked}
             onRegen={() => void regen(c.id)}
+            onRegenSlide={(i) => void regenSlide(c.id, i)}
             onPublish={() => void publish(c.id)}
             onSchedule={() => void schedule(c.id)}
             onSaveCaption={(cap) => void saveCaption(c.id, cap)}
@@ -186,6 +212,7 @@ function CreativeCard({
   busy,
   locked,
   onRegen,
+  onRegenSlide,
   onPublish,
   onSchedule,
   onSaveCaption,
@@ -194,14 +221,20 @@ function CreativeCard({
   busy: boolean;
   locked: boolean;
   onRegen: () => void;
+  onRegenSlide: (index: number) => void;
   onPublish: () => void;
   onSchedule: () => void;
   onSaveCaption: (caption: string) => void;
 }) {
   const [caption, setCaption] = useState(c.caption);
+  const [slideIdx, setSlideIdx] = useState(0);
   useEffect(() => setCaption(c.caption), [c.caption]);
+  useEffect(() => setSlideIdx(0), [c.id, c.media_url]);
 
   const generating = busy || c.status === "generating";
+  const slides = (c.media_urls?.length ? c.media_urls : c.media_url ? [c.media_url] : []).filter(Boolean);
+  const active = slides[slideIdx] || c.media_url;
+  const isCarousel = c.format === "carrossel" && slides.length > 1;
 
   return (
     <article className="card overflow-hidden p-0">
@@ -209,8 +242,23 @@ function CreativeCard({
         <div className="w-full aspect-[4/5] bg-ink-800 flex items-center justify-center text-signal text-sm px-4 text-center">
           Gerando imagem… aguarde (não clique de novo)
         </div>
-      ) : c.media_url ? (
-        <img src={c.media_url} alt={c.hook} className="w-full aspect-[4/5] object-cover bg-ink-800" />
+      ) : active ? (
+        <div className="relative">
+          <img src={active} alt={c.hook} className="w-full aspect-[4/5] object-cover bg-ink-800" />
+          {isCarousel && (
+            <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 px-2">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`h-2 w-2 rounded-full ${i === slideIdx ? "bg-signal" : "bg-white/40"}`}
+                  onClick={() => setSlideIdx(i)}
+                  aria-label={`Slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       ) : (
         <div className="w-full aspect-[4/5] bg-ink-800 flex items-center justify-center text-white/40 text-sm px-4 text-center">
           {c.error || "Sem mídia"}
@@ -218,11 +266,26 @@ function CreativeCard({
       )}
       <div className="p-4 space-y-2">
         <div className="flex justify-between gap-2 text-xs text-white/45">
-          <span>
-            Dia {c.day_index} · {c.format}
-          </span>
+          <span>Dia {c.day_index} · {formatBadge(c.format, slides.length)}</span>
           <span className="text-signal uppercase">{generating ? "generating" : c.status}</span>
         </div>
+        {c.format === "reels" && (
+          <p className="text-[11px] text-white/40">Reels: capa estática. Vídeo ~8s ainda não disponível.</p>
+        )}
+        {isCarousel && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {slides.map((url, i) => (
+              <button
+                key={`${url}-${i}`}
+                type="button"
+                className={`shrink-0 w-14 h-14 rounded overflow-hidden border ${i === slideIdx ? "border-signal" : "border-white/15"}`}
+                onClick={() => setSlideIdx(i)}
+              >
+                <img src={url} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
         <p className="font-medium text-signal text-sm">{c.hook}</p>
         <textarea
           className="field text-sm min-h-[80px]"
@@ -240,10 +303,15 @@ function CreativeCard({
             Salvar caption
           </button>
           <button type="button" className="btn-ghost" disabled={locked} onClick={onRegen}>
-            {busy ? "Regenerando…" : "Regenerar"}
+            {busy ? "Regenerando…" : isCarousel ? "Regenerar todos" : "Regenerar"}
           </button>
+          {isCarousel && (
+            <button type="button" className="btn-ghost" disabled={locked} onClick={() => onRegenSlide(slideIdx)}>
+              Regenerar slide {slideIdx + 1}
+            </button>
+          )}
           <button type="button" className="btn-ghost" disabled={locked || !c.media_url} onClick={onPublish}>
-            Publicar
+            {isCarousel ? "Publicar carrossel" : "Publicar"}
           </button>
           <button type="button" className="btn-ghost" disabled={locked || !c.media_url} onClick={onSchedule}>
             Agendar

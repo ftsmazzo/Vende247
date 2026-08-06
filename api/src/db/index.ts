@@ -84,6 +84,7 @@ export async function ensureTables(): Promise<void> {
       caption TEXT DEFAULT '',
       visual_prompt TEXT DEFAULT '',
       media_url TEXT DEFAULT '',
+      media_urls JSONB DEFAULT '[]'::jsonb,
       status TEXT NOT NULL DEFAULT 'draft',
       scheduled_at TIMESTAMPTZ,
       published_at TIMESTAMPTZ,
@@ -93,8 +94,18 @@ export async function ensureTables(): Promise<void> {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS landings (
+      id SERIAL PRIMARY KEY,
+      workspace_id INT REFERENCES workspaces(id) ON DELETE CASCADE,
+      html TEXT NOT NULL,
+      meta JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
     CREATE INDEX IF NOT EXISTS idx_creatives_scheduled
       ON creatives (status, scheduled_at)
       WHERE status = 'scheduled';
+
+    ALTER TABLE creatives ADD COLUMN IF NOT EXISTS media_urls JSONB DEFAULT '[]'::jsonb;
   `);
 }

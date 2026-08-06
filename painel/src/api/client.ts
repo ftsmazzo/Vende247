@@ -122,6 +122,19 @@ export const api = {
       }),
     approveAll: () => request<{ approved: number }>("/api/creatives/approve-all-ready", { method: "POST" }),
     clear: () => request<{ deleted: number }>("/api/creatives/clear", { method: "POST" }),
+    regenerateSlide: (id: number, slide_index: number) =>
+      request<{ creative: Creative }>(`/api/creatives/${id}/regenerate-slide`, {
+        method: "POST",
+        body: JSON.stringify({ slide_index }),
+      }),
+  },
+  landing: {
+    latest: () => request<{ landing: Landing | null }>("/api/landing/latest"),
+    generate: (with_hero_image = true) =>
+      request<{ landing: Landing }>("/api/landing/generate", {
+        method: "POST",
+        body: JSON.stringify({ with_hero_image }),
+      }),
   },
 };
 
@@ -168,6 +181,7 @@ export type StrategyPlan = {
     caption: string;
     cta: string;
     visual_prompt: string;
+    slides?: Array<{ titulo?: string; texto?: string; visual_prompt?: string }>;
   }>;
 };
 
@@ -188,8 +202,21 @@ export type Creative = {
   caption: string;
   visual_prompt: string;
   media_url: string;
+  media_urls?: string[];
   status: string;
   scheduled_at?: string | null;
   published_at?: string | null;
   error?: string | null;
+};
+
+export type Landing = {
+  id: number;
+  html: string;
+  meta: {
+    brand_name?: string;
+    headline?: string;
+    hero_image_url?: string;
+    colors?: string[];
+  };
+  created_at?: string;
 };

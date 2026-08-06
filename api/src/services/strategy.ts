@@ -2,6 +2,12 @@ import { chatJson } from "./llm.js";
 import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { BrandKit } from "./brandFromUrl.js";
 
+export type CarouselSlide = {
+  titulo: string;
+  texto: string;
+  visual_prompt: string;
+};
+
 export type CreativeBrief = {
   day: number;
   titulo: string;
@@ -14,6 +20,8 @@ export type CreativeBrief = {
   cta: string;
   /** Cena visual — NÃO mockup de celular repetido */
   visual_prompt: string;
+  /** Slides do carrossel (3–5). Obrigatório se formato=carrossel */
+  slides?: CarouselSlide[];
   /** Tipo de cena para diversidade */
   cena_tipo:
     | "trabalhador_epi"
@@ -60,6 +68,7 @@ PROIBIDO:
 - visual_prompt com mockup de celular / "smartphone showing dashboard" / telas inventadas de app
 - captions genéricas tipo "transforme sua gestão" sem dor concreta
 - repetir o mesmo layout visual em vários dias
+- prometer vídeo gerado / motion / reels animado (o sistema ainda NÃO gera vídeo)
 
 OBRIGATÓRIO em cada post:
 - hook específico (dor: CA vencido, planilha, multa, biometria, consultor multi-cliente, auditoria)
@@ -70,9 +79,13 @@ OBRIGATÓRIO em cada post:
 - cena_tipo: um de trabalhador_epi | biometria_entrega | estoque_ca | gestor_alerta | antes_depois | prova_social | oferta
   — varie: no máximo 1 post com celular E só se for mão de operador no pátio (não mockup 3D de marketing)
 
-Mix: ~40% feed, 30% carrossel, 30% reels (carrossel = estrutura em slides na campo estrutura).
+FORMATOS:
+- Mix: ~40% feed, 30% carrossel, 30% reels
+- feed = 1 imagem
+- carrossel = OBRIGATÓRIO campo slides[] com 4 ou 5 itens { titulo, texto, visual_prompt } — cada slide com cena/texto diferente; estrutura descreve a sequência
+- reels = ainda é IMAGEM ESTÁTICA estilo capa de reel (9:16 vibe em 4:5); NÃO descreva como vídeo
 
-JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, hook, estrutura, caption, cta, visual_prompt, cena_tipo }] }`,
+JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, hook, estrutura, caption, cta, visual_prompt, slides?, cena_tipo }] }`,
     JSON.stringify(
       {
         workspace: ctx,
@@ -89,7 +102,6 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
           ? {
               colors: brand.colors,
               visual_summary: brand.visual_summary,
-              // UI notes só como referência de cor/estilo — NÃO pedir mockup de tela
               estilo: brand.visual_summary,
             }
           : null,
@@ -115,18 +127,78 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     ) {
       visual = fallbackVisual(ctx, cena, p.hook || p.titulo);
     }
+    const formato = (["feed", "carrossel", "reels"].includes(p.formato)
+      ? p.formato
+      : "feed") as CreativeBrief["formato"];
+
+    let slides = Array.isArray(p.slides) ? p.slides : undefined;
+    if (formato === "carrossel") {
+      slides = normalizeCarouselSlides(slides, visual, p.hook || p.titulo, ctx, cena);
+    }
+
     return {
       ...p,
       day: i + 1,
-      formato: (["feed", "carrossel", "reels"].includes(p.formato)
-        ? p.formato
-        : "feed") as CreativeBrief["formato"],
+      formato,
       cena_tipo: p.cena_tipo || cena,
       visual_prompt: visual,
+      slides,
     };
   });
 
   return plan;
+}
+
+export function normalizeCarouselSlides(
+  slides: CarouselSlide[] | undefined,
+  coverVisual: string,
+  hook: string,
+  ctx: WorkspaceContext,
+  cena: CreativeBrief["cena_tipo"]
+): CarouselSlide[] {
+  const h = (hook || "ProntEPI").slice(0, 36);
+  const defaults: CarouselSlide[] = [
+    {
+      titulo: "Hook",
+      texto: h,
+      visual_prompt: coverVisual || fallbackVisual(ctx, cena, h),
+    },
+    {
+      titulo: "Dor",
+      texto: "CA vencido e planilha?",
+      visual_prompt: fallbackVisual(ctx, "gestor_alerta", "PARE DE CORRER RISCO"),
+    },
+    {
+      titulo: "Solução",
+      texto: "Controle real de EPI",
+      visual_prompt: fallbackVisual(ctx, "biometria_entrega", "ENTREGA COM BIOMETRIA"),
+    },
+    {
+      titulo: "Prova",
+      texto: "Estoque + CA na mão",
+      visual_prompt: fallbackVisual(ctx, "estoque_ca", "CA EM DIA"),
+    },
+    {
+      titulo: "CTA",
+      texto: ctx.cta || "Chama no Direct",
+      visual_prompt: fallbackVisual(ctx, "oferta", (ctx.cta || "PEÇA DEMO").slice(0, 28)),
+    },
+  ];
+
+  if (!slides?.length) return defaults.slice(0, 4);
+
+  const cleaned = slides
+    .map((s, i) => ({
+      titulo: (s.titulo || `Slide ${i + 1}`).slice(0, 40),
+      texto: (s.texto || s.titulo || h).slice(0, 80),
+      visual_prompt: (s.visual_prompt || coverVisual || fallbackVisual(ctx, cena, s.texto || h)).trim(),
+    }))
+    .filter((s) => s.visual_prompt);
+
+  while (cleaned.length < 3) {
+    cleaned.push(defaults[cleaned.length]);
+  }
+  return cleaned.slice(0, 5);
 }
 
 function fallbackVisual(

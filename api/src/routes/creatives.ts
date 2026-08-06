@@ -3,8 +3,21 @@ import { query } from "../db/index.js";
 import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHelpers.js";
 import type { BrandKit } from "../services/brandFromUrl.js";
 import { gerarImagemViral } from "../services/imageGen.js";
-import { publishImage } from "../services/instagram.js";
-import type { StrategyPlan, CreativeBrief } from "../services/strategy.js";
+import { publishCarousel, publishImage } from "../services/instagram.js";
+import {
+  normalizeCarouselSlides,
+  type CreativeBrief,
+  type StrategyPlan,
+} from "../services/strategy.js";
+
+const CREATIVE_COLS = `id, strategy_id, day_index, format, hook, caption, visual_prompt,
+              media_url, COALESCE(media_urls, '[]'::jsonb) AS media_urls,
+              status, scheduled_at, published_at, ig_media_id, error, created_at`;
+
+function asUrlList(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((u): u is string => typeof u === "string" && !!u);
+  return [];
+}
 
 export const creativesRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", requireAuth);
@@ -13,8 +26,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
     const r = await query(
-      `SELECT id, strategy_id, day_index, format, hook, caption, visual_prompt,
-              media_url, status, scheduled_at, published_at, ig_media_id, error, created_at
+      `SELECT ${CREATIVE_COLS}
        FROM creatives WHERE workspace_id = $1
        ORDER BY strategy_id DESC NULLS LAST, day_index ASC, id ASC
        LIMIT 100`,
@@ -52,7 +64,6 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     const posts = (plan?.posts ?? []) as CreativeBrief[];
     if (!posts.length) return reply.status(400).send({ error: "Plano sem posts." });
 
-    // Remove lote anterior (não publicados) para não acumular / confundir
     await query(
       `DELETE FROM creatives
        WHERE workspace_id = $1
@@ -61,43 +72,69 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     );
 
     const brand = (ws.brand_kit || {}) as BrandKit;
-
     const created: unknown[] = [];
     const errors: Array<{ day: number; error: string }> = [];
 
     for (const post of posts) {
       const caption = [post.caption, post.cta].filter(Boolean).join("\n\n").trim();
+      const formato = post.formato || "feed";
       const visual =
         post.visual_prompt ||
         `Viral Instagram creative about ${ws.produto}. Hook text: "${post.hook}". Niche: ${ws.nicho}.`;
 
       let mediaUrl = "";
+      let mediaUrls: string[] = [];
       let status = "ready";
       let error: string | null = null;
+
       try {
-        mediaUrl = await gerarImagemViral(visual, brand);
+        if (formato === "carrossel") {
+          const slides = normalizeCarouselSlides(
+            post.slides,
+            visual,
+            post.hook || post.titulo,
+            {
+              nicho: ws.nicho,
+              produto: ws.produto,
+              oferta: ws.oferta,
+              cta: ws.cta,
+              tom_voz: ws.tom_voz,
+              concorrentes: ws.concorrentes || [],
+              ig_username: ws.ig_username,
+            },
+            post.cena_tipo || "trabalhador_epi"
+          );
+          for (const slide of slides) {
+            const url = await gerarImagemViral(slide.visual_prompt, brand);
+            mediaUrls.push(url);
+          }
+          mediaUrl = mediaUrls[0] || "";
+        } else {
+          mediaUrl = await gerarImagemViral(visual, brand);
+          mediaUrls = mediaUrl ? [mediaUrl] : [];
+        }
       } catch (err) {
         status = "error";
         error = err instanceof Error ? err.message : String(err);
-        errors.push({ day: post.day, error: error });
+        errors.push({ day: post.day, error });
       }
 
       const ins = await query(
         `INSERT INTO creatives (
            workspace_id, strategy_id, day_index, format, hook, caption,
-           visual_prompt, media_url, status, error
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-         RETURNING id, strategy_id, day_index, format, hook, caption, visual_prompt,
-                   media_url, status, error, created_at`,
+           visual_prompt, media_url, media_urls, status, error
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11)
+         RETURNING ${CREATIVE_COLS}`,
         [
           ws.id,
           strategyId,
           post.day,
-          post.formato || "feed",
+          formato,
           post.hook || "",
           caption,
           visual,
           mediaUrl,
+          JSON.stringify(mediaUrls),
           status === "error" ? "error" : "ready",
           error,
         ]
@@ -136,8 +173,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
          status = COALESCE($5, status),
          updated_at = NOW()
        WHERE id = $1 AND workspace_id = $2
-       RETURNING id, strategy_id, day_index, format, hook, caption, visual_prompt,
-                 media_url, status, scheduled_at, published_at, error`,
+       RETURNING ${CREATIVE_COLS}`,
       [id, ws.id, b.caption ?? null, b.hook ?? null, b.status ?? null]
     );
     if (!r.rows[0]) return reply.status(404).send({ error: "Criativo não encontrado." });
@@ -148,8 +184,15 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
     const id = Number(req.params.id);
-    const cur = await query<{ id: number; visual_prompt: string }>(
-      `SELECT id, visual_prompt FROM creatives WHERE id = $1 AND workspace_id = $2`,
+    const cur = await query<{
+      id: number;
+      visual_prompt: string;
+      format: string;
+      hook: string;
+      media_urls: unknown;
+    }>(
+      `SELECT id, visual_prompt, format, hook, COALESCE(media_urls, '[]'::jsonb) AS media_urls
+       FROM creatives WHERE id = $1 AND workspace_id = $2`,
       [id, ws.id]
     );
     if (!cur.rows[0]) return reply.status(404).send({ error: "Criativo não encontrado." });
@@ -161,12 +204,31 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
 
     try {
       const brand = (ws.brand_kit || {}) as BrandKit;
-      const mediaUrl = await gerarImagemViral(cur.rows[0].visual_prompt, brand);
+      const row = cur.rows[0];
+      let mediaUrl = "";
+      let mediaUrls: string[] = [];
+
+      if (row.format === "carrossel") {
+        const existing = asUrlList(row.media_urls);
+        const count = Math.max(existing.length, 4);
+        for (let i = 0; i < count; i++) {
+          const prompt =
+            i === 0
+              ? row.visual_prompt
+              : `${row.visual_prompt}. Carousel slide ${i + 1} of ${count}, different angle, bold Portuguese text related to "${row.hook}"`;
+          mediaUrls.push(await gerarImagemViral(prompt, brand));
+        }
+        mediaUrl = mediaUrls[0] || "";
+      } else {
+        mediaUrl = await gerarImagemViral(row.visual_prompt, brand);
+        mediaUrls = [mediaUrl];
+      }
+
       const r = await query(
-        `UPDATE creatives SET media_url = $2, status = 'ready', error = NULL, updated_at = NOW()
+        `UPDATE creatives SET media_url = $2, media_urls = $3::jsonb, status = 'ready', error = NULL, updated_at = NOW()
          WHERE id = $1
-         RETURNING id, day_index, format, hook, caption, visual_prompt, media_url, status`,
-        [id, mediaUrl]
+         RETURNING ${CREATIVE_COLS}`,
+        [id, mediaUrl, JSON.stringify(mediaUrls)]
       );
       return { creative: r.rows[0] };
     } catch (err) {
@@ -179,6 +241,53 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
+  app.post<{ Params: { id: string }; Body: { slide_index?: number } }>(
+    "/:id/regenerate-slide",
+    async (req, reply) => {
+      const ws = await getWorkspaceForUser(getUserId(req));
+      if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+      const id = Number(req.params.id);
+      const slideIndex = Number(req.body?.slide_index ?? 0);
+      const cur = await query<{
+        id: number;
+        visual_prompt: string;
+        format: string;
+        hook: string;
+        media_urls: unknown;
+        media_url: string;
+      }>(
+        `SELECT id, visual_prompt, format, hook, media_url,
+                COALESCE(media_urls, '[]'::jsonb) AS media_urls
+         FROM creatives WHERE id = $1 AND workspace_id = $2`,
+        [id, ws.id]
+      );
+      if (!cur.rows[0]) return reply.status(404).send({ error: "Criativo não encontrado." });
+      const urls = asUrlList(cur.rows[0].media_urls);
+      if (slideIndex < 0 || slideIndex >= Math.max(urls.length, 1)) {
+        return reply.status(400).send({ error: "slide_index inválido." });
+      }
+
+      try {
+        const brand = (ws.brand_kit || {}) as BrandKit;
+        const prompt = `${cur.rows[0].visual_prompt}. Carousel slide ${slideIndex + 1}, bold Portuguese hook "${cur.rows[0].hook}", unique composition`;
+        const newUrl = await gerarImagemViral(prompt, brand);
+        const next = [...urls];
+        if (next.length === 0) next.push(newUrl);
+        else next[slideIndex] = newUrl;
+        const cover = next[0] || cur.rows[0].media_url;
+        const r = await query(
+          `UPDATE creatives SET media_url = $2, media_urls = $3::jsonb, status = 'ready', error = NULL, updated_at = NOW()
+           WHERE id = $1 RETURNING ${CREATIVE_COLS}`,
+          [id, cover, JSON.stringify(next)]
+        );
+        return { creative: r.rows[0] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return reply.status(500).send({ error: msg });
+      }
+    }
+  );
+
   app.post<{ Params: { id: string } }>("/:id/publish", async (req, reply) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
@@ -186,8 +295,15 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: "Configure ig_user_id e token no onboarding." });
     }
     const id = Number(req.params.id);
-    const cur = await query<{ id: number; media_url: string; caption: string }>(
-      `SELECT id, media_url, caption FROM creatives WHERE id = $1 AND workspace_id = $2`,
+    const cur = await query<{
+      id: number;
+      media_url: string;
+      media_urls: unknown;
+      caption: string;
+      format: string;
+    }>(
+      `SELECT id, media_url, caption, format, COALESCE(media_urls, '[]'::jsonb) AS media_urls
+       FROM creatives WHERE id = $1 AND workspace_id = $2`,
       [id, ws.id]
     );
     if (!cur.rows[0]?.media_url) {
@@ -195,15 +311,24 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
-      const mediaId = await publishImage({
-        igUserId: ws.ig_user_id,
-        accessToken: ws.ig_access_token,
-        imageUrl: cur.rows[0].media_url,
-        caption: cur.rows[0].caption,
-      });
+      const urls = asUrlList(cur.rows[0].media_urls);
+      const isCarousel = cur.rows[0].format === "carrossel" && urls.length > 1;
+      const mediaId = isCarousel
+        ? await publishCarousel({
+            igUserId: ws.ig_user_id,
+            accessToken: ws.ig_access_token,
+            imageUrls: urls,
+            caption: cur.rows[0].caption,
+          })
+        : await publishImage({
+            igUserId: ws.ig_user_id,
+            accessToken: ws.ig_access_token,
+            imageUrl: cur.rows[0].media_url,
+            caption: cur.rows[0].caption,
+          });
       const r = await query(
         `UPDATE creatives SET status = 'published', published_at = NOW(), ig_media_id = $2, updated_at = NOW()
-         WHERE id = $1 RETURNING *`,
+         WHERE id = $1 RETURNING ${CREATIVE_COLS}`,
         [id, mediaId]
       );
       return { creative: r.rows[0] };
@@ -229,7 +354,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       const r = await query(
         `UPDATE creatives SET status = 'scheduled', scheduled_at = $3::timestamptz, updated_at = NOW()
          WHERE id = $1 AND workspace_id = $2 AND media_url <> ''
-         RETURNING id, status, scheduled_at, media_url, caption`,
+         RETURNING ${CREATIVE_COLS}`,
         [id, ws.id, when]
       );
       if (!r.rows[0]) {

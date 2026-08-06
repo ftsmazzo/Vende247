@@ -7,6 +7,7 @@ const links = [
   { to: "/research", label: "Research" },
   { to: "/estrategia", label: "Estratégia" },
   { to: "/criativos", label: "Criativos" },
+  { to: "/landing", label: "Landing" },
   { to: "/config", label: "Config" },
 ];
 

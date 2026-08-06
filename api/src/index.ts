@@ -10,6 +10,7 @@ import { workspaceRoutes } from "./routes/workspace.js";
 import { researchRoutes } from "./routes/research.js";
 import { strategyRoutes } from "./routes/strategy.js";
 import { creativesRoutes } from "./routes/creatives.js";
+import { landingRoutes } from "./routes/landing.js";
 import { startCronJob } from "./services/cron.js";
 import { getLocalUploadsDir } from "./services/storage.js";
 
@@ -33,6 +34,7 @@ async function build() {
   await app.register(researchRoutes, { prefix: "/api/research" });
   await app.register(strategyRoutes, { prefix: "/api/strategy" });
   await app.register(creativesRoutes, { prefix: "/api/creatives" });
+  await app.register(landingRoutes, { prefix: "/api/landing" });
 
   // Rota também no root (garantia — alguns deploys não pegavam a do plugin)
   app.post<{ Body: { url?: string; logo_url?: string } }>(
