@@ -58,7 +58,7 @@ export function OnboardingPage() {
         <Field label="CTA padrão" value={cta} onChange={setCta} />
         <Field label="Tom de voz" value={tom} onChange={setTom} />
         <label className="block">
-          <span className="label">Concorrentes (3–5 @handles) *</span>
+          <span className="label">Concorrentes (até 8 @handles) *</span>
           <textarea
             className="field min-h-[100px]"
             required
@@ -66,6 +66,9 @@ export function OnboardingPage() {
             value={concorrentes}
             onChange={(e) => setConcorrentes(e.target.value)}
           />
+          <p className="text-xs text-white/40 mt-1">
+            Quanto mais perfis relevantes, melhor a pesquisa. Pode editar depois em Configurações.
+          </p>
         </label>
 
         <div className="pt-4 border-t border-white/10 space-y-4">

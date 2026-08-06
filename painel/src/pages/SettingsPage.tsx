@@ -162,7 +162,11 @@ export function SettingsPage() {
         <label className="block"><span className="label">Oferta</span><input className="field" value={oferta} onChange={(e) => setOferta(e.target.value)} /></label>
         <label className="block"><span className="label">CTA</span><input className="field" value={cta} onChange={(e) => setCta(e.target.value)} /></label>
         <label className="block"><span className="label">Tom</span><input className="field" value={tom} onChange={(e) => setTom(e.target.value)} /></label>
-        <label className="block"><span className="label">Concorrentes</span><textarea className="field min-h-[90px]" value={concorrentes} onChange={(e) => setConcorrentes(e.target.value)} /></label>
+        <label className="block">
+          <span className="label">Concorrentes (até 8 @handles)</span>
+          <textarea className="field min-h-[90px]" value={concorrentes} onChange={(e) => setConcorrentes(e.target.value)} placeholder={"@perfil1\n@perfil2"} />
+          <p className="text-xs text-white/40 mt-1">Inclua marcas do nicho, não só 1–2. Depois rode Research de novo.</p>
+        </label>
         <label className="block"><span className="label">@Instagram</span><input className="field" value={igUsername} onChange={(e) => setIgUsername(e.target.value)} /></label>
         <label className="block"><span className="label">IG User ID</span><input className="field" value={igUserId} onChange={(e) => setIgUserId(e.target.value)} /></label>
         <label className="block">

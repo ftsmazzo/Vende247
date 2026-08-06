@@ -45,7 +45,10 @@ export function ResearchPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Research</h1>
-          <p className="text-white/55 mt-1">Analisa concorrentes e ads do nicho → padrão engajador.</p>
+          <p className="text-white/55 mt-1 max-w-xl">
+            Usa os @ que você cadastrou (posts recentes via Apify), ads da Meta Ad Library no nicho e o brief do produto.
+            Adicione mais concorrentes em Configurações e rode de novo para enriquecer.
+          </p>
         </div>
         <button type="button" className="btn-primary" disabled={running} onClick={() => void runResearch()}>
           {running ? "Analisando… (pode levar 1–2 min)" : "Rodar research"}
