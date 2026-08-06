@@ -9,10 +9,21 @@ import { StrategyPage } from "./pages/StrategyPage";
 import { CreativesPage } from "./pages/CreativesPage";
 import { LandingPage } from "./pages/LandingPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
+import { StyleBits } from "./components/StyleBits";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   if (!getToken()) return <Navigate to="/login" replace />;
   return <>{children}</>;
+}
+
+function Safe({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <RouteErrorBoundary label={label}>
+      <StyleBits />
+      {children}
+    </RouteErrorBoundary>
+  );
 }
 
 export default function App() {
@@ -27,13 +38,13 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<HomePage />} />
-        <Route path="onboarding" element={<OnboardingPage />} />
-        <Route path="research" element={<ResearchPage />} />
-        <Route path="estrategia" element={<StrategyPage />} />
-        <Route path="criativos" element={<CreativesPage />} />
-        <Route path="landing" element={<LandingPage />} />
-        <Route path="config" element={<SettingsPage />} />
+        <Route index element={<Safe label="Início"><HomePage /></Safe>} />
+        <Route path="onboarding" element={<Safe label="Onboarding"><OnboardingPage /></Safe>} />
+        <Route path="research" element={<Safe label="Research"><ResearchPage /></Safe>} />
+        <Route path="estrategia" element={<Safe label="Estratégia"><StrategyPage /></Safe>} />
+        <Route path="criativos" element={<Safe label="Criativos"><CreativesPage /></Safe>} />
+        <Route path="landing" element={<Safe label="Landing"><LandingPage /></Safe>} />
+        <Route path="config" element={<Safe label="Config"><SettingsPage /></Safe>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

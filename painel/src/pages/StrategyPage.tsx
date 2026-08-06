@@ -1,42 +1,49 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, StrategyRow } from "../api/client";
-import { StyleBits } from "./OnboardingPage";
+import { api, type StrategyPlan, type StrategyRow } from "../api/client";
+import { StyleBits } from "../components/StyleBits";
 
-/** Evita crash React quando a LLM manda objeto/array no lugar de string. */
 function asText(v: unknown, fallback = ""): string {
-  if (v == null) return fallback;
-  if (typeof v === "string") return v;
-  if (typeof v === "number" || typeof v === "boolean") return String(v);
-  if (Array.isArray(v)) {
-    return v
-      .map((x) => asText(x))
-      .filter(Boolean)
-      .join(" · ");
-  }
-  if (typeof v === "object") {
-    const o = v as Record<string, unknown>;
-    if (typeof o.titulo === "string" || typeof o.texto === "string") {
-      return [o.titulo, o.texto].map((x) => asText(x)).filter(Boolean).join(" — ");
+  try {
+    if (v == null) return fallback;
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    if (Array.isArray(v)) {
+      return v.map((x) => asText(x)).filter(Boolean).join(" · ");
     }
-    try {
+    if (typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      const bits = [o.titulo, o.texto, o.body, o.caption, o.hook, o.name]
+        .map((x) => asText(x))
+        .filter(Boolean);
+      if (bits.length) return bits.join(" — ");
       return JSON.stringify(v);
-    } catch {
-      return fallback;
     }
+  } catch {
+    /* ignore */
   }
   return fallback;
 }
 
 function asStringList(v: unknown): string[] {
-  if (!Array.isArray(v)) {
-    if (typeof v === "string" && v.trim()) return [v.trim()];
-    return [];
-  }
-  return v.map((x) => asText(x)).filter(Boolean);
+  if (Array.isArray(v)) return v.map((x) => asText(x)).filter(Boolean);
+  if (typeof v === "string" && v.trim()) return [v.trim()];
+  return [];
 }
 
 type SlideView = { titulo: string; texto: string };
+type PostView = {
+  day: number;
+  titulo: string;
+  formato: string;
+  pilar: string;
+  objetivo: string;
+  hook: string;
+  estrutura: string;
+  caption: string;
+  cta: string;
+  slides: SlideView[];
+};
 
 function asSlides(v: unknown): SlideView[] {
   if (!Array.isArray(v)) return [];
@@ -46,11 +53,69 @@ function asSlides(v: unknown): SlideView[] {
       const o = raw as Record<string, unknown>;
       return {
         titulo: asText(o.titulo, `Slide ${i + 1}`),
-        texto: asText(o.texto || o.body || o.caption),
+        texto: asText(o.texto ?? o.body ?? o.caption),
       };
     }
     return { titulo: `Slide ${i + 1}`, texto: "" };
   });
+}
+
+/** Normaliza qualquer lixo da LLM/Postgres para um plano renderizável. */
+export function normalizePlan(raw: unknown): StrategyPlan | null {
+  if (raw == null) return null;
+  let data: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return { resumo: raw, dias: 0, pilares: [], posts: [] };
+    }
+  }
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  const postsIn = Array.isArray(o.posts) ? o.posts : [];
+  const posts = postsIn
+    .map((item, idx) => {
+      if (!item || typeof item !== "object") return null;
+      const p = item as Record<string, unknown>;
+      const dayNum = Number(p.day);
+      return {
+        day: Number.isFinite(dayNum) && dayNum > 0 ? dayNum : idx + 1,
+        titulo: asText(p.titulo, `Dia ${idx + 1}`),
+        pilar: asText(p.pilar),
+        objetivo: asText(p.objetivo),
+        formato: asText(p.formato, "feed").toLowerCase(),
+        hook: asText(p.hook),
+        estrutura: asText(p.estrutura),
+        caption: asText(p.caption),
+        cta: asText(p.cta),
+        visual_prompt: asText(p.visual_prompt),
+        slides: asSlides(p.slides),
+      };
+    })
+    .filter(Boolean) as StrategyPlan["posts"];
+
+  return {
+    resumo: asText(o.resumo),
+    dias: Number(o.dias) || posts.length || 0,
+    pilares: asStringList(o.pilares),
+    posts,
+  };
+}
+
+function toPostViews(plan: StrategyPlan): PostView[] {
+  return (plan.posts || []).map((p, idx) => ({
+    day: typeof p.day === "number" ? p.day : idx + 1,
+    titulo: asText(p.titulo, "Post"),
+    formato: asText(p.formato, "feed").toLowerCase(),
+    pilar: asText(p.pilar),
+    objetivo: asText(p.objetivo),
+    hook: asText(p.hook),
+    estrutura: asText(p.estrutura),
+    caption: asText(p.caption),
+    cta: asText(p.cta),
+    slides: asSlides(p.slides),
+  }));
 }
 
 export function StrategyPage() {
@@ -60,12 +125,31 @@ export function StrategyPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 
+  function applyStrategy(row: StrategyRow | null) {
+    if (!row) {
+      setStrategy(null);
+      return;
+    }
+    const plan = normalizePlan(row.plan);
+    setStrategy({ ...row, plan: plan || { resumo: "", dias: 0, pilares: [], posts: [] } });
+  }
+
   useEffect(() => {
+    let cancelled = false;
     api.strategy
       .latest()
-      .then((r) => setStrategy(r.strategy))
-      .catch((err) => setError(err instanceof Error ? err.message : "Erro"))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (!cancelled) applyStrategy(r.strategy);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Erro");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function generate() {
@@ -73,7 +157,7 @@ export function StrategyPage() {
     setError("");
     try {
       const r = await api.strategy.generate(days);
-      setStrategy(r.strategy);
+      applyStrategy(r.strategy);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha");
     } finally {
@@ -81,12 +165,13 @@ export function StrategyPage() {
     }
   }
 
-  const plan = strategy?.plan;
-  const pilares = asStringList(plan?.pilares);
-  const posts = Array.isArray(plan?.posts) ? plan!.posts : [];
+  const plan = strategy?.plan ?? null;
+  const pilares = useMemo(() => asStringList(plan?.pilares), [plan]);
+  const posts = useMemo(() => (plan ? toPostViews(plan) : []), [plan]);
 
   return (
-    <div className="animate-rise space-y-6">
+    <div className="space-y-6">
+      <StyleBits />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Estratégia</h1>
@@ -122,59 +207,60 @@ export function StrategyPage() {
               <p className="mt-3 text-sm text-white/50">Pilares: {pilares.join(" · ")}</p>
             )}
           </div>
+
+          {posts.length === 0 && (
+            <div className="card text-white/55">
+              Plano sem posts legíveis. Clique em “Gerar plano” de novo.
+            </div>
+          )}
+
           <div className="space-y-3">
-            {posts.map((p, idx) => {
-              const formato = asText(p.formato, "feed").toLowerCase();
-              const slides = asSlides(p.slides);
-              const day = typeof p.day === "number" ? p.day : idx + 1;
-              return (
-                <div key={`day-${day}-${idx}`} className="card">
-                  <div className="flex flex-wrap gap-2 items-baseline justify-between mb-2">
-                    <h2 className="font-display text-lg font-semibold">
-                      Dia {day} — {asText(p.titulo, "Post")}
-                    </h2>
-                    <span className="text-xs uppercase tracking-wide text-signal">
-                      {formato === "carrossel"
-                        ? `carrossel · ${slides.length || "N"} slides`
-                        : formato === "reels"
-                          ? "reels · imagem (vídeo em breve)"
-                          : formato || "feed"}
-                    </span>
-                  </div>
-                  <p className="text-sm text-white/45 mb-2">
-                    {asText(p.pilar)} · {asText(p.objetivo)}
-                  </p>
-                  <p className="text-signal font-medium mb-1">Hook: {asText(p.hook)}</p>
-                  <p className="text-sm text-white/70 mb-2 whitespace-pre-wrap">{asText(p.estrutura)}</p>
-                  {formato === "carrossel" && slides.length > 0 && (
-                    <ol className="text-sm text-white/55 list-decimal pl-5 space-y-1 mb-2">
-                      {slides.map((s, i) => (
-                        <li key={i}>
-                          <span className="text-white/80">{s.titulo}</span>
-                          {s.texto ? ` — ${s.texto}` : ""}
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                  {formato === "reels" && (
-                    <p className="text-xs text-white/40 mb-2">
-                      Ainda não geramos vídeo; o lote criará uma imagem estilo capa.
-                    </p>
-                  )}
-                  <p className="text-sm text-white/60 whitespace-pre-wrap border-t border-white/10 pt-2 mt-2">
-                    {asText(p.caption)}
-                    {asText(p.cta) ? `\n\n${asText(p.cta)}` : ""}
-                  </p>
+            {posts.map((p, idx) => (
+              <div key={`day-${p.day}-${idx}`} className="card">
+                <div className="flex flex-wrap gap-2 items-baseline justify-between mb-2">
+                  <h2 className="font-display text-lg font-semibold">
+                    Dia {p.day} — {p.titulo}
+                  </h2>
+                  <span className="text-xs uppercase tracking-wide text-signal">
+                    {p.formato === "carrossel"
+                      ? `carrossel · ${p.slides.length || "N"} slides`
+                      : p.formato === "reels"
+                        ? "reels · imagem (vídeo em breve)"
+                        : p.formato || "feed"}
+                  </span>
                 </div>
-              );
-            })}
+                <p className="text-sm text-white/45 mb-2">
+                  {p.pilar} · {p.objetivo}
+                </p>
+                <p className="text-signal font-medium mb-1">Hook: {p.hook}</p>
+                <p className="text-sm text-white/70 mb-2 whitespace-pre-wrap">{p.estrutura}</p>
+                {p.formato === "carrossel" && p.slides.length > 0 && (
+                  <ol className="text-sm text-white/55 list-decimal pl-5 space-y-1 mb-2">
+                    {p.slides.map((s, i) => (
+                      <li key={i}>
+                        <span className="text-white/80">{s.titulo}</span>
+                        {s.texto ? ` — ${s.texto}` : ""}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {p.formato === "reels" && (
+                  <p className="text-xs text-white/40 mb-2">
+                    Ainda não geramos vídeo; o lote criará uma imagem estilo capa.
+                  </p>
+                )}
+                <p className="text-sm text-white/60 whitespace-pre-wrap border-t border-white/10 pt-2 mt-2">
+                  {p.caption}
+                  {p.cta ? `\n\n${p.cta}` : ""}
+                </p>
+              </div>
+            ))}
           </div>
           <Link to="/criativos" className="btn-primary inline-block">
             Gerar lote de criativos →
           </Link>
         </div>
       )}
-      <StyleBits />
     </div>
   );
 }
