@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-// CreativeCard also uses useEffect
 import { api, Creative } from "../api/client";
 import { StyleBits } from "./OnboardingPage";
 
@@ -7,6 +6,7 @@ export function CreativesPage() {
   const [items, setItems] = useState<Creative[]>([]);
   const [loading, setLoading] = useState(true);
   const [batching, setBatching] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -27,40 +27,69 @@ export function CreativesPage() {
     void load();
   }, []);
 
+  const locked = batching || clearing || busyId !== null;
+
   async function batch() {
+    if (locked) return;
     setBatching(true);
     setError("");
-    setMsg("");
+    setMsg("Gerando lote com Gemini… isso pode levar 1–3 min. Não clique de novo.");
     try {
       const r = await api.creatives.batch();
-      setItems(r.creatives);
       if (r.errors?.length) {
         setMsg(`${r.creatives.length} criados; ${r.errors.length} com erro de imagem.`);
       } else {
-        setMsg(`${r.creatives.length} criativos gerados.`);
+        setMsg(`${r.creatives.length} criativos gerados. Revise um a um.`);
       }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha no lote");
+      setMsg("");
     } finally {
       setBatching(false);
     }
   }
 
+  async function clearLote() {
+    if (locked) return;
+    if (!window.confirm("Apagar todos os criativos deste lote (exceto publicados/agendados)?")) return;
+    setClearing(true);
+    setError("");
+    setMsg("");
+    try {
+      const r = await api.creatives.clear();
+      setMsg(`${r.deleted} criativo(s) removido(s).`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao limpar");
+    } finally {
+      setClearing(false);
+    }
+  }
+
   async function regen(id: number) {
+    if (locked) return;
     setBusyId(id);
     setError("");
+    setMsg(`Regenerando criativo #${id}… aguarde.`);
+    setItems((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, status: "generating", error: null } : c))
+    );
     try {
       await api.creatives.regenerate(id);
+      setMsg(`Criativo #${id} atualizado.`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha");
+      setMsg("");
+      await load();
     } finally {
       setBusyId(null);
     }
   }
 
   async function publish(id: number) {
+    if (locked) return;
     setBusyId(id);
     setError("");
     try {
@@ -74,6 +103,7 @@ export function CreativesPage() {
   }
 
   async function schedule(id: number) {
+    if (locked) return;
     const raw = window.prompt("Agendar para (ISO local ou YYYY-MM-DDTHH:mm)", "");
     if (!raw) return;
     const d = new Date(raw);
@@ -93,6 +123,7 @@ export function CreativesPage() {
   }
 
   async function saveCaption(id: number, caption: string) {
+    if (locked) return;
     setBusyId(id);
     try {
       await api.creatives.patch(id, { caption });
@@ -109,11 +140,18 @@ export function CreativesPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Criativos</h1>
-          <p className="text-white/55 mt-1">Lote a partir da estratégia — aprovar, regenerar ou publicar.</p>
+          <p className="text-white/55 mt-1">
+            Um lote por vez. Regenerar espera a imagem — não clique várias vezes.
+          </p>
         </div>
-        <button type="button" className="btn-primary" disabled={batching} onClick={() => void batch()}>
-          {batching ? "Gerando lote… (imagens)" : "Gerar lote"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-ghost" disabled={locked || items.length === 0} onClick={() => void clearLote()}>
+            {clearing ? "Limpando…" : "Limpar lote"}
+          </button>
+          <button type="button" className="btn-primary" disabled={locked} onClick={() => void batch()}>
+            {batching ? "Gerando lote… aguarde" : "Gerar lote novo"}
+          </button>
+        </div>
       </div>
 
       {error && <p className="text-coral text-sm">{error}</p>}
@@ -126,6 +164,7 @@ export function CreativesPage() {
             key={c.id}
             c={c}
             busy={busyId === c.id}
+            locked={locked}
             onRegen={() => void regen(c.id)}
             onPublish={() => void publish(c.id)}
             onSchedule={() => void schedule(c.id)}
@@ -135,7 +174,7 @@ export function CreativesPage() {
       </div>
 
       {!loading && items.length === 0 && (
-        <div className="card text-white/55">Nenhum criativo. Gere a estratégia e depois o lote.</div>
+        <div className="card text-white/55">Nenhum criativo. Clique em “Gerar lote novo”.</div>
       )}
       <StyleBits />
     </div>
@@ -145,6 +184,7 @@ export function CreativesPage() {
 function CreativeCard({
   c,
   busy,
+  locked,
   onRegen,
   onPublish,
   onSchedule,
@@ -152,6 +192,7 @@ function CreativeCard({
 }: {
   c: Creative;
   busy: boolean;
+  locked: boolean;
   onRegen: () => void;
   onPublish: () => void;
   onSchedule: () => void;
@@ -160,9 +201,15 @@ function CreativeCard({
   const [caption, setCaption] = useState(c.caption);
   useEffect(() => setCaption(c.caption), [c.caption]);
 
+  const generating = busy || c.status === "generating";
+
   return (
     <article className="card overflow-hidden p-0">
-      {c.media_url ? (
+      {generating ? (
+        <div className="w-full aspect-[4/5] bg-ink-800 flex items-center justify-center text-signal text-sm px-4 text-center">
+          Gerando imagem… aguarde (não clique de novo)
+        </div>
+      ) : c.media_url ? (
         <img src={c.media_url} alt={c.hook} className="w-full aspect-[4/5] object-cover bg-ink-800" />
       ) : (
         <div className="w-full aspect-[4/5] bg-ink-800 flex items-center justify-center text-white/40 text-sm px-4 text-center">
@@ -174,25 +221,31 @@ function CreativeCard({
           <span>
             Dia {c.day_index} · {c.format}
           </span>
-          <span className="text-signal uppercase">{c.status}</span>
+          <span className="text-signal uppercase">{generating ? "generating" : c.status}</span>
         </div>
         <p className="font-medium text-signal text-sm">{c.hook}</p>
         <textarea
           className="field text-sm min-h-[80px]"
           value={caption}
+          disabled={locked}
           onChange={(e) => setCaption(e.target.value)}
         />
         <div className="flex flex-wrap gap-2 pt-1">
-          <button type="button" className="btn-ghost" disabled={busy || caption === c.caption} onClick={() => onSaveCaption(caption)}>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={locked || caption === c.caption}
+            onClick={() => onSaveCaption(caption)}
+          >
             Salvar caption
           </button>
-          <button type="button" className="btn-ghost" disabled={busy} onClick={onRegen}>
-            Regenerar
+          <button type="button" className="btn-ghost" disabled={locked} onClick={onRegen}>
+            {busy ? "Regenerando…" : "Regenerar"}
           </button>
-          <button type="button" className="btn-ghost" disabled={busy || !c.media_url} onClick={onPublish}>
+          <button type="button" className="btn-ghost" disabled={locked || !c.media_url} onClick={onPublish}>
             Publicar
           </button>
-          <button type="button" className="btn-ghost" disabled={busy || !c.media_url} onClick={onSchedule}>
+          <button type="button" className="btn-ghost" disabled={locked || !c.media_url} onClick={onSchedule}>
             Agendar
           </button>
         </div>

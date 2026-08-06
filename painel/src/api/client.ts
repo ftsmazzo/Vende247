@@ -104,6 +104,7 @@ export const api = {
         body: JSON.stringify(body),
       }),
     approveAll: () => request<{ approved: number }>("/api/creatives/approve-all-ready", { method: "POST" }),
+    clear: () => request<{ deleted: number }>("/api/creatives/clear", { method: "POST" }),
   },
 };
 

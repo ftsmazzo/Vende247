@@ -51,6 +51,14 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     const posts = (plan?.posts ?? []) as CreativeBrief[];
     if (!posts.length) return reply.status(400).send({ error: "Plano sem posts." });
 
+    // Remove lote anterior (não publicados) para não acumular / confundir
+    await query(
+      `DELETE FROM creatives
+       WHERE workspace_id = $1
+         AND status IN ('draft', 'ready', 'error', 'approved', 'generating')`,
+      [ws.id]
+    );
+
     const created: unknown[] = [];
     const errors: Array<{ day: number; error: string }> = [];
 
@@ -97,6 +105,19 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     return { creatives: created, errors, strategy_id: strategyId };
   });
 
+  app.post("/clear", async (req, reply) => {
+    const ws = await getWorkspaceForUser(getUserId(req));
+    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const r = await query(
+      `DELETE FROM creatives
+       WHERE workspace_id = $1
+         AND status NOT IN ('published', 'scheduled')
+       RETURNING id`,
+      [ws.id]
+    );
+    return { deleted: r.rows.length };
+  });
+
   app.patch<{
     Params: { id: string };
     Body: { caption?: string; hook?: string; status?: string };
@@ -129,6 +150,11 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       [id, ws.id]
     );
     if (!cur.rows[0]) return reply.status(404).send({ error: "Criativo não encontrado." });
+
+    await query(
+      `UPDATE creatives SET status = 'generating', error = NULL, updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
 
     try {
       const mediaUrl = await gerarImagemViral(cur.rows[0].visual_prompt);

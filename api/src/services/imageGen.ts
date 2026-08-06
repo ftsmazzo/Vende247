@@ -34,9 +34,11 @@ export async function gerarImagemViral(prompt: string): Promise<string> {
   const provider = (process.env.IMAGE_PROVIDER ?? "openai").toLowerCase();
   const enriched = [
     "Instagram feed creative 4:5 vertical, scroll-stopping, high contrast,",
-    "bold short hook text space in upper third, modern commercial photography,",
-    "no watermarks, no logos unless asked, viral social ad style 2026.",
-    prompt.slice(0, 2800),
+    "bold short Portuguese hook text readable in upper third,",
+    "modern B2B SaaS / workplace safety commercial photo style 2026,",
+    "phones and screens must be upright and correctly oriented, never upside-down,",
+    "hands holding devices naturally, correct anatomy, no watermarks, no fake logos.",
+    prompt.slice(0, 2600),
   ].join(" ");
 
   let buffer: Buffer;
