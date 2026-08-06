@@ -27,7 +27,8 @@ Antes de abrir o EasyPanel, separe estas chaves (pode deixar em um bloco de nota
 |------|------------|---------------------------|
 | Conta GitHub com acesso ao repo `ftsmazzo/Vende247` | GitHub | Sim |
 | EasyPanel no ar | Seu servidor | Sim |
-| `OPENAI_API_KEY` | platform.openai.com | Sim (para research/criativos) |
+| `OPENAI_API_KEY` | platform.openai.com | Sim (imagens gpt-image; texto se usar OpenAI) |
+| `ANTHROPIC_API_KEY` | console.anthropic.com | Não (só se `LLM_PROVIDER=anthropic`) |
 | `APIFY_TOKEN` | console.apify.com → Integrations → API token | Recomendado (sem isso o research fica “degradado”) |
 | Conta Cloudinary (cloud name + upload preset **unsigned**) | cloudinary.com | Recomendado em produção |
 | `META_ACCESS_TOKEN` | Meta for Developers (Ad Library) | Não (opcional) |
@@ -157,8 +158,11 @@ E monte um volume persistente no caminho `/app/data` (ou `data`), senão as imag
 ### 3.4 Opcionais
 
 ```env
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-4o-mini
+# Texto com Claude (teste de qualidade de copy)
+ANTHROPIC_API_KEY=sk-ant-...
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-sonnet-4-6
+# Voltar ao barato: LLM_PROVIDER=openai + LLM_MODEL=gpt-4o-mini
 IMAGE_PROVIDER=openai
 OPENAI_IMAGE_MODEL=gpt-image-1.5
 # OpenRouter (roteamento): IMAGE_PROVIDER=openrouter + OPENROUTER_API_KEY

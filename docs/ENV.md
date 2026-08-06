@@ -27,10 +27,11 @@ APIFY_TOKEN=
 | `NODE_ENV` | não | — | Use `production` |
 | `DATABASE_URL` | sim | — | Postgres; tabelas criadas no boot |
 | `JWT_SECRET` | sim | fraco em dev | Assina login |
-| `OPENAI_API_KEY` | sim* | — | Texto (research/estratégia) + imagem |
+| `OPENAI_API_KEY` | sim* | — | Imagem (gpt-image) e/ou texto se `LLM_PROVIDER=openai` |
+| `ANTHROPIC_API_KEY` | alt | — | Se `LLM_PROVIDER=anthropic` (Claude) |
 | `GEMINI_API_KEY` | alt | — | Se `LLM_PROVIDER=gemini` ou `IMAGE_PROVIDER=gemini` |
-| `LLM_PROVIDER` | não | `openai` | `openai` ou `gemini` |
-| `LLM_MODEL` | não | `gpt-4o-mini` | Modelo de texto |
+| `LLM_PROVIDER` | não | `openai` | `openai`, `gemini` ou `anthropic` |
+| `LLM_MODEL` | não | depende | Ex.: `gpt-4o-mini`, `claude-sonnet-4-6` |
 | `IMAGE_PROVIDER` | não | `openai` | `openai`, `gemini` ou `openrouter` |
 | `OPENAI_IMAGE_MODEL` | não | `gpt-image-1.5` | Fallback / provider openai |
 | `OPENROUTER_API_KEY` | alt | — | Obrigatória se `IMAGE_PROVIDER=openrouter` |
