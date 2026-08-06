@@ -79,6 +79,8 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
         likes: p.likes,
         comments: p.comments,
         caption: p.caption.slice(0, 500),
+        // URL do post (não baixamos a foto — só inspira análise de formato/tema)
+        postUrl: p.url?.slice(0, 120),
       })),
   }));
 
@@ -95,7 +97,8 @@ OBRIGATÓRIO:
 - Citar padrões REAIS vistos nas captions/posts dos concorrentes (temas, ângulos, provas)
 - Separar o que concorrentes fazem bem vs o que o produto pode ganhar (oportunidades_unicas)
 - Hooks concretos, no tom do produto (ex.: biometria na entrega, CA vencendo, consultor multi-cliente, planilha vs painel)
-- direcao_visual: 5–8 cenas HUMANAS / operação (trabalhador com EPI, entrega facial, estoque, auditoria, gestor no pátio). PROIBIDO sugerir "só mockup de celular/dashboard genérico"
+- direcao_visual: 8–12 cenas HUMANAS / operação DIFERENTES entre si (trabalhador EPI, entrega facial, estoque, auditoria, gestor pátio, consultor, antes/depois documental, close de CA, equipe em checklist). Cada item = 1 frase de cena concreta. PROIBIDO: "mockup de celular", "dashboard genérico", "foto profissional genérica"
+- Inferir o que as mídias dos top posts sugerem pelo tipo (GraphImage/Video/Sidecar) + caption — mesmo sem ver o JPEG
 - Bio e pilares específicos do produto informado
 
 Se dados Apify estiverem vazios, diga isso em resumo e ainda proponha ângulos com base no produto (não invente likes).
@@ -118,6 +121,7 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
         concorrentes_analisados: compactCompetitors,
         ads_nicho: ads.slice(0, 15),
         flags: { apifyOk, adOk, degraded },
+        nota: "As imagens dos concorrentes NÃO são reutilizadas pixel a pixel; use captions+tipo para extrair padrões visuais e de mensagem.",
       },
       null,
       2

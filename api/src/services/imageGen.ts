@@ -16,14 +16,39 @@ export type ImageGenOpts = {
   overlayLogo?: boolean;
   purpose?: ImagePurpose;
   aspectRatio?: "4:5" | "9:16" | "3:4" | "1:1";
+  /** Índice do post/slide — muda ângulo/luz para não repetir a mesma cena */
+  diversityIndex?: number;
+  /** Cena inspirada na research (texto), se houver */
+  researchCue?: string;
 };
 
+/**
+ * gpt-image gera ~2:3 (1024x1536); feed IG é 4:5 (1080x1350).
+ * Cover centrado corta o topo — onde fica o hook — e parece “texto fora da moldura”.
+ * position:north preserva o terço superior.
+ */
 async function toFeedJpeg(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer)
     .rotate()
-    .resize(1080, 1350, { fit: "cover" })
+    .resize(1080, 1350, { fit: "cover", position: "north" })
     .jpeg({ quality: 88 })
     .toBuffer();
+}
+
+/** Sufixos de diversidade (ângulo / luz / locação) — evita lote “tudo igual”. */
+const DIVERSITY_SHOTS = [
+  "wide establishing shot, morning industrial light",
+  "medium shot, eye-level, soft daylight through warehouse windows",
+  "close-up on hands and EPI gear, shallow depth of field",
+  "slight low angle, dramatic side light, high contrast",
+  "documentary candid, over-the-shoulder of supervisor",
+  "two-shot conversation on plant floor, natural colors",
+  "top-down / high angle on organized EPI shelves",
+  "golden hour outdoor yard with workers in PPE",
+];
+
+export function diversityShot(index = 0): string {
+  return DIVERSITY_SHOTS[Math.abs(index) % DIVERSITY_SHOTS.length];
 }
 
 async function bufferFromOpenAI(
@@ -174,30 +199,42 @@ async function bufferFromGemini(prompt: string, aspectRatio: string): Promise<Bu
 function buildPrompt(
   prompt: string,
   brand: BrandKit | null | undefined,
-  mode: "ad" | "photo"
+  mode: "ad" | "photo",
+  extras?: { diversityIndex?: number; researchCue?: string }
 ): string {
+  const shot = diversityShot(extras?.diversityIndex ?? 0);
+  const cue = extras?.researchCue?.trim()
+    ? `Visual inspiration (mood only, do not copy a brand): ${extras.researchCue.trim().slice(0, 220)}.`
+    : "";
+
   if (mode === "photo") {
     return [
       "Premium photorealistic photograph, full bleed, no letterboxing, no frames,",
       "ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO TYPOGRAPHY, NO CAPTIONS, NO LOGOS, NO WATERMARKS, NO UI,",
       "cinematic lighting, editorial quality, clean composition with negative space on the left,",
+      `Camera: ${shot}.`,
       "FORBIDDEN: smartphone mockups, fake dashboards, graphic overlays, stickers, banners.",
       brandPromptBits(brand),
-      prompt.slice(0, 2300),
+      cue,
+      prompt.slice(0, 2200),
     ]
       .filter(Boolean)
       .join(" ");
   }
   return [
-    "Instagram ad creative FULL BLEED edge-to-edge, no letterboxing, no black bars, no outer frame,",
+    "Instagram ad creative 4:5 portrait FULL BLEED edge-to-edge, no letterboxing, no black bars, no outer frame,",
     "scroll-stopping, vivid colors, emotional impact,",
-    "bold short Portuguese hook text in upper third, clean typography,",
+    "SAFE ZONE: keep ALL text and faces inside a 12% margin from every edge — nothing important near the border,",
+    "bold short Portuguese hook (3–6 words) in the UPPER-CENTER, fully readable, large clean sans typography,",
     "photorealistic workplace / industrial safety scene with real people wearing EPI when relevant,",
+    `UNIQUE SHOT THIS IMAGE: ${shot} — must look different from other ads in the same campaign.`,
     "FORBIDDEN: smartphone mockups, fake app dashboards, invented UI, dark mats, widescreen bars,",
+    "FORBIDDEN: text cut off, text overflowing edges, tiny unreadable type, watermark stamps,",
     "leave small clean space bottom-left for logo overlay only,",
     "no watermarks, no invented brand logos in the scene.",
     brandPromptBits(brand),
-    prompt.slice(0, 2300),
+    cue,
+    prompt.slice(0, 2200),
   ]
     .filter(Boolean)
     .join(" ");
@@ -216,7 +253,10 @@ export async function gerarImagemViral(
     opts?.purpose ?? (mode === "photo" ? "photo" : "cover");
   const aspectRatio = opts?.aspectRatio ?? "4:5";
   const provider = (process.env.IMAGE_PROVIDER ?? "openai").toLowerCase();
-  const enriched = buildPrompt(prompt, brand, mode);
+  const enriched = buildPrompt(prompt, brand, mode, {
+    diversityIndex: opts?.diversityIndex,
+    researchCue: opts?.researchCue,
+  });
 
   let buffer: Buffer;
   const tryOpenRouter = async () => {

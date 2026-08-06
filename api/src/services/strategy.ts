@@ -62,27 +62,30 @@ export async function generateStrategy(
     `Você é diretor criativo de anúncios Instagram para software SST/EPI (Brasil, 2026).
 Produto a vender: use SOMENTE ângulos do produto informado + research (oportunidades_unicas, direcao_visual, hooks).
 
-Plano de exatamente ${n} dias. Cada post DEVE ser diferente do anterior.
+Plano de exatamente ${n} dias. Cada post DEVE ser visualmente e tematicamente diferente do anterior.
 
 PROIBIDO:
 - visual_prompt com mockup de celular / "smartphone showing dashboard" / telas inventadas de app
 - captions genéricas tipo "transforme sua gestão" sem dor concreta
-- repetir o mesmo layout visual em vários dias
+- repetir o mesmo layout visual, mesma locação ou mesmo ângulo de câmera em vários dias
 - prometer vídeo gerado / motion / reels animado (o sistema ainda NÃO gera vídeo)
+- copiar arte de concorrente; só reaproveitar ÂNGULOS de mensagem da research
 
 OBRIGATÓRIO em cada post:
 - hook específico (dor: CA vencido, planilha, multa, biometria, consultor multi-cliente, auditoria)
 - caption curta (máx 320 caracteres), 1ª linha = hook, CTA no fim
-- visual_prompt = FOTO/CENA realista de ambiente industrial ou operação SST:
-  trabalhador com capacete/luvas/óculos, entrega com reconhecimento facial, estoque de EPI, gestor no pátio, auditoria — cores vivas, impacto emocional
-  texto no visual: 3–6 palavras em português, tipografia bold
+- visual_prompt = FOTO/CENA realista ÚNICA — use 1 item diferente de research.direcao_visual por dia:
+  trabalhador com capacete/luvas/óculos, entrega com reconhecimento facial, estoque de EPI, gestor no pátio, auditoria — cores vivas
+  texto no visual: 3–6 palavras em português, tipografia bold, longe das bordas
+  especifique: local concreto + ângulo de câmera + hora do dia (ex.: "close mãos no estoque, luz matinal")
 - cena_tipo: um de trabalhador_epi | biometria_entrega | estoque_ca | gestor_alerta | antes_depois | prova_social | oferta
   — varie: no máximo 1 post com celular E só se for mão de operador no pátio (não mockup 3D de marketing)
+- NÃO repita a mesma cena_tipo em dias consecutivos
 
 FORMATOS:
 - Mix: ~40% feed, 30% carrossel, 30% reels
 - feed = 1 imagem
-- carrossel = OBRIGATÓRIO campo slides[] com 4 ou 5 itens { titulo, texto, visual_prompt } — cada slide com cena/texto diferente; estrutura descreve a sequência
+- carrossel = OBRIGATÓRIO campo slides[] com 4 ou 5 itens { titulo, texto, visual_prompt } — cada slide com cena/ângulo/texto DIFERENTE
 - reels = ainda é IMAGEM ESTÁTICA estilo capa de reel (9:16 vibe em 4:5); NÃO descreva como vídeo
 
 JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, hook, estrutura, caption, cta, visual_prompt, slides?, cena_tipo }] }`,
@@ -106,6 +109,8 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
             }
           : null,
         cena_rotation_sugerida: CENA_ROTATION.slice(0, n),
+        regra_diversidade:
+          "Cada visual_prompt deve citar uma cena distinta de direcao_visual; se faltar, invente variação de local/ângulo.",
       },
       null,
       2
@@ -137,6 +142,22 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     ) {
       visual = fallbackVisual(ctx, cena, hook);
     }
+    const cue = (report.direcao_visual || [])[i % Math.max(report.direcao_visual?.length || 1, 1)];
+    if (cue && !visual.toLowerCase().includes(cue.slice(0, 24).toLowerCase())) {
+      visual = `${visual}. Scene mood from research: ${cue.slice(0, 160)}`;
+    }
+    // Força variação de câmera no prompt (mesmo se o LLM repetir cena)
+    const angles = [
+      "wide shot morning light",
+      "medium eye-level documentary",
+      "close-up details shallow DOF",
+      "low angle dramatic side light",
+      "over-shoulder supervisor view",
+      "high angle shelves",
+      "candid two-shot plant floor",
+    ];
+    visual = `${visual}. Camera: ${angles[i % angles.length]}.`;
+
     const formato = (["feed", "carrossel", "reels"].includes(String(p.formato))
       ? p.formato
       : "feed") as CreativeBrief["formato"];
@@ -144,6 +165,10 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     let slides = Array.isArray(p.slides) ? p.slides : undefined;
     if (formato === "carrossel") {
       slides = normalizeCarouselSlides(slides, visual, hook, ctx, cena);
+      slides = slides.map((s, si) => ({
+        ...s,
+        visual_prompt: `${s.visual_prompt}. Camera: ${angles[(i + si + 1) % angles.length]}. Distinct from other slides.`,
+      }));
     }
 
     return {
