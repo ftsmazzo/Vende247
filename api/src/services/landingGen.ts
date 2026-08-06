@@ -121,7 +121,6 @@ const ICONS = [
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" opacity=".4"/></svg>`,
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18M8 5v14"/></svg>`,
 ];
-const WARN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 17h.01"/><path d="M10.3 4.3L2.8 17a2 2 0 001.7 3h15a2 2 0 001.7-3L13.7 4.3a2 2 0 00-3.4 0z"/></svg>`;
 const CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7L9 18l-5-5"/></svg>`;
 
 function isFakePhone(digits: string): boolean {
@@ -183,13 +182,19 @@ function cleanPublicText(v: unknown): string {
   return s.replace(/\s+/g, " ").trim();
 }
 
-/** Copy de marketing Instagram / meta interna — NÃO serve para LP do produto. */
+/** Copy de marketing Instagram / meta interna / estrategia — NAO serve para LP. */
 function isIgOrInternalNoise(s: string): boolean {
   const t = s.toLowerCase();
   return (
     /\b(perfil|instagram|engajamento|seguidores|followers|bio\b|destaques|reels|carrossel|stories|conteúdo|posts?\b|feed\b|hook\b|copy\b|vende247|research)\b/i.test(
       t
     ) ||
+    /\b(concorrente|ownar|avatar|buscaepi|entregaepi|softwaresgg|letsworkbr)\b/i.test(t) ||
+    /nenhum concorrente/i.test(t) ||
+    /prontepi pode/i.test(t) ||
+    /pode (ser o primeiro|ownar)/i.test(t) ||
+    /transformando feature/i.test(t) ||
+    /ângulo de/i.test(t) ||
     /falta de (conteúdo|engajamento)/i.test(t) ||
     /perfil ainda vazio/i.test(t) ||
     /estratégia clara de conteúdo/i.test(t) ||
@@ -201,8 +206,25 @@ function isIgOrInternalNoise(s: string): boolean {
   );
 }
 
+/** Remove aside de estrategista: "… — ativa medo de auditoria" */
+function stripStrategyAside(s: string): string {
+  let t = cleanPublicText(s);
+  t = t.replace(
+    /\s*[—–\-]\s*(ativa |dor direta|abre o|narrativa |analogia |específico para|sem citar|prova de ROI).*$/i,
+    ""
+  );
+  // titulos em CAPS de research: "BIOMETRIA FACIAL NA ENTREGA: texto longo"
+  if (/^[A-ZÁÉÍÓÚÃÕÂÊÔÇ0-9 ]{12,}:/.test(t) && t.length > 140) {
+    const after = t.split(":").slice(1).join(":").trim();
+    if (after && !isIgOrInternalNoise(after)) t = after;
+  }
+  return t.replace(/\s+/g, " ").trim();
+}
+
 function filterProductLines(lines: string[]): string[] {
-  return lines.map(cleanPublicText).filter((s) => s.length > 8 && !isIgOrInternalNoise(s));
+  return lines
+    .map(stripStrategyAside)
+    .filter((s) => s.length > 8 && s.length < 180 && !isIgOrInternalNoise(s));
 }
 
 function pairFrom(raw: unknown): { title: string; body: string } | null {
@@ -287,12 +309,12 @@ export function renderLandingHtml(
   const head = splitHeadline(copy.headline, copy.headline_accent);
 
   const pains = (copy.pains || [])
-    .map(cleanPublicText)
-    .filter(Boolean)
-    .slice(0, 5)
+    .map(stripStrategyAside)
+    .filter((p) => p && !isIgOrInternalNoise(p))
+    .slice(0, 4)
     .map(
       (p, i) =>
-        `<li class="pain-item"><span class="num">0${i + 1}</span><span class="ico">${WARN}</span><p>${esc(p)}</p></li>`
+        `<li class="pain-item"><span class="num">0${i + 1}</span><p>${esc(p)}</p></li>`
     )
     .join("");
 
@@ -316,19 +338,17 @@ export function renderLandingHtml(
     )
     .join("");
 
-  const pillarItems = (copy.pillars || []).filter((p) => p.title || p.body).slice(0, 4);
+  const pillarItems = (copy.pillars || []).filter((p) => p.title || p.body).slice(0, 3);
   const pillars = pillarItems
     .map((p) => `<article class="pillar"><h3>${esc(p.title)}</h3><p>${esc(p.body)}</p></article>`)
     .join("");
 
-  const angleItems = (copy.angles || []).map(cleanPublicText).filter(Boolean).slice(0, 6);
+  const angleItems = (copy.angles || [])
+    .map(stripStrategyAside)
+    .filter((a) => a && !isIgOrInternalNoise(a))
+    .slice(0, 4);
   const angles = angleItems
-    .map((a) => `<li><span class="ico">${CHECK}</span>${esc(a)}</li>`)
-    .join("");
-
-  const proofItems = (copy.proof_items || []).map(cleanPublicText).filter(Boolean).slice(0, 4);
-  const proofs = proofItems
-    .map((p) => `<li class="proof"><span class="ico">${CHECK}</span>${esc(p)}</li>`)
+    .map((a) => `<li><span class="ico">${CHECK}</span><span>${esc(a)}</span></li>`)
     .join("");
 
   const metricItems = (copy.metrics || [])
@@ -337,7 +357,7 @@ export function renderLandingHtml(
       label: cleanPublicText(m.label),
     }))
     .filter((m) => m.value)
-    .slice(0, 4);
+    .slice(0, 3);
   const metrics = metricItems
     .map(
       (m) =>
@@ -345,7 +365,7 @@ export function renderLandingHtml(
     )
     .join("");
 
-  const faqItems = (copy.faq || []).filter((f) => f.q || f.a).slice(0, 5);
+  const faqItems = (copy.faq || []).filter((f) => f.q || f.a).slice(0, 4);
   const faq = faqItems
     .map(
       (f) =>
@@ -354,8 +374,11 @@ export function renderLandingHtml(
     .join("");
 
   const heroMedia = opts.heroUrl
-    ? `<div class="hero-media" style="background-image:url('${esc(opts.heroUrl)}')" role="img" aria-label="Ambiente industrial"></div>`
+    ? `<div class="hero-media" style="background-image:url('${esc(opts.heroUrl)}')" role="img" aria-label=""></div>`
     : `<div class="hero-media hero-media--fallback"></div>`;
+
+  // proof section removida do HTML se pillars cobrem o mesmo — evita pagina alongada/vazia
+  void copy.proof_items;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -388,142 +411,143 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 a{color:inherit;text-decoration:none}
-.wrap{width:min(1120px,90vw);margin:0 auto}
+.wrap{width:min(1080px,92vw);margin:0 auto}
 .display{font-family:"Fraunces",Georgia,serif;font-weight:600;letter-spacing:-.03em;line-height:1.05}
-.ico{width:1.2rem;height:1.2rem;flex-shrink:0;display:block}
+.ico{width:1.15rem;height:1.15rem;flex-shrink:0;display:block}
 .ico-wrap{
-  width:2.6rem;height:2.6rem;border-radius:.9rem;display:grid;place-items:center;
-  color:var(--accent);margin-bottom:1rem;
+  width:2.35rem;height:2.35rem;border-radius:.75rem;display:grid;place-items:center;
+  color:var(--accent);margin-bottom:.75rem;
   background:color-mix(in srgb,var(--accent) 14%,transparent);
   border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);
 }
 .topbar{
-  position:sticky;top:0;z-index:50;padding:.75rem 0;
-  background:rgba(6,9,8,.72);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:50;padding:.65rem 0;
+  background:rgba(6,9,8,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
   border-bottom:1px solid var(--line);
 }
 .brand{display:flex;align-items:center;justify-content:space-between;gap:1rem}
-.logo{height:36px;width:auto;object-fit:contain}
-.logo-text{font-family:"Fraunces",serif;font-size:1.35rem;color:var(--accent)}
+.logo{height:32px;width:auto;object-fit:contain}
+.logo-text{font-family:"Fraunces",serif;font-size:1.25rem;color:var(--accent)}
 .nav-cta{
-  font-size:.8rem;font-weight:700;padding:.6rem 1rem;border-radius:999px;
+  font-size:.78rem;font-weight:700;padding:.55rem .95rem;border-radius:999px;
   background:var(--accent);color:var(--ink);
 }
 .hero{
   position:relative;isolation:isolate;
-  min-height:auto;
-  display:grid;align-items:center;
-  padding:2.75rem 0 2.5rem;
+  padding:2.25rem 0 1.75rem;
+  background:
+    radial-gradient(55% 70% at 85% 15%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 60%),
+    linear-gradient(180deg,var(--ink),var(--surface));
 }
 .hero-grid{
-  display:grid;gap:2rem;align-items:center;
-  grid-template-columns:minmax(0,1.15fr) minmax(0,.95fr);
+  display:grid;gap:1.75rem;align-items:stretch;
+  grid-template-columns:minmax(0,1.05fr) minmax(280px,.9fr);
 }
 .hero-media{
-  position:relative;z-index:0;min-height:340px;max-height:460px;
-  border-radius:1.35rem;overflow:hidden;
+  position:relative;min-height:100%;aspect-ratio:4/5;max-height:420px;
+  border-radius:1.15rem;overflow:hidden;
   background-size:cover;background-position:center;
   border:1px solid var(--line);
-  box-shadow:0 24px 60px rgba(0,0,0,.35);
 }
 .hero-media--fallback{background:radial-gradient(70% 50% at 80% 10%,color-mix(in srgb,var(--accent) 30%,transparent),transparent 55%),linear-gradient(165deg,var(--ink),var(--deep))}
 .hero-media::after{
   content:"";position:absolute;inset:0;
-  background:linear-gradient(180deg,transparent 45%,rgba(6,9,8,.55));
+  background:linear-gradient(180deg,transparent 50%,rgba(6,9,8,.5));
 }
-.hero-inner{position:relative;z-index:1;max-width:40rem}
+.hero-inner{display:flex;flex-direction:column;justify-content:center;max-width:36rem}
 .eyebrow{
-  display:inline-flex;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--accent);margin-bottom:.85rem;padding:.35rem .7rem;border-radius:999px;
+  display:inline-flex;align-self:flex-start;font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:.7rem;padding:.3rem .65rem;border-radius:999px;
   border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
   background:color-mix(in srgb,var(--accent) 10%,transparent);
 }
-.hero h1{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:clamp(2.1rem,4.6vw,3.35rem);letter-spacing:-.035em;line-height:1.05;margin:0 0 .85rem}
-.accent-line{display:block;color:var(--accent);font-style:italic;font-weight:500;margin-top:.1em}
-.lead{font-size:clamp(1.02rem,1.6vw,1.15rem);color:var(--muted);margin-bottom:1.1rem;font-weight:450;max-width:34rem}
-.meta-line{font-size:.88rem;color:rgba(244,246,245,.55);margin-bottom:1.25rem}
-.cta-row{display:flex;flex-wrap:wrap;gap:.75rem}
+.hero h1{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:clamp(1.95rem,4.2vw,2.85rem);letter-spacing:-.035em;line-height:1.06;margin:0 0 .7rem}
+.accent-line{display:block;color:var(--accent);font-style:italic;font-weight:500;margin-top:.08em}
+.lead{font-size:1.02rem;color:var(--muted);margin-bottom:.85rem;font-weight:450;max-width:34rem;line-height:1.5}
+.meta-line{font-size:.84rem;color:rgba(244,246,245,.55);margin-bottom:1rem}
+.cta-row{display:flex;flex-wrap:wrap;gap:.65rem}
 .btn{
   display:inline-flex;align-items:center;justify-content:center;
-  background:var(--accent);color:var(--ink);font-weight:700;font-size:.95rem;
-  padding:.9rem 1.25rem;border-radius:999px;border:0;
-  box-shadow:0 10px 36px color-mix(in srgb,var(--accent) 28%,transparent);
+  background:var(--accent);color:var(--ink);font-weight:700;font-size:.92rem;
+  padding:.82rem 1.15rem;border-radius:999px;border:0;
+  box-shadow:0 8px 28px color-mix(in srgb,var(--accent) 22%,transparent);
   transition:transform .18s ease;
 }
-.btn:hover{transform:translateY(-2px)}
-.btn-ghost{background:transparent;color:var(--paper);border:1px solid rgba(255,255,255,.22);box-shadow:none}
-.section{padding:4rem 0}
-.section-kicker{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.85rem}
-.section h2.display{font-size:clamp(1.75rem,3.5vw,2.6rem);max-width:18ch;margin-bottom:1.4rem}
+.btn:hover{transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--paper);border:1px solid rgba(255,255,255,.2);box-shadow:none}
+.section{padding:2.75rem 0}
+.section + .section{border-top:1px solid var(--line)}
+.section-kicker{font-size:.68rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.55rem}
+.section h2.display{font-size:clamp(1.55rem,3vw,2.15rem);max-width:20ch;margin-bottom:1.15rem}
 .metrics{
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;
-  padding:1.1rem;border-radius:var(--radius);border:1px solid var(--line);
-  background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
-  margin-top:1.4rem;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;
+  margin-top:1.15rem;border:1px solid var(--line);border-radius:1rem;overflow:hidden;
+  background:rgba(255,255,255,.03);
 }
-.metric strong{display:block;font-family:"Fraunces",serif;font-size:1.55rem;color:var(--accent);margin-bottom:.25rem}
-.metric span{font-size:.82rem;color:var(--muted)}
-.pain{background:linear-gradient(180deg,var(--surface),var(--ink))}
-.pain-list{list-style:none;display:grid;gap:.85rem;max-width:46rem}
+.metric{padding:.85rem .9rem;border-right:1px solid var(--line)}
+.metric:last-child{border-right:0}
+.metric strong{display:block;font-family:"Fraunces",serif;font-size:1.15rem;color:var(--accent);margin-bottom:.15rem}
+.metric span{font-size:.75rem;color:var(--muted);line-height:1.35}
+.pain{background:var(--surface)}
+.pain-split{display:grid;gap:1.5rem;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);align-items:start}
+.pain-list{list-style:none;display:grid;gap:.65rem;grid-template-columns:1fr 1fr}
 .pain-item{
-  display:grid;grid-template-columns:auto auto 1fr;gap:.85rem;align-items:start;
-  padding:1.1rem 1.2rem;border-radius:1.1rem;border:1px solid var(--line);
+  display:grid;grid-template-columns:auto 1fr;gap:.65rem;align-items:start;
+  padding:.95rem 1rem;border-radius:1rem;border:1px solid var(--line);
+  background:rgba(255,255,255,.03);
+}
+.pain-item .num{font-family:"Fraunces",serif;color:var(--accent);font-size:.95rem;line-height:1.2}
+.pain-item p{font-weight:550;font-size:.95rem;line-height:1.4}
+.grid-4{display:grid;gap:.85rem;grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{
+  padding:1.15rem 1.05rem;border-radius:1rem;border:1px solid var(--line);
   background:rgba(255,255,255,.035);
 }
-.pain-item .num{font-family:"Fraunces",serif;color:var(--accent);font-size:1.05rem;min-width:1.6rem}
-.pain-item .ico{color:var(--accent);margin-top:.2rem}
-.pain-item p{font-weight:560;font-size:1.02rem}
-.grid-4{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-.card{
-  padding:1.35rem 1.25rem;border-radius:var(--radius);border:1px solid var(--line);
-  background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
-}
-.card h3,.pillar h3,.step h3{font-size:1.12rem;font-weight:700;margin-bottom:.4rem;letter-spacing:-.02em}
-.card p,.pillar p,.step p,.faq-item p{color:var(--muted);font-size:.94rem;font-weight:450}
-.steps{list-style:none;display:grid;gap:1rem}
+.card h3,.pillar h3,.step h3{font-size:1.02rem;font-weight:700;margin-bottom:.35rem;letter-spacing:-.02em}
+.card p,.pillar p,.step p,.faq-item p{color:var(--muted);font-size:.88rem;font-weight:450;line-height:1.45}
+.steps{list-style:none;display:grid;gap:.75rem;grid-template-columns:repeat(3,minmax(0,1fr))}
 .step{
-  display:grid;grid-template-columns:3rem 1fr;gap:1rem;align-items:start;
-  padding:1.2rem 1.25rem;border-radius:var(--radius);border:1px solid var(--line);
+  display:grid;gap:.65rem;align-content:start;
+  padding:1.1rem 1rem;border-radius:1rem;border:1px solid var(--line);
   background:rgba(255,255,255,.03);
 }
 .step-n{
-  width:2.6rem;height:2.6rem;border-radius:999px;display:grid;place-items:center;
-  font-family:"Fraunces",serif;font-weight:600;background:var(--accent);color:var(--ink);
+  width:2.2rem;height:2.2rem;border-radius:999px;display:grid;place-items:center;
+  font-family:"Fraunces",serif;font-weight:600;font-size:.95rem;background:var(--accent);color:var(--ink);
 }
-.pillars{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
-.pillar{padding:1.4rem;border-radius:var(--radius);background:color-mix(in srgb,var(--deep) 55%,#000);border:1px solid color-mix(in srgb,var(--accent) 18%,transparent)}
-.angle-list,.proof-list{list-style:none;display:grid;gap:.75rem}
-.angle-list li,.proof{display:flex;gap:.75rem;align-items:flex-start;padding:1rem 1.1rem;border-radius:1rem;border:1px solid var(--line);background:rgba(255,255,255,.03);font-weight:550}
-.angle-list .ico,.proof .ico{color:var(--accent);margin-top:.15rem}
-.chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.25rem}
-.chip{font-size:.78rem;padding:.35rem .7rem;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pillars{display:grid;gap:.85rem;grid-template-columns:repeat(3,minmax(0,1fr))}
+.pillar{padding:1.15rem 1.05rem;border-radius:1rem;background:color-mix(in srgb,var(--deep) 50%,#000);border:1px solid color-mix(in srgb,var(--accent) 16%,transparent)}
+.angle-list{list-style:none;display:grid;gap:.65rem;grid-template-columns:1fr 1fr}
+.angle-list li{display:flex;gap:.65rem;align-items:flex-start;padding:.9rem 1rem;border-radius:.9rem;border:1px solid var(--line);background:rgba(255,255,255,.03);font-weight:550;font-size:.92rem;line-height:1.4}
+.angle-list .ico{color:var(--accent);margin-top:.12rem}
+.bottom-grid{display:grid;gap:1.25rem;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);align-items:stretch}
 .offer{
-  margin:0 auto;width:min(1120px,90vw);padding:2.5rem;border-radius:1.5rem;
+  padding:1.75rem;border-radius:1.25rem;height:100%;
+  display:flex;flex-direction:column;justify-content:center;
   background:
-    radial-gradient(90% 120% at 100% 0%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 55%),
+    radial-gradient(90% 120% at 100% 0%,color-mix(in srgb,var(--accent) 20%,transparent),transparent 55%),
     linear-gradient(135deg,var(--deep),#071210);
-  border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 20%,transparent);
 }
-.offer p{color:var(--muted);margin:1rem 0 1.4rem;max-width:36rem}
-.faq-item{border:1px solid var(--line);border-radius:1rem;padding:1rem 1.15rem;background:rgba(255,255,255,.03);margin-bottom:.65rem}
-.faq-item summary{cursor:pointer;font-weight:650;list-style:none}
+.offer h2{margin-bottom:.75rem}
+.offer p{color:var(--muted);margin:0 0 1.15rem;max-width:36rem;font-size:.95rem}
+.faq-item{border:1px solid var(--line);border-radius:.85rem;padding:.85rem 1rem;background:rgba(255,255,255,.03);margin-bottom:.5rem}
+.faq-item summary{cursor:pointer;font-weight:650;list-style:none;font-size:.95rem}
 .faq-item summary::-webkit-details-marker{display:none}
-.faq-item p{margin-top:.65rem}
-.final{text-align:center;padding:5rem 0 4rem}
-.final h2{max-width:14ch;margin:0 auto 1rem}
-.final .sub{color:var(--muted);margin:0 auto 1.5rem;max-width:32rem}
-.hint{display:block;margin-top:1rem;font-size:.85rem;color:var(--muted)}
-footer{padding:2rem 0 2.75rem;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem;text-align:center}
-@media (max-width:900px){
-  .hero-grid{grid-template-columns:1fr}
-  .hero-media{min-height:220px;max-height:280px;order:-1}
+.faq-item p{margin-top:.55rem}
+.hint{display:block;margin-top:.85rem;font-size:.8rem;color:var(--muted)}
+footer{padding:1.5rem 0 2rem;border-top:1px solid var(--line);color:var(--muted);font-size:.75rem;text-align:center}
+@media (max-width:960px){
+  .hero-grid,.pain-split,.bottom-grid,.grid-4,.steps,.pillars,.angle-list,.pain-list{grid-template-columns:1fr}
+  .hero-media{aspect-ratio:16/10;max-height:260px;min-height:200px;order:-1}
+  .metrics{grid-template-columns:1fr}
+  .metric{border-right:0;border-bottom:1px solid var(--line)}
+  .metric:last-child{border-bottom:0}
 }
 @media (max-width:720px){
-  .hero{padding:1.75rem 0 1.5rem}
-  .offer{padding:1.5rem}
-  .pain-item{grid-template-columns:auto 1fr}
-  .pain-item .num{display:none}
-  .metrics{grid-template-columns:1fr}
+  .hero{padding:1.5rem 0 1.25rem}
+  .section{padding:2.15rem 0}
+  .offer{padding:1.35rem}
 }
 </style>
 </head>
@@ -555,9 +579,11 @@ footer{padding:2rem 0 2.75rem;border-top:1px solid var(--line);color:var(--muted
 </header>
 
 <section class="section pain" id="dor">
-  <div class="wrap">
-    <p class="section-kicker">O problema</p>
-    <h2 class="display">${esc(cleanPublicText(copy.pain_title) || "Isso ainda trava a sua operação?")}</h2>
+  <div class="wrap pain-split">
+    <div>
+      <p class="section-kicker">O problema</p>
+      <h2 class="display">${esc(cleanPublicText(copy.pain_title) || "Isso ainda trava a sua operacao?")}</h2>
+    </div>
     <ul class="pain-list">${pains}</ul>
   </div>
 </section>
@@ -610,45 +636,24 @@ ${
     : ""
 }
 
-${
-  proofs
-    ? `<section class="section" id="prova">
-  <div class="wrap">
-    <p class="section-kicker">Por que agora</p>
-    <h2 class="display">${esc(cleanPublicText(copy.proof_title) || "Prova sem enrolação")}</h2>
-    <ul class="proof-list">${proofs}</ul>
-  </div>
-</section>`
-    : ""
-}
-
-${
-  faq
-    ? `<section class="section" id="faq">
-  <div class="wrap">
-    <p class="section-kicker">Dúvidas</p>
+<section class="section" id="oferta">
+  <div class="wrap bottom-grid">
+    ${
+      faq
+        ? `<div id="faq">
+    <p class="section-kicker">Duvidas</p>
     <h2 class="display">${esc(cleanPublicText(copy.faq_title) || "Perguntas frequentes")}</h2>
     ${faq}
-  </div>
-</section>`
-    : ""
-}
-
-<section class="section" style="padding-top:1rem" id="oferta">
-  <div class="offer" id="contato">
-    <p class="section-kicker">Próximo passo</p>
-    <h2 class="display">${esc(shortTitle(copy.offer_title, 48) || "Peça uma demonstração")}</h2>
-    <p>${esc(cleanPublicText(copy.offer_body))}</p>
-    <a class="btn" href="${esc(ctaHref)}">${esc(ctaFinal)}</a>
-    <span class="hint">${esc(cleanPublicText(copy.whatsapp_hint))}</span>
-  </div>
-</section>
-
-<section class="final">
-  <div class="wrap">
-    <h2 class="display">${esc(ctaFinal)}</h2>
-    <p class="sub">${esc(cleanPublicText(copy.final_sub))}</p>
-    <a class="btn" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a>
+  </div>`
+        : "<div></div>"
+    }
+    <div class="offer" id="contato">
+      <p class="section-kicker">Proximo passo</p>
+      <h2 class="display">${esc(shortTitle(copy.offer_title, 48) || "Peca uma demonstracao")}</h2>
+      <p>${esc(cleanPublicText(copy.offer_body))}</p>
+      <a class="btn" href="${esc(ctaHref)}">${esc(ctaFinal)}</a>
+      <span class="hint">${esc(cleanPublicText(copy.whatsapp_hint))}</span>
+    </div>
   </div>
 </section>
 <footer><div class="wrap">${esc(copy.brand_name)}</div></footer>
@@ -696,12 +701,12 @@ PROIBIDO ABSOLUTO nas dores/pains/pillars/angles:
 - copy genérica tipo "tecnologia de ponta", "otimize seus gastos", "transforme sua gestão"
 
 OBRIGATÓRIO:
-- pains = dores OPERACIONAIS do comprador: CA vencido, planilha, multa, entrega sem prova, estoque, multi-cliente, auditoria
+- pains = 4 dores OPERACIONAIS curtas (máx 110 caracteres cada). Tom do COMPRADOR. PROIBIDO citar concorrentes, "ownar", research, nomes de @.
+- angles = frases comerciais curtas (máx 120 chars), SEM comentário de estrategista depois do travessão
 - headline com tensão concreta (máx 6 palavras na linha principal) + accent com benefício
-- subheadline = 1 frase com o mecanismo (biometria / CA / multi-cliente) amarrado ao produto
+- subheadline = 1 frase completa (não truncar) com mecanismo (biometria / CA / multi-cliente)
 - benefits: título curto + body com resultado concreto (não feature vazia)
 - pillars: diferenciais do PRODUTO (não pilares editoriais de Instagram)
-- angles: gatilhos de compra duros e específicos
 - faq: objeções reais de compra B2B
 - Preencha TODOS os arrays; nunca {}
 - Sem markdown, sem emoji, sem métricas inventadas (% / "500 empresas"), sem telefone inventado
@@ -803,10 +808,12 @@ JSON estrito.`,
   ];
 
   if (copy.pains.length < 3) {
-    const fromOpp = filterProductLines(normalizeStrings(report?.oportunidades_unicas));
-    copy.pains = [...copy.pains, ...fromOpp, ...defaultPains]
+    // NUNCA usar oportunidades_unicas da research (vem em tom de estrategia)
+    copy.pains = [...copy.pains, ...defaultPains]
       .filter((v, i, a) => a.indexOf(v) === i)
-      .slice(0, 5);
+      .slice(0, 4);
+  } else {
+    copy.pains = copy.pains.slice(0, 4);
   }
   if (!copy.benefits.length) copy.benefits = defaultBenefits;
   if (!copy.how_steps.length) copy.how_steps = defaultSteps;
