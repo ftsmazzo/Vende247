@@ -32,7 +32,8 @@ APIFY_TOKEN=
 | `LLM_PROVIDER` | não | `openai` | `openai` ou `gemini` |
 | `LLM_MODEL` | não | `gpt-4o-mini` | Modelo de texto |
 | `IMAGE_PROVIDER` | não | `openai` | `openai` ou `gemini` |
-| `OPENAI_IMAGE_MODEL` | não | `dall-e-3` | Ex.: `gpt-image-1` |
+| `OPENAI_IMAGE_MODEL` | não | `gpt-image-1.5` | Ex.: `gpt-image-1.5` |
+| `GEMINI_IMAGE_MODEL` | não | `gemini-3.1-flash-image` | Nano Banana 2; ou `imagen-4.0-generate-001` |
 | `APIFY_TOKEN` | recomendado | — | Scrape de perfis concorrentes |
 | `APIFY_IG_ACTOR` | não | `apify/instagram-profile-scraper` | Actor Apify |
 | `META_ACCESS_TOKEN` | não | — | Meta Ad Library |

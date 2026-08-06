@@ -57,6 +57,49 @@ function brandPromptBits(brand?: BrandKit | null): string {
   return parts.join(". ");
 }
 
+/** Nano Banana 2 (padrão) via generateContent; Imagen só se GEMINI_IMAGE_MODEL=imagen-* */
+async function bufferFromGemini(prompt: string): Promise<Buffer> {
+  if (!GEMINI_API_KEY?.trim()) throw new Error("GEMINI_API_KEY não configurada.");
+  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.trim() });
+  const model =
+    process.env.GEMINI_IMAGE_MODEL?.trim() || "gemini-3.1-flash-image";
+
+  if (model.toLowerCase().startsWith("imagen")) {
+    const response = await ai.models.generateImages({
+      model,
+      prompt,
+      config: { numberOfImages: 1, aspectRatio: "4:5" },
+    });
+    const generatedImages = (
+      response as { generatedImages?: Array<{ image?: { imageBytes?: string } }> }
+    ).generatedImages;
+    const b64 = generatedImages?.[0]?.image?.imageBytes;
+    if (!b64) throw new Error("Imagen não retornou imagem.");
+    return Buffer.from(b64, "base64");
+  }
+
+  // Nano Banana / Nano Banana 2 — geração nativa Gemini
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      responseModalities: ["TEXT", "IMAGE"],
+      imageConfig: {
+        aspectRatio: "4:5",
+      },
+    },
+  });
+
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  for (const part of parts) {
+    const data = part.inlineData?.data;
+    if (data) return Buffer.from(data, "base64");
+  }
+  throw new Error(
+    `Nano Banana (${model}) não retornou imagem. Verifique a key e o modelo.`
+  );
+}
+
 export async function gerarImagemViral(
   prompt: string,
   brand?: BrandKit | null
@@ -84,19 +127,7 @@ export async function gerarImagemViral(
 
   let buffer: Buffer;
   if (provider === "gemini") {
-    if (!GEMINI_API_KEY?.trim()) throw new Error("GEMINI_API_KEY não configurada.");
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.trim() });
-    const response = await ai.models.generateImages({
-      model: "imagen-4.0-generate-001",
-      prompt: enriched.slice(0, 4000),
-      config: { numberOfImages: 1, aspectRatio: "3:4" },
-    });
-    const generatedImages = (
-      response as { generatedImages?: Array<{ image?: { imageBytes?: string } }> }
-    ).generatedImages;
-    const b64 = generatedImages?.[0]?.image?.imageBytes;
-    if (!b64) throw new Error("Imagen não retornou imagem.");
-    buffer = Buffer.from(b64, "base64");
+    buffer = await bufferFromGemini(enriched.slice(0, 4000));
   } else {
     if (!OPENAI_API_KEY?.trim()) throw new Error("OPENAI_API_KEY não configurada.");
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY.trim() });

@@ -160,7 +160,8 @@ E monte um volume persistente no caminho `/app/data` (ou `data`), senão as imag
 LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 IMAGE_PROVIDER=openai
-OPENAI_IMAGE_MODEL=dall-e-3
+OPENAI_IMAGE_MODEL=gpt-image-1.5
+# Teste Nano Banana 2: IMAGE_PROVIDER=gemini + GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
 META_ACCESS_TOKEN=
 META_AD_LIBRARY_SEARCH_COUNTRY=BR
 ALLOW_OPEN_REGISTER=false
