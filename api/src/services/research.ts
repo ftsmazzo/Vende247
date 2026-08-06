@@ -26,6 +26,8 @@ export type ResearchReport = {
     apify: boolean;
     ad_library: boolean;
     modo_degradado: boolean;
+    /** Por que Meta veio vazia / limitada — honestidade com o usuário */
+    ad_library_nota?: string;
   };
 };
 
@@ -49,15 +51,24 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
     ctx.nicho,
     ctx.produto.split(/[—\-–]/).map((s) => s.trim()).find(Boolean) || "",
     "gestão de EPI",
-    "software SST NR-6",
+    "software SST",
+    "entrega de EPI",
+    "NR-6",
   ].filter((q) => q.length > 3);
 
   const adsNested = await Promise.all(
-    adQueries.slice(0, 3).map((q) => searchAdLibrary(q, 12))
+    adQueries.slice(0, 4).map((q) => searchAdLibrary(q, 12))
   );
   const adsMap = new Map<string, AdSnippet>();
-  for (const list of adsNested) {
-    for (const ad of list) {
+  let adStatus = adsNested[0]?.status ?? "empty";
+  let adDetail = adsNested[0]?.detail;
+  for (const batch of adsNested) {
+    if (batch.status === "ok") adStatus = "ok";
+    else if (adStatus !== "ok" && batch.detail) {
+      adStatus = batch.status;
+      adDetail = batch.detail;
+    }
+    for (const ad of batch.ads) {
       const key = `${ad.pageName}|${ad.body?.slice(0, 80)}`;
       if (!adsMap.has(key)) adsMap.set(key, ad);
     }
@@ -66,6 +77,12 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
   const apifyOk = competitors.some((c) => c.source === "apify" && c.posts.length > 0);
   const adOk = ads.length > 0;
   const degraded = !apifyOk;
+
+  const adLibraryNota =
+    adDetail ||
+    (adOk
+      ? "Ads retornados pela API (escopo limitado por país)."
+      : "Ad Library API sem resultados comerciais úteis para BR — não interprete como ‘nicho sem tráfego pago’.");
 
   const compactCompetitors = competitors.map((c) => ({
     username: c.username,
@@ -103,6 +120,12 @@ OBRIGATÓRIO:
 
 Se dados Apify estiverem vazios, diga isso em resumo e ainda proponha ângulos com base no produto (não invente likes).
 
+Sobre Meta Ad Library (CRÍTICO):
+- Se ads_nicho estiver vazio OU flags.ad_library_limitacao indicar cobertura limitada no BR: NÃO diga que “o nicho não tem anúncios pagos” ou “Ad Library vazia = sem tráfego pago”.
+- Explique em 1 frase que a API oficial da Meta no Brasil quase não devolve ads comerciais (só políticos/sociais; comerciais plenos via API são tipicamente UE/UK).
+- Em insights_ads: foque em hipóteses a partir do Apify + produto; sugira validar ads manuais em facebook.com/ads/library se o usuário quiser.
+- Só afirme padrões de ads pagos se houver itens reais em ads_nicho.
+
 JSON com chaves:
 resumo, o_que_concorrentes_fazem_bem[], oportunidades_unicas[], formatos_que_performam[],
 hooks_vencedores[], ctas_comuns[], pilares_conteudo[], direcao_visual[],
@@ -120,7 +143,13 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
         },
         concorrentes_analisados: compactCompetitors,
         ads_nicho: ads.slice(0, 15),
-        flags: { apifyOk, adOk, degraded },
+        flags: {
+          apifyOk,
+          adOk,
+          degraded,
+          ad_library_status: adStatus,
+          ad_library_limitacao: adLibraryNota,
+        },
         nota: "As imagens dos concorrentes NÃO são reutilizadas pixel a pixel; use captions+tipo para extrair padrões visuais e de mensagem.",
       },
       null,
@@ -132,6 +161,7 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
     apify: apifyOk,
     ad_library: adOk,
     modo_degradado: degraded,
+    ad_library_nota: adLibraryNota,
   };
   report.o_que_concorrentes_fazem_bem = report.o_que_concorrentes_fazem_bem ?? [];
   report.oportunidades_unicas = report.oportunidades_unicas ?? [];

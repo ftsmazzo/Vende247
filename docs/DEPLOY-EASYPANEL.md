@@ -173,7 +173,7 @@ META_AD_LIBRARY_SEARCH_COUNTRY=BR
 ALLOW_OPEN_REGISTER=false
 ```
 
-- `META_ACCESS_TOKEN`: só se quiser puxar anúncios da Meta Ad Library.
+- `META_ACCESS_TOKEN`: opcional. **Atenção:** a API `ads_archive` da Meta **quase não devolve anúncios comerciais no Brasil** (só políticos/sociais; comerciais plenos via API costumam ser UE/UK). Research “Ad Library vazia” ≠ “nicho sem ads pagos”. Para ver ads comerciais, use [facebook.com/ads/library](https://www.facebook.com/ads/library) manualmente.
 - `ALLOW_OPEN_REGISTER=true`: só se quiser permitir **novos** cadastros depois do primeiro usuário. No 1º deploy pode deixar `false` — o **primeiro** usuário ainda consegue se registrar.
 
 ---
