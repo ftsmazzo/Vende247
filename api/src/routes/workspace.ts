@@ -6,7 +6,6 @@ import {
   publicWorkspace,
   requireAuth,
 } from "../services/authHelpers.js";
-import { extractBrandFromUrl } from "../services/brandFromUrl.js";
 
 function normalizeCompetitors(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -23,29 +22,6 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
     return publicWorkspace(ws);
-  });
-
-  app.post<{ Body: { url?: string; logo_url?: string } }>("/brand-from-url", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
-    const url = req.body?.url?.trim();
-    if (!url) return reply.status(400).send({ error: "Informe a URL da landing (pública)." });
-
-    try {
-      const kit = await extractBrandFromUrl(url);
-      if (req.body?.logo_url?.trim()) {
-        kit.logo_url = req.body.logo_url.trim();
-      }
-      const merged = { ...(ws.brand_kit || {}), ...kit };
-      await query(`UPDATE workspaces SET brand_kit = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
-        ws.id,
-        JSON.stringify(merged),
-      ]);
-      const fresh = await getWorkspaceForUser(getUserId(req));
-      return { workspace: publicWorkspace(fresh), brand_kit: merged };
-    } catch (err) {
-      return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) });
-    }
   });
 
   app.put<{

@@ -19,7 +19,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error || `HTTP ${res.status}`);
+    const d = data as { error?: string; message?: string };
+    throw new Error(d.error && d.error !== "Not Found" ? d.error : d.message || d.error || `HTTP ${res.status}`);
   }
   return data as T;
 }

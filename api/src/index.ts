@@ -13,6 +13,10 @@ import { creativesRoutes } from "./routes/creatives.js";
 import { startCronJob } from "./services/cron.js";
 import { getLocalUploadsDir } from "./services/storage.js";
 
+import { extractBrandFromUrl } from "./services/brandFromUrl.js";
+import { getUserId, getWorkspaceForUser, publicWorkspace } from "./services/authHelpers.js";
+import { query } from "./db/index.js";
+
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || "0.0.0.0";
 const JWT_SECRET = process.env.JWT_SECRET?.trim() || "dev-mudar-JWT_SECRET-em-producao";
@@ -29,6 +33,33 @@ async function build() {
   await app.register(researchRoutes, { prefix: "/api/research" });
   await app.register(strategyRoutes, { prefix: "/api/strategy" });
   await app.register(creativesRoutes, { prefix: "/api/creatives" });
+
+  // Rota também no root (garantia — alguns deploys não pegavam a do plugin)
+  app.post<{ Body: { url?: string; logo_url?: string } }>(
+    "/api/workspace/brand-from-url",
+    { preHandler: async (req, reply) => {
+      try { await req.jwtVerify(); } catch { return reply.status(401).send({ error: "Não autenticado." }); }
+    }},
+    async (req, reply) => {
+      const ws = await getWorkspaceForUser(getUserId(req));
+      if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+      const url = req.body?.url?.trim();
+      if (!url) return reply.status(400).send({ error: "Informe a URL da landing (pública)." });
+      try {
+        const kit = await extractBrandFromUrl(url);
+        if (req.body?.logo_url?.trim()) kit.logo_url = req.body.logo_url.trim();
+        const merged = { ...(ws.brand_kit || {}), ...kit };
+        await query(`UPDATE workspaces SET brand_kit = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+          ws.id,
+          JSON.stringify(merged),
+        ]);
+        const fresh = await getWorkspaceForUser(getUserId(req));
+        return { workspace: publicWorkspace(fresh), brand_kit: merged };
+      } catch (err) {
+        return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  );
 
   app.get<{ Params: { file: string } }>("/media/:file", async (req, reply) => {
     const file = path.basename(req.params.file);
