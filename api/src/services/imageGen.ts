@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import sharp from "sharp";
 import { uploadMedia, isStorageConfigured } from "./storage.js";
+import type { BrandKit } from "./brandFromUrl.js";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GEMINI_API_KEY;
@@ -27,7 +28,48 @@ async function bufferFromOpenAI(
   throw new Error("OpenAI sem b64_json nem url.");
 }
 
-export async function gerarImagemViral(prompt: string): Promise<string> {
+async function overlayLogo(baseJpeg: Buffer, logoUrl: string): Promise<Buffer> {
+  try {
+    const res = await fetch(logoUrl);
+    if (!res.ok) return baseJpeg;
+    const logoBuf = Buffer.from(await res.arrayBuffer());
+    const logo = await sharp(logoBuf)
+      .resize({ width: 220, height: 220, fit: "inside", withoutEnlargement: true })
+      .png()
+      .toBuffer();
+    const meta = await sharp(logo).metadata();
+    const lw = meta.width ?? 160;
+    const lh = meta.height ?? 80;
+    const pad = 36;
+    return sharp(baseJpeg)
+      .composite([{ input: logo, left: pad, top: 1350 - lh - pad }])
+      .jpeg({ quality: 88 })
+      .toBuffer();
+  } catch {
+    return baseJpeg;
+  }
+}
+
+function brandPromptBits(brand?: BrandKit | null): string {
+  if (!brand) return "";
+  const parts: string[] = [];
+  if (brand.visual_summary) parts.push(`Brand visual identity: ${brand.visual_summary}`);
+  if (brand.product_ui_notes) {
+    parts.push(`Show product UI resembling: ${brand.product_ui_notes}`);
+  }
+  if (brand.colors?.length) {
+    parts.push(`Use brand color palette approximately: ${brand.colors.join(", ")}`);
+  }
+  parts.push(
+    "Prefer mockups of the real SaaS dashboard/mobile UI (clean product screens), not generic stock safety photos."
+  );
+  return parts.join(". ");
+}
+
+export async function gerarImagemViral(
+  prompt: string,
+  brand?: BrandKit | null
+): Promise<string> {
   if (!isStorageConfigured()) {
     throw new Error("Storage de mídia não configurado.");
   }
@@ -35,11 +77,15 @@ export async function gerarImagemViral(prompt: string): Promise<string> {
   const enriched = [
     "Instagram feed creative 4:5 vertical, scroll-stopping, high contrast,",
     "bold short Portuguese hook text readable in upper third,",
-    "modern B2B SaaS / workplace safety commercial photo style 2026,",
-    "phones and screens must be upright and correctly oriented, never upside-down,",
-    "hands holding devices naturally, correct anatomy, no watermarks, no fake logos.",
-    prompt.slice(0, 2600),
-  ].join(" ");
+    "modern B2B SaaS product marketing style 2026,",
+    "phones and UI screens upright and correctly oriented, never upside-down,",
+    "leave a clean bottom-left corner for a real logo overlay,",
+    "no fake logos, no watermarks.",
+    brandPromptBits(brand),
+    prompt.slice(0, 2200),
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   let buffer: Buffer;
   if (provider === "gemini") {
@@ -71,6 +117,8 @@ export async function gerarImagemViral(prompt: string): Promise<string> {
     buffer = await bufferFromOpenAI(res.data?.[0]);
   }
 
-  const jpeg = await toFeedJpeg(buffer);
+  let jpeg = await toFeedJpeg(buffer);
+  const logo = brand?.logo_url || brand?.og_image_url;
+  if (logo) jpeg = await overlayLogo(jpeg, logo);
   return uploadMedia(jpeg, "image/jpeg", ".jpg");
 }

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { query } from "../db/index.js";
 import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHelpers.js";
+import type { BrandKit } from "../services/brandFromUrl.js";
 import { gerarImagemViral } from "../services/imageGen.js";
 import { publishImage } from "../services/instagram.js";
 import type { StrategyPlan, CreativeBrief } from "../services/strategy.js";
@@ -59,6 +60,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       [ws.id]
     );
 
+    const brand = (ws.brand_kit || {}) as BrandKit;
+
     const created: unknown[] = [];
     const errors: Array<{ day: number; error: string }> = [];
 
@@ -72,7 +75,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       let status = "ready";
       let error: string | null = null;
       try {
-        mediaUrl = await gerarImagemViral(visual);
+        mediaUrl = await gerarImagemViral(visual, brand);
       } catch (err) {
         status = "error";
         error = err instanceof Error ? err.message : String(err);
@@ -157,7 +160,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     );
 
     try {
-      const mediaUrl = await gerarImagemViral(cur.rows[0].visual_prompt);
+      const brand = (ws.brand_kit || {}) as BrandKit;
+      const mediaUrl = await gerarImagemViral(cur.rows[0].visual_prompt, brand);
       const r = await query(
         `UPDATE creatives SET media_url = $2, status = 'ready', error = NULL, updated_at = NOW()
          WHERE id = $1

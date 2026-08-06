@@ -24,6 +24,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
+export type BrandKit = {
+  site_url?: string;
+  logo_url?: string;
+  og_image_url?: string;
+  colors?: string[];
+  visual_summary?: string;
+  product_ui_notes?: string;
+  extracted_at?: string;
+};
+
 export type Workspace = {
   id: number;
   name: string;
@@ -37,6 +47,7 @@ export type Workspace = {
   ig_username: string;
   has_ig_token: boolean;
   onboarding_done: boolean;
+  brand_kit?: BrandKit;
 };
 
 export const api = {
@@ -68,6 +79,11 @@ export const api = {
       request<Workspace>("/api/workspace", {
         method: "PUT",
         body: JSON.stringify(body),
+      }),
+    brandFromUrl: (url: string, logo_url?: string) =>
+      request<{ workspace: Workspace; brand_kit: BrandKit }>("/api/workspace/brand-from-url", {
+        method: "POST",
+        body: JSON.stringify({ url, logo_url }),
       }),
   },
   research: {
