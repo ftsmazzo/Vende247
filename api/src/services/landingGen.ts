@@ -176,9 +176,33 @@ function cleanPublicText(v: unknown): string {
   s = s.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "");
   s = s.replace(/^["'«»]+|["'«»]+$/g, "");
   s = s.replace(/\s+/g, " ").trim();
-  // remove linguagem interna do produto
-  s = s.replace(/\b(research|estratégia de conteúdo|ângulos da research|hooks validados|vende247)\b/gi, "");
+  s = s.replace(
+    /\b(research|estratégia de conteúdo|ângulos da research|hooks validados|vende247|gaps? do perfil)\b/gi,
+    ""
+  );
   return s.replace(/\s+/g, " ").trim();
+}
+
+/** Copy de marketing Instagram / meta interna — NÃO serve para LP do produto. */
+function isIgOrInternalNoise(s: string): boolean {
+  const t = s.toLowerCase();
+  return (
+    /\b(perfil|instagram|engajamento|seguidores|followers|bio\b|destaques|reels|carrossel|stories|conteúdo|posts?\b|feed\b|hook\b|copy\b|vende247|research)\b/i.test(
+      t
+    ) ||
+    /falta de (conteúdo|engajamento)/i.test(t) ||
+    /perfil ainda vazio/i.test(t) ||
+    /estratégia clara de conteúdo/i.test(t) ||
+    /prova(s)? sociais? e depoimento/i.test(t) ||
+    /eduque e informe o público/i.test(t) ||
+    /cases de sucesso/i.test(t) ||
+    /demonstrações práticas/i.test(t) ||
+    /educação sobre normas/i.test(t)
+  );
+}
+
+function filterProductLines(lines: string[]): string[] {
+  return lines.map(cleanPublicText).filter((s) => s.length > 8 && !isIgOrInternalNoise(s));
 }
 
 function pairFrom(raw: unknown): { title: string; body: string } | null {
@@ -385,42 +409,57 @@ a{color:inherit;text-decoration:none}
   font-size:.8rem;font-weight:700;padding:.6rem 1rem;border-radius:999px;
   background:var(--accent);color:var(--ink);
 }
-.hero{position:relative;min-height:min(88vh,860px);display:grid;align-items:end;padding:3rem 0 4rem;isolation:isolate}
-.hero-media{position:absolute;inset:0;z-index:-2;background-size:cover;background-position:center 28%}
-.hero-media--fallback{background:radial-gradient(70% 50% at 80% 10%,color-mix(in srgb,var(--accent) 30%,transparent),transparent 55%),linear-gradient(165deg,var(--ink),var(--deep))}
-.hero::before{
-  content:"";position:absolute;inset:0;z-index:-1;
-  background:linear-gradient(100deg,rgba(6,9,8,.96) 0%,rgba(6,9,8,.82) 38%,rgba(6,9,8,.45) 68%,rgba(6,9,8,.72) 100%);
+.hero{
+  position:relative;isolation:isolate;
+  min-height:auto;
+  display:grid;align-items:center;
+  padding:2.75rem 0 2.5rem;
 }
-.hero-inner{max-width:38rem}
+.hero-grid{
+  display:grid;gap:2rem;align-items:center;
+  grid-template-columns:minmax(0,1.15fr) minmax(0,.95fr);
+}
+.hero-media{
+  position:relative;z-index:0;min-height:340px;max-height:460px;
+  border-radius:1.35rem;overflow:hidden;
+  background-size:cover;background-position:center;
+  border:1px solid var(--line);
+  box-shadow:0 24px 60px rgba(0,0,0,.35);
+}
+.hero-media--fallback{background:radial-gradient(70% 50% at 80% 10%,color-mix(in srgb,var(--accent) 30%,transparent),transparent 55%),linear-gradient(165deg,var(--ink),var(--deep))}
+.hero-media::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,transparent 45%,rgba(6,9,8,.55));
+}
+.hero-inner{position:relative;z-index:1;max-width:40rem}
 .eyebrow{
   display:inline-flex;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--accent);margin-bottom:1.1rem;padding:.4rem .75rem;border-radius:999px;
+  color:var(--accent);margin-bottom:.85rem;padding:.35rem .7rem;border-radius:999px;
   border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
   background:color-mix(in srgb,var(--accent) 10%,transparent);
 }
-.hero h1{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:clamp(2.5rem,6.5vw,4.4rem);letter-spacing:-.035em;line-height:1.02;margin:0 0 1rem}
-.accent-line{display:block;color:var(--accent);font-style:italic;font-weight:500;margin-top:.12em}
-.lead{font-size:clamp(1.02rem,1.8vw,1.18rem);color:var(--muted);margin-bottom:1.2rem;font-weight:450;max-width:32rem}
-.meta-line{font-size:.9rem;color:rgba(244,246,245,.55);margin-bottom:1.6rem}
+.hero h1{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:clamp(2.1rem,4.6vw,3.35rem);letter-spacing:-.035em;line-height:1.05;margin:0 0 .85rem}
+.accent-line{display:block;color:var(--accent);font-style:italic;font-weight:500;margin-top:.1em}
+.lead{font-size:clamp(1.02rem,1.6vw,1.15rem);color:var(--muted);margin-bottom:1.1rem;font-weight:450;max-width:34rem}
+.meta-line{font-size:.88rem;color:rgba(244,246,245,.55);margin-bottom:1.25rem}
 .cta-row{display:flex;flex-wrap:wrap;gap:.75rem}
 .btn{
   display:inline-flex;align-items:center;justify-content:center;
   background:var(--accent);color:var(--ink);font-weight:700;font-size:.95rem;
-  padding:.95rem 1.35rem;border-radius:999px;border:0;
+  padding:.9rem 1.25rem;border-radius:999px;border:0;
   box-shadow:0 10px 36px color-mix(in srgb,var(--accent) 28%,transparent);
   transition:transform .18s ease;
 }
 .btn:hover{transform:translateY(-2px)}
 .btn-ghost{background:transparent;color:var(--paper);border:1px solid rgba(255,255,255,.22);box-shadow:none}
-.section{padding:5rem 0}
+.section{padding:4rem 0}
 .section-kicker{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.85rem}
-.section h2.display{font-size:clamp(1.9rem,4vw,3rem);max-width:16ch;margin-bottom:1.6rem}
+.section h2.display{font-size:clamp(1.75rem,3.5vw,2.6rem);max-width:18ch;margin-bottom:1.4rem}
 .metrics{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;
-  padding:1.4rem;border-radius:var(--radius);border:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;
+  padding:1.1rem;border-radius:var(--radius);border:1px solid var(--line);
   background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
-  margin-top:2rem;
+  margin-top:1.4rem;
 }
 .metric strong{display:block;font-family:"Fraunces",serif;font-size:1.55rem;color:var(--accent);margin-bottom:.25rem}
 .metric span{font-size:.82rem;color:var(--muted)}
@@ -475,36 +514,43 @@ a{color:inherit;text-decoration:none}
 .final .sub{color:var(--muted);margin:0 auto 1.5rem;max-width:32rem}
 .hint{display:block;margin-top:1rem;font-size:.85rem;color:var(--muted)}
 footer{padding:2rem 0 2.75rem;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem;text-align:center}
+@media (max-width:900px){
+  .hero-grid{grid-template-columns:1fr}
+  .hero-media{min-height:220px;max-height:280px;order:-1}
+}
 @media (max-width:720px){
-  .hero{min-height:84vh;padding-bottom:3rem}
+  .hero{padding:1.75rem 0 1.5rem}
   .offer{padding:1.5rem}
   .pain-item{grid-template-columns:auto 1fr}
   .pain-item .num{display:none}
+  .metrics{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
 <div class="topbar"><div class="wrap brand">${logo}<a class="nav-cta" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a></div></div>
 <header class="hero">
-  ${heroMedia}
-  <div class="wrap hero-inner">
-    ${copy.eyebrow ? `<div class="eyebrow">${esc(cleanPublicText(copy.eyebrow))}</div>` : ""}
-    <h1>${esc(head.main).replace(/\n/g, "<br/>")}<span class="accent-line">${esc(head.accent)}</span></h1>
-    <p class="lead">${esc(cleanPublicText(copy.subheadline))}</p>
-    ${
-      copy.audience || copy.differentiator
-        ? `<p class="meta-line">${esc(
-            [cleanPublicText(copy.audience), cleanPublicText(copy.differentiator)]
-              .filter(Boolean)
-              .join(" · ")
-          )}</p>`
-        : ""
-    }
-    <div class="cta-row">
-      <a class="btn" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a>
-      <a class="btn btn-ghost" href="#dor">${esc(cleanPublicText(copy.hero_cta_secondary) || "Ver o problema")}</a>
+  <div class="wrap hero-grid">
+    <div class="hero-inner">
+      ${copy.eyebrow ? `<div class="eyebrow">${esc(cleanPublicText(copy.eyebrow))}</div>` : ""}
+      <h1>${esc(head.main).replace(/\n/g, "<br/>")}<span class="accent-line">${esc(head.accent)}</span></h1>
+      <p class="lead">${esc(cleanPublicText(copy.subheadline))}</p>
+      ${
+        copy.audience || copy.differentiator
+          ? `<p class="meta-line">${esc(
+              [cleanPublicText(copy.audience), cleanPublicText(copy.differentiator)]
+                .filter(Boolean)
+                .join(" · ")
+            )}</p>`
+          : ""
+      }
+      <div class="cta-row">
+        <a class="btn" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a>
+        <a class="btn btn-ghost" href="#dor">${esc(cleanPublicText(copy.hero_cta_secondary) || "Ver o problema")}</a>
+      </div>
+      ${metrics ? `<div class="metrics">${metrics}</div>` : ""}
     </div>
-    ${metrics ? `<div class="metrics">${metrics}</div>` : ""}
+    ${heroMedia}
   </div>
 </header>
 
@@ -620,45 +666,67 @@ export async function generateLanding(opts: {
   const { ctx, report, strategy, brand } = opts;
   const colors = pickColors(brand);
 
-  const strategyDigest = strategy
+  // Research de Instagram NÃO é brief de LP. Só ângulos de PRODUTO / mercado.
+  const productSignals = report
     ? {
-        resumo: strategy.resumo,
-        pilares: strategy.pilares,
-        posts_amostra: (strategy.posts || []).slice(0, 8).map((p) => ({
-          titulo: p.titulo,
-          formato: p.formato,
-          hook: p.hook,
-          objetivo: p.objetivo,
-          pilar: p.pilar,
-        })),
+        oportunidades_unicas: (report.oportunidades_unicas || []).filter(
+          (s) => !isIgOrInternalNoise(String(s))
+        ),
+        o_que_mercado_faz_bem: (report.o_que_concorrentes_fazem_bem || []).filter(
+          (s) => !isIgOrInternalNoise(String(s))
+        ),
+        mensagens_produto: (report.hooks_vencedores || []).filter(
+          (s) => !isIgOrInternalNoise(String(s))
+        ),
+        insights_ads: (report.insights_ads || []).filter(
+          (s) => !isIgOrInternalNoise(String(s))
+        ),
       }
     : null;
 
   const copy = await chatJson<LandingCopy>(
-    `Você é diretor de copy de landing pages B2B (Brasil). Texto para o CLIENTE FINAL — nunca mencione research, estratégia interna, hooks, Vende247 ou concorrentes com @.
-Preencha TODOS os arrays com conteúdo real (title/body ou titulo/texto). Nunca devolva objetos vazios {}.
-PROIBIDO: markdown (*negrito*), emojis, métricas inventadas (% / "500 empresas"), telefone inventado.
-whatsapp_url: só se o workspace tiver número real; senão omita.
-hero_cta máx 32 caracteres. offer_title máx 8 palavras.
-benefits/how_steps/pillars/faq: use chaves title+body (ou titulo+texto / pergunta+resposta).
-angles: frases comerciais curtas SEM aspas e SEM emoji.
+    `Você escreve landing pages B2B de SOFTWARE (Brasil) para o COMPRADOR do produto — gestor SST, técnico de segurança, consultor multi-cliente, comprador de EPI.
+
+MISSÃO: vender o PRODUTO do workspace (descrição + oferta). NÃO vender "presença no Instagram".
+
+PROIBIDO ABSOLUTO nas dores/pains/pillars/angles:
+- perfil vazio, falta de conteúdo, engajamento, posts, reels, carrossel, bio, seguidores
+- "estratégia de conteúdo", "prova social / depoimentos" como dor de marketing
+- research, Vende247, hooks internos, @ de concorrentes
+- copy genérica tipo "tecnologia de ponta", "otimize seus gastos", "transforme sua gestão"
+
+OBRIGATÓRIO:
+- pains = dores OPERACIONAIS do comprador: CA vencido, planilha, multa, entrega sem prova, estoque, multi-cliente, auditoria
+- headline com tensão concreta (máx 6 palavras na linha principal) + accent com benefício
+- subheadline = 1 frase com o mecanismo (biometria / CA / multi-cliente) amarrado ao produto
+- benefits: título curto + body com resultado concreto (não feature vazia)
+- pillars: diferenciais do PRODUTO (não pilares editoriais de Instagram)
+- angles: gatilhos de compra duros e específicos
+- faq: objeções reais de compra B2B
+- Preencha TODOS os arrays; nunca {}
+- Sem markdown, sem emoji, sem métricas inventadas (% / "500 empresas"), sem telefone inventado
+- hero_cta ≤ 32 caracteres; offer_title ≤ 8 palavras
+- benefits/how_steps/pillars/faq: title+body (ou titulo+texto)
+
 JSON estrito.`,
     JSON.stringify(
       {
-        workspace: ctx,
-        insights_produto: report
-          ? {
-              dores: report.gaps_do_seu_perfil,
-              oportunidades: report.oportunidades_unicas,
-              mensagens_fortes: report.hooks_vencedores,
-              pilares: report.pilares_conteudo,
-              prova: report.insights_ads,
-            }
-          : null,
-        plano_conteudo: strategyDigest,
+        produto: {
+          nome_sugerido: ctx.produto.split(/[—\-–]/)[0]?.trim(),
+          descricao_completa: ctx.produto,
+          nicho: ctx.nicho,
+          oferta: ctx.oferta,
+          cta: ctx.cta,
+          tom_voz: ctx.tom_voz,
+          publico_alvo:
+            "Consultores SST multi-cliente, técnicos de segurança e empresas que controlam entrega de EPI",
+        },
+        sinais_de_mercado_somente_produto: productSignals,
         brand: brand
           ? { colors: brand.colors, visual_summary: brand.visual_summary }
           : null,
+        lembrete:
+          "gaps do Instagram / pilares de conteúdo / plano de posts NÃO entram nesta LP.",
       },
       null,
       2
@@ -710,60 +778,66 @@ JSON estrito.`,
   ];
 
   copy.brand_name = brandName;
-  copy.pains = normalizeStrings(copy.pains);
-  copy.benefits = normalizePairs(copy.benefits);
-  copy.how_steps = normalizePairs(copy.how_steps);
-  copy.pillars = normalizePairs(copy.pillars);
-  copy.angles = normalizeStrings(copy.angles);
-  copy.proof_items = normalizeStrings(copy.proof_items);
-  copy.metrics = normalizePairs(copy.metrics).map((p) => ({ value: p.title, label: p.body }));
-  copy.faq = normalizeFaq(copy.faq);
+  copy.pains = filterProductLines(normalizeStrings(copy.pains));
+  copy.benefits = normalizePairs(copy.benefits).filter(
+    (b) => !isIgOrInternalNoise(`${b.title} ${b.body}`)
+  );
+  copy.how_steps = normalizePairs(copy.how_steps).filter(
+    (b) => !isIgOrInternalNoise(`${b.title} ${b.body}`)
+  );
+  copy.pillars = normalizePairs(copy.pillars).filter(
+    (b) => !isIgOrInternalNoise(`${b.title} ${b.body}`)
+  );
+  copy.angles = filterProductLines(normalizeStrings(copy.angles));
+  copy.proof_items = filterProductLines(normalizeStrings(copy.proof_items));
+  copy.metrics = normalizePairs(copy.metrics)
+    .filter((p) => !isIgOrInternalNoise(`${p.title} ${p.body}`))
+    .map((p) => ({ value: p.title, label: p.body }));
+  copy.faq = normalizeFaq(copy.faq).filter((f) => !isIgOrInternalNoise(`${f.q} ${f.a}`));
 
-  if (!copy.pains.length) {
-    copy.pains = normalizeStrings(report?.gaps_do_seu_perfil).slice(0, 5);
-  }
-  if (!copy.pains.length) {
-    copy.pains = [
-      "Auditoria sem comprovação clara de entrega de EPI",
-      "CA vencido e risco de multa",
-      "Planilha que não escala para vários clientes",
-      "Estoque sem visibilidade de custo e consumo",
-      "Consultor sobrecarregado sem painel unificado",
-    ];
+  const defaultPains = [
+    "Entrega de EPI sem prova auditável — risco na fiscalização",
+    "CA vencido ou vida útil estourada sem alerta a tempo",
+    "Planilha que não escala quando o consultor tem vários clientes",
+    "Estoque e custo de EPI sem visão clara por empresa",
+  ];
+
+  if (copy.pains.length < 3) {
+    const fromOpp = filterProductLines(normalizeStrings(report?.oportunidades_unicas));
+    copy.pains = [...copy.pains, ...fromOpp, ...defaultPains]
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .slice(0, 5);
   }
   if (!copy.benefits.length) copy.benefits = defaultBenefits;
   if (!copy.how_steps.length) copy.how_steps = defaultSteps;
   if (!copy.faq.length) copy.faq = defaultFaq;
 
   if (!copy.pillars.length) {
-    const fromStrategy = (strategy?.pilares || []).map((t) => ({
-      title: cleanPublicText(t).slice(0, 40) || "Pilar",
-      body: "Narrativa alinhada à oferta e às dores do nicho SST/EPI.",
-    }));
-    const fromResearch = normalizeStrings(report?.pilares_conteudo).map((t) => ({
-      title: t.slice(0, 40),
-      body: "Tema forte para autoridade e conversão no Instagram e na LP.",
-    }));
-    copy.pillars = (fromStrategy.length ? fromStrategy : fromResearch).slice(0, 4);
-  }
-  if (!copy.pillars.length) {
     copy.pillars = [
-      { title: "Prova na entrega", body: "Biometria e histórico para aguentar auditoria." },
-      { title: "Operação multi-cliente", body: "Um consultor, vários painéis, menos caos." },
-      { title: "Prevenção de multa", body: "CA e vida útil com alerta — não no susto." },
+      {
+        title: "Prova na entrega",
+        body: "Biometria facial e histórico — base mais forte que assinatura em papel.",
+      },
+      {
+        title: "Operação multi-cliente",
+        body: "Consultor SST com vários painéis no mesmo fluxo, sem planilha paralela.",
+      },
+      {
+        title: "Alerta antes da multa",
+        body: "CA e vida útil no radar operacional — não no susto da auditoria.",
+      },
     ];
   }
 
-  if (!copy.angles.length) {
-    copy.angles = normalizeStrings(report?.hooks_vencedores).slice(0, 6);
-  }
-  if (!copy.angles.length) {
-    copy.angles = [
+  if (copy.angles.length < 3) {
+    copy.angles = filterProductLines([
+      ...copy.angles,
+      ...normalizeStrings(report?.hooks_vencedores),
       "Auditoria sem prova de entrega é risco caro",
       "Biometria na entrega muda o jogo da conformidade",
       "CA vencido não pode ser surpresa",
       "Multi-cliente sem planilha solta",
-    ];
+    ]).slice(0, 6);
   }
 
   if (!copy.proof_items.length) {
@@ -781,39 +855,80 @@ JSON estrito.`,
     ];
   }
 
-  const head = splitHeadline(copy.headline || "Menos papel.", copy.headline_accent || "Mais controle.");
+  // Headline fraca / genérica → força tensão de produto
+  const weakHeadline =
+    !copy.headline ||
+    /menos papel/i.test(copy.headline) ||
+    isIgOrInternalNoise(copy.headline) ||
+    cleanPublicText(copy.headline).split(/\s+/).length < 2;
+
+  const head = splitHeadline(
+    weakHeadline ? "CA vencido na auditoria?" : copy.headline,
+    weakHeadline || !copy.headline_accent
+      ? "Controle EPI com prova."
+      : copy.headline_accent
+  );
   copy.headline = head.main;
   copy.headline_accent = head.accent;
-  copy.eyebrow = cleanPublicText(copy.eyebrow) || "Gestão de EPI com prova real";
-  copy.subheadline =
-    cleanPublicText(copy.subheadline) ||
-    "Biometria na entrega, CA sob alerta e operação multi-cliente em um fluxo só.";
+  copy.eyebrow = cleanPublicText(copy.eyebrow);
+  if (!copy.eyebrow || isIgOrInternalNoise(copy.eyebrow)) {
+    copy.eyebrow = "Software de gestão de EPI";
+  }
+  copy.subheadline = cleanPublicText(copy.subheadline);
+  if (!copy.subheadline || isIgOrInternalNoise(copy.subheadline) || copy.subheadline.length < 40) {
+    copy.subheadline =
+      cleanPublicText(ctx.oferta)?.slice(0, 180) ||
+      "Biometria na entrega, alerta de CA e painel multi-cliente — menos papel, menos multa, mais controle.";
+  }
   copy.audience = cleanPublicText(copy.audience);
+  if (isIgOrInternalNoise(copy.audience)) copy.audience = "";
+  if (!copy.audience) {
+    copy.audience = "Para consultores SST e times de segurança do trabalho";
+  }
   copy.differentiator = cleanPublicText(copy.differentiator);
+  if (isIgOrInternalNoise(copy.differentiator)) copy.differentiator = "";
+  if (!copy.differentiator) {
+    copy.differentiator = "Prova na entrega + CA sob alerta";
+  }
   copy.hero_cta = shortCta(copy.hero_cta || "Quero demonstração");
   copy.hero_cta_secondary = cleanPublicText(copy.hero_cta_secondary) || "Ver o problema";
   copy.final_cta = shortCta(copy.final_cta || copy.hero_cta);
   copy.pain_title = cleanPublicText(copy.pain_title) || "Isso ainda trava a sua operação?";
+  if (isIgOrInternalNoise(copy.pain_title)) {
+    copy.pain_title = "Isso ainda trava a sua operação?";
+  }
   copy.solution_title = cleanPublicText(copy.solution_title) || "O que muda na prática";
   copy.how_title = cleanPublicText(copy.how_title) || "Como funciona";
-  copy.pillars_title = cleanPublicText(copy.pillars_title) || "Pilares do produto";
+  copy.pillars_title = cleanPublicText(copy.pillars_title) || "Por que o produto";
   copy.angles_title = cleanPublicText(copy.angles_title) || "O que o mercado responde";
   copy.proof_title = cleanPublicText(copy.proof_title) || "Prova sem enrolação";
   copy.faq_title = cleanPublicText(copy.faq_title) || "Perguntas frequentes";
-  copy.offer_title = shortTitle(copy.offer_title || ctx.oferta || "Peça uma demonstração", 48);
+  copy.offer_title = shortTitle(copy.offer_title || "Peça uma demonstração", 48);
   copy.offer_body =
     cleanPublicText(copy.offer_body) ||
     cleanPublicText(ctx.oferta) ||
     "Veja o fluxo de entrega com biometria e o painel multi-cliente ao vivo.";
-  // se offer_title veio como parágrafo longo do produto, troca
-  if (copy.offer_title.length > 60 || copy.offer_title === copy.offer_body.slice(0, copy.offer_title.length)) {
+  if (isIgOrInternalNoise(copy.offer_body)) {
+    copy.offer_body =
+      cleanPublicText(ctx.oferta) ||
+      "Veja o fluxo de entrega com biometria e o painel multi-cliente ao vivo.";
+  }
+  if (copy.offer_title.length > 60 || isIgOrInternalNoise(copy.offer_title)) {
     copy.offer_title = "Peça uma demonstração";
   }
   copy.final_sub = cleanPublicText(copy.final_sub) || "Resposta rápida para times SST.";
   copy.whatsapp_hint = cleanPublicText(copy.whatsapp_hint || ctx.cta) || "Chama no WhatsApp e peça uma demo";
+  if (isIgOrInternalNoise(copy.whatsapp_hint)) {
+    copy.whatsapp_hint = "Peça uma demonstração do produto";
+  }
   copy.whatsapp_url = copy.whatsapp_url && !isFakePhone(String(copy.whatsapp_url).replace(/\D/g, ""))
     ? copy.whatsapp_url
     : undefined;
+  copy.seo_title =
+    cleanPublicText(copy.seo_title) ||
+    `${brandName} — gestão de EPI com biometria`;
+  copy.seo_description =
+    cleanPublicText(copy.seo_description) || copy.subheadline.slice(0, 155);
 
   let heroUrl: string | undefined;
   if (opts.withHeroImage !== false && isStorageConfigured()) {
