@@ -127,10 +127,13 @@ export const api = {
 
 export type ResearchReport = {
   resumo: string;
+  o_que_concorrentes_fazem_bem?: string[];
+  oportunidades_unicas?: string[];
   formatos_que_performam: string[];
   hooks_vencedores: string[];
   ctas_comuns: string[];
   pilares_conteudo: string[];
+  direcao_visual?: string[];
   padrao_perfil_engajador: {
     bio_sugerida: string;
     destaques: string[];

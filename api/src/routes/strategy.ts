@@ -3,6 +3,7 @@ import { query } from "../db/index.js";
 import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHelpers.js";
 import { generateStrategy } from "../services/strategy.js";
 import type { ResearchReport } from "../services/research.js";
+import type { BrandKit } from "../services/brandFromUrl.js";
 
 export const strategyRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", requireAuth);
@@ -60,7 +61,8 @@ export const strategyRoutes: FastifyPluginAsync = async (app) => {
         ig_username: ws.ig_username,
       },
       report!,
-      days
+      days,
+      (ws.brand_kit || {}) as BrandKit
     );
 
     const inserted = await query<{ id: number }>(

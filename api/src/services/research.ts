@@ -4,10 +4,16 @@ import { chatJson } from "./llm.js";
 
 export type ResearchReport = {
   resumo: string;
+  /** O que os concorrentes fazem de concreto (não genérico) */
+  o_que_concorrentes_fazem_bem: string[];
+  /** Lacunas / ângulos que o produto pode dominar */
+  oportunidades_unicas: string[];
   formatos_que_performam: string[];
   hooks_vencedores: string[];
   ctas_comuns: string[];
   pilares_conteudo: string[];
+  /** Direção visual: cenas humanas, EPI, fábrica — NÃO lista de mockups de celular */
+  direcao_visual: string[];
   padrao_perfil_engajador: {
     bio_sugerida: string;
     destaques: string[];
@@ -49,35 +55,50 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
     followers: c.followers,
     topPosts: [...c.posts]
       .sort((a, b) => b.likes + b.comments * 3 - (a.likes + a.comments * 3))
-      .slice(0, 8)
+      .slice(0, 10)
       .map((p) => ({
         type: p.type,
         likes: p.likes,
         comments: p.comments,
-        caption: p.caption.slice(0, 400),
+        caption: p.caption.slice(0, 500),
       })),
   }));
 
   const report = await chatJson<ResearchReport>(
-    `Você é estrategista sênior de Instagram e performance criativa (2026).
-Analise concorrentes e anúncios do nicho. Seja específico, acionável e em português do Brasil.
-NÃO invente métricas falsas quando os dados estiverem vazios — diga o que falta e ainda proponha um padrão engajador baseado em melhores práticas do nicho.
-Responda em JSON com as chaves:
-resumo, formatos_que_performam (array), hooks_vencedores (array), ctas_comuns (array),
-pilares_conteudo (array), padrao_perfil_engajador { bio_sugerida, destaques[], ritmo_posts_semana, mix_formatos {feed,carrossel,reels} },
-gaps_do_seu_perfil (array), insights_ads (array), fontes { apify, ad_library, modo_degradado }.`,
+    `Você é estrategista de conteúdo B2B para Instagram no Brasil (SST / EPI / software industrial).
+Sua missão: insights DECISIVOS para vender ESTE produto — não platitudes de marketing.
+
+PROIBIDO (genérico demais):
+- "segurança é compromisso", "vídeos e imagens", "saiba mais na bio" sem contexto
+- listas vagas tipo "formatos: vídeo, carrossel"
+- repetir o óbvio do nicho sem amarrar ao produto
+
+OBRIGATÓRIO:
+- Citar padrões REAIS vistos nas captions/posts dos concorrentes (temas, ângulos, provas)
+- Separar o que concorrentes fazem bem vs o que o produto pode ganhar (oportunidades_unicas)
+- Hooks concretos, no tom do produto (ex.: biometria na entrega, CA vencendo, consultor multi-cliente, planilha vs painel)
+- direcao_visual: 5–8 cenas HUMANAS / operação (trabalhador com EPI, entrega facial, estoque, auditoria, gestor no pátio). PROIBIDO sugerir "só mockup de celular/dashboard genérico"
+- Bio e pilares específicos do produto informado
+
+Se dados Apify estiverem vazios, diga isso em resumo e ainda proponha ângulos com base no produto (não invente likes).
+
+JSON com chaves:
+resumo, o_que_concorrentes_fazem_bem[], oportunidades_unicas[], formatos_que_performam[],
+hooks_vencedores[], ctas_comuns[], pilares_conteudo[], direcao_visual[],
+padrao_perfil_engajador { bio_sugerida, destaques[], ritmo_posts_semana, mix_formatos {feed,carrossel,reels} },
+gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado }.`,
     JSON.stringify(
       {
-        workspace: {
+        produto_a_vender: {
           nicho: ctx.nicho,
           produto: ctx.produto,
           oferta: ctx.oferta,
           cta: ctx.cta,
           tom_voz: ctx.tom_voz,
-          meu_ig: ctx.ig_username || "(vazio / quase sem posts)",
+          meu_ig: ctx.ig_username || "(perfil quase vazio — construir do zero)",
         },
-        competitors: compactCompetitors,
-        ads: ads.slice(0, 15),
+        concorrentes_analisados: compactCompetitors,
+        ads_nicho: ads.slice(0, 15),
         flags: { apifyOk, adOk, degraded },
       },
       null,
@@ -90,6 +111,9 @@ gaps_do_seu_perfil (array), insights_ads (array), fontes { apify, ad_library, mo
     ad_library: adOk,
     modo_degradado: degraded,
   };
+  report.o_que_concorrentes_fazem_bem = report.o_que_concorrentes_fazem_bem ?? [];
+  report.oportunidades_unicas = report.oportunidades_unicas ?? [];
+  report.direcao_visual = report.direcao_visual ?? [];
 
   return { raw: { competitors, ads }, report };
 }

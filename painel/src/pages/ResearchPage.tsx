@@ -71,6 +71,9 @@ export function ResearchPage() {
             <h2 className="font-display text-lg font-semibold mb-2">Resumo</h2>
             <p className="text-white/75 whitespace-pre-wrap">{report.resumo}</p>
           </div>
+          <ListCard title="O que concorrentes fazem bem" items={report.o_que_concorrentes_fazem_bem} />
+          <ListCard title="Oportunidades únicas (seu ângulo)" items={report.oportunidades_unicas} />
+          <ListCard title="Direção visual (cenas)" items={report.direcao_visual} />
           <ListCard title="Formatos que performam" items={report.formatos_que_performam} />
           <ListCard title="Hooks vencedores" items={report.hooks_vencedores} />
           <ListCard title="CTAs comuns" items={report.ctas_comuns} />

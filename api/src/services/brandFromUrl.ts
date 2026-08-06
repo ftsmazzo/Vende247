@@ -106,11 +106,11 @@ export async function extractBrandFromUrl(siteUrl: string): Promise<BrandKit> {
     suggested_colors: string[];
   }>(
     `Você é diretor de arte. Com base no HTML/texto de uma landing, descreva a identidade visual
-para gerar criativos de Instagram fiéis ao produto (não genéricos).
+para criativos de Instagram impactantes (pessoas, operação, emoção) — NÃO peça mockups de celular.
 Responda JSON: {
-  visual_summary: string (cores, tipografia, mood, estilo SaaS — 2-4 frases em PT),
-  product_ui_notes: string (como parece a UI: cards, dashboard, mobile — o que mostrar nas artes),
-  suggested_colors: string[] (hex principais, máx 4)
+  visual_summary: string (cores, mood, tipografia — 2-4 frases PT),
+  product_ui_notes: string (o que o produto RESOLVE na operação física: entrega EPI, biometria, estoque — cenas humanas),
+  suggested_colors: string[] (hex, máx 4)
 }`,
     JSON.stringify(
       {

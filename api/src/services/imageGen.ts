@@ -34,11 +34,10 @@ async function overlayLogo(baseJpeg: Buffer, logoUrl: string): Promise<Buffer> {
     if (!res.ok) return baseJpeg;
     const logoBuf = Buffer.from(await res.arrayBuffer());
     const logo = await sharp(logoBuf)
-      .resize({ width: 220, height: 220, fit: "inside", withoutEnlargement: true })
+      .resize({ width: 200, height: 200, fit: "inside", withoutEnlargement: true })
       .png()
       .toBuffer();
     const meta = await sharp(logo).metadata();
-    const lw = meta.width ?? 160;
     const lh = meta.height ?? 80;
     const pad = 36;
     return sharp(baseJpeg)
@@ -53,16 +52,8 @@ async function overlayLogo(baseJpeg: Buffer, logoUrl: string): Promise<Buffer> {
 function brandPromptBits(brand?: BrandKit | null): string {
   if (!brand) return "";
   const parts: string[] = [];
-  if (brand.visual_summary) parts.push(`Brand visual identity: ${brand.visual_summary}`);
-  if (brand.product_ui_notes) {
-    parts.push(`Show product UI resembling: ${brand.product_ui_notes}`);
-  }
-  if (brand.colors?.length) {
-    parts.push(`Use brand color palette approximately: ${brand.colors.join(", ")}`);
-  }
-  parts.push(
-    "Prefer mockups of the real SaaS dashboard/mobile UI (clean product screens), not generic stock safety photos."
-  );
+  if (brand.visual_summary) parts.push(`Brand mood/colors: ${brand.visual_summary}`);
+  if (brand.colors?.length) parts.push(`Accent colors: ${brand.colors.join(", ")}`);
   return parts.join(". ");
 }
 
@@ -75,14 +66,16 @@ export async function gerarImagemViral(
   }
   const provider = (process.env.IMAGE_PROVIDER ?? "openai").toLowerCase();
   const enriched = [
-    "Instagram feed creative 4:5 vertical, scroll-stopping, high contrast,",
-    "bold short Portuguese hook text readable in upper third,",
-    "modern B2B SaaS product marketing style 2026,",
-    "phones and UI screens upright and correctly oriented, never upside-down,",
-    "leave a clean bottom-left corner for a real logo overlay,",
-    "no fake logos, no watermarks.",
+    "Instagram ad creative 4:5, scroll-stopping, vivid colors, emotional impact,",
+    "bold short Portuguese hook text in upper third, clean typography,",
+    "photorealistic workplace / industrial safety scene with real people wearing EPI",
+    "(hard hat, gloves, goggles) when relevant,",
+    "FORBIDDEN: smartphone mockups, 3D phone clusters, fake generic app dashboards, invented UI screens,",
+    "FORBIDDEN: upside-down phones, plastic stock marketing of floating devices,",
+    "leave small clean space bottom-left for logo overlay,",
+    "no watermarks, no invented brand logos in the scene.",
     brandPromptBits(brand),
-    prompt.slice(0, 2200),
+    prompt.slice(0, 2400),
   ]
     .filter(Boolean)
     .join(" ");
