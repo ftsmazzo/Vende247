@@ -2,7 +2,7 @@ import { chatJson } from "./llm.js";
 import type { BrandKit } from "./brandFromUrl.js";
 import type { ResearchReport } from "./research.js";
 import type { StrategyPlan } from "./strategy.js";
-import { isFaithLifestyleNiche, isIndustrialNiche, looksIndustrialVisual } from "./nicheVisual.js";
+import { isFaithLifestyleNiche, isIndustrialNiche } from "./nicheVisual.js";
 import { PLANNER_MULHER_PRESET } from "./brandPresets.js";
 
 export type BrandSource = "url" | "generated" | "preset" | "manual";
@@ -21,14 +21,29 @@ export function brandMismatchReason(
   ctx: WorkspaceBrandCtx
 ): string | null {
   if (!brand?.visual_summary && !brand?.colors?.length) return null;
-  const blob = `${brand.visual_summary || ""} ${brand.product_ui_notes || ""} ${(brand.colors || []).join(" ")}`;
-  const brandLooksIndustrial =
-    looksIndustrialVisual(blob) ||
-    /prontepi|saas|dashboard|gestores|seguran[cç]a do trabalho|azul escuro e verde|teal|#0f766e|#99f6e4|#0f172a/i.test(
-      blob
-    );
-  const productIsIndustrial = isIndustrialNiche(ctx);
-  if (brandLooksIndustrial && !productIsIndustrial) {
+
+  // Motor / preset já são do produto atual — não alertar
+  if (brand.source === "generated" || brand.source === "preset") return null;
+
+  if (isIndustrialNiche(ctx)) return null;
+
+  const colors = (brand.colors || []).map((c) =>
+    (c.startsWith("#") ? c : `#${c}`).toLowerCase()
+  );
+  const prontepiHex = ["#0f766e", "#115e59", "#99f6e4", "#0f172a", "#14b8a6", "#0d9488"];
+  const hasProntColors = prontepiHex.some((c) => colors.includes(c));
+
+  // Só texto que afirma identidade EPI/SaaS antiga (não "evitar dashboard")
+  const blob = `${brand.visual_summary || ""} ${brand.product_ui_notes || ""}`;
+  const strongOldBrand =
+    /prontepi/i.test(blob) ||
+    /azul escuro e verde/i.test(blob) ||
+    /gestores e operadores de seguran/i.test(blob) ||
+    /seguran[cç]a do trabalho/i.test(blob) ||
+    /estoque,? alertas e relat/i.test(blob) ||
+    /paleta de cores que remete [àa] seguran/i.test(blob);
+
+  if (hasProntColors || strongOldBrand) {
     return "A identidade salva ainda parece do produto anterior (EPI/SaaS verde-azul). Gere uma nova ou aplique o preset do Planner.";
   }
   return null;

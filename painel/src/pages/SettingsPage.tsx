@@ -153,6 +153,7 @@ export function SettingsPage() {
       applyWorkspaceToForm(r.workspace, formSetters);
       setBrand(r.brand_kit);
       setSiteUrl("");
+      setWs(r.workspace);
       setMsg(
         "Identidade gerada (produto + research/estratégia). Visual ProntEPI substituído. Regenere criativos e landing."
       );
