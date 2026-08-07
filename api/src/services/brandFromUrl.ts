@@ -8,6 +8,8 @@ export type BrandKit = {
   visual_summary?: string;
   product_ui_notes?: string;
   extracted_at?: string;
+  /** url = extraiu de site | generated = motor | preset = template | manual */
+  source?: "url" | "generated" | "preset" | "manual";
 };
 
 function absUrl(base: string, href: string | undefined | null): string | undefined {
@@ -138,6 +140,7 @@ Responda JSON: {
     colors: mergedColors,
     visual_summary: ai.visual_summary || description || title || "",
     product_ui_notes: ai.product_ui_notes || "",
+    source: "url",
     extracted_at: new Date().toISOString(),
   };
 }

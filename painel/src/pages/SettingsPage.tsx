@@ -49,6 +49,7 @@ export function SettingsPage() {
   const [brand, setBrand] = useState<BrandKit | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [applyingPreset, setApplyingPreset] = useState(false);
+  const [generatingBrand, setGeneratingBrand] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -84,8 +85,9 @@ export function SettingsPage() {
     try {
       const kit = {
         ...(brand || {}),
-        site_url: siteUrl || brand?.site_url,
+        site_url: siteUrl || undefined,
         logo_url: logoUrl || brand?.logo_url,
+        source: brand?.source || ("manual" as const),
       };
       const updated = await api.workspace.update({
         nicho,
@@ -117,7 +119,7 @@ export function SettingsPage() {
       applyWorkspaceToForm(r.workspace, formSetters);
       setBrand(r.brand_kit);
       if (r.brand_kit.logo_url) setLogoUrl(r.brand_kit.logo_url);
-      setMsg("Identidade visual extraída. Gere o lote de criativos de novo.");
+      setMsg("Identidade extraída da referência. Regenere criativos e landing.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao ler o site");
     } finally {
@@ -133,7 +135,7 @@ export function SettingsPage() {
       const r = await api.workspace.applyPreset("planner-mulher");
       applyWorkspaceToForm(r.workspace, formSetters);
       setMsg(
-        `Preset “${r.preset.label}” aplicado (briefing + identidade). Tokens do Instagram foram mantidos. Rode Research → Estratégia → Criativos de novo.`
+        `Preset “${r.preset.label}” aplicado (briefing + identidade nova). Tokens IG mantidos. Rode Research → Estratégia → Criativos.`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao aplicar preset");
@@ -142,7 +144,37 @@ export function SettingsPage() {
     }
   }
 
+  async function generateBrand() {
+    setGeneratingBrand(true);
+    setError("");
+    setMsg("");
+    try {
+      const r = await api.workspace.generateBrand(Boolean(logoUrl.trim()));
+      applyWorkspaceToForm(r.workspace, formSetters);
+      setBrand(r.brand_kit);
+      setSiteUrl("");
+      setMsg(
+        "Identidade gerada (produto + research/estratégia). Visual ProntEPI substituído. Regenere criativos e landing."
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao gerar identidade");
+    } finally {
+      setGeneratingBrand(false);
+    }
+  }
+
   if (loading) return <p className="text-white/50">Carregando…</p>;
+
+  const sourceLabel =
+    brand?.source === "url"
+      ? "extraída de site"
+      : brand?.source === "generated"
+        ? "gerada pelo motor"
+        : brand?.source === "preset"
+          ? "preset Planner"
+          : brand?.visual_summary
+            ? "salva"
+            : "ainda não definida";
 
   return (
     <div className="animate-rise max-w-xl space-y-6">
@@ -151,12 +183,17 @@ export function SettingsPage() {
         <p className="text-white/55 mt-1">Nicho, identidade visual do produto e Instagram.</p>
       </div>
 
+      {ws?.brand_warning && (
+        <div className="rounded-lg border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-coral">
+          {ws.brand_warning}
+        </div>
+      )}
+
       <div className="card space-y-3">
         <h2 className="font-display text-lg font-semibold">Produto atual</h2>
         <p className="text-sm text-white/50">
-          Sem site ainda? Aplique o preset do <strong className="text-white/70">Planner Mulher Cristã</strong>:
-          preenche nicho, oferta, concorrentes e uma identidade visual soft (bege/terracotta) para
-          criativos e landing — sem depender do ProntEPI.
+          Atalho: preenche nicho, oferta, concorrentes e identidade soft do{" "}
+          <strong className="text-white/70">Planner Mulher</strong> (apaga visual ProntEPI).
         </p>
         <button
           type="button"
@@ -168,23 +205,58 @@ export function SettingsPage() {
         </button>
       </div>
 
-      <div className="card space-y-3">
-        <h2 className="font-display text-lg font-semibold">Identidade visual</h2>
-        <p className="text-sm text-white/50">
-          Sem logo? O preset acima já define cores e mood. Depois você pode colar uma URL de logo
-          (Canva / Drive público) ou extrair de um site quando tiver landing.
-        </p>
+      <div className="card space-y-4">
+        <div>
+          <h2 className="font-display text-lg font-semibold">Identidade visual</h2>
+          <p className="text-sm text-white/50 mt-1">
+            A landing é <strong className="text-white/70">criada por nós</strong> — não dá para
+            extrair dela antes. Use um dos caminhos. Fonte atual:{" "}
+            <strong className="text-white/70">{sourceLabel}</strong>.
+          </p>
+        </div>
+
+        <div className="space-y-2 rounded-lg border border-white/10 p-3">
+          <p className="text-sm font-medium text-white/80">1 · Sem site (recomendado agora)</p>
+          <p className="text-xs text-white/45">
+            Motor sugere cores e mood com produto + research + estratégia. Depois cole só o logo se
+            quiser.
+          </p>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={generatingBrand}
+            onClick={() => void generateBrand()}
+          >
+            {generatingBrand ? "Gerando…" : "Gerar identidade (Config + Research + Estratégia)"}
+          </button>
+        </div>
+
+        <div className="space-y-2 rounded-lg border border-white/10 p-3">
+          <p className="text-sm font-medium text-white/80">2 · Com referência externa</p>
+          <p className="text-xs text-white/45">
+            Tem site de outro lugar? Extrai logo/cores. Não use URL do ProntEPI.
+          </p>
+          <label className="block">
+            <span className="label">URL do site / landing</span>
+            <input
+              className="field"
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value)}
+              placeholder="https://referencia.com.br"
+            />
+          </label>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={extracting || !siteUrl.trim()}
+            onClick={() => void extractBrand()}
+          >
+            {extracting ? "Extraindo…" : "Extrair identidade do site"}
+          </button>
+        </div>
+
         <label className="block">
-          <span className="label">URL do site / landing (opcional)</span>
-          <input
-            className="field"
-            value={siteUrl}
-            onChange={(e) => setSiteUrl(e.target.value)}
-            placeholder="https://seusite.com.br"
-          />
-        </label>
-        <label className="block">
-          <span className="label">URL do logo (opcional)</span>
+          <span className="label">URL do logo (opcional — qualquer caminho)</span>
           <input
             className="field"
             value={logoUrl}
@@ -192,14 +264,7 @@ export function SettingsPage() {
             placeholder="https://.../logo.png"
           />
         </label>
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={extracting || !siteUrl.trim()}
-          onClick={() => void extractBrand()}
-        >
-          {extracting ? "Extraindo…" : "Extrair identidade do site"}
-        </button>
+
         {brand?.visual_summary && (
           <div className="text-sm text-white/70 space-y-2 border-t border-white/10 pt-3">
             <p>
@@ -266,9 +331,6 @@ export function SettingsPage() {
             onChange={(e) => setConcorrentes(e.target.value)}
             placeholder={"@perfil1\n@perfil2"}
           />
-          <p className="text-xs text-white/40 mt-1">
-            Inclua marcas do nicho. Depois rode Research de novo.
-          </p>
         </label>
         <label className="block">
           <span className="label">@Instagram</span>

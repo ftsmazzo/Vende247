@@ -33,6 +33,7 @@ export type BrandKit = {
   visual_summary?: string;
   product_ui_notes?: string;
   extracted_at?: string;
+  source?: "url" | "generated" | "preset" | "manual";
 };
 
 export type Workspace = {
@@ -49,6 +50,7 @@ export type Workspace = {
   has_ig_token: boolean;
   onboarding_done: boolean;
   brand_kit?: BrandKit;
+  brand_warning?: string | null;
 };
 
 export const api = {
@@ -94,6 +96,11 @@ export const api = {
           body: JSON.stringify({ preset_id }),
         }
       ),
+    generateBrand: (keep_logo = true) =>
+      request<{ workspace: Workspace; brand_kit: BrandKit }>("/api/workspace/generate-brand", {
+        method: "POST",
+        body: JSON.stringify({ keep_logo }),
+      }),
   },
   research: {
     latest: () => request<{ run: ResearchRun | null }>("/api/research/latest"),

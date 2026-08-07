@@ -7,6 +7,10 @@ import {
   requireAuth,
 } from "../services/authHelpers.js";
 import { getProductPreset, listProductPresets } from "../services/brandPresets.js";
+import { generateBrandIdentity } from "../services/brandIdentity.js";
+import type { BrandKit } from "../services/brandFromUrl.js";
+import type { ResearchReport } from "../services/research.js";
+import type { StrategyPlan } from "../services/strategy.js";
 
 function normalizeCompetitors(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -27,6 +31,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/presets", async () => ({ presets: listProductPresets() }));
 
+  /** Preset = briefing + identidade NOVA (não mescla ProntEPI). */
   app.post<{ Body: { preset_id?: string } }>("/apply-preset", async (req, reply) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
@@ -34,12 +39,9 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
     const preset = getProductPreset(id);
     if (!preset) return reply.status(400).send({ error: "Preset não encontrado." });
 
-    const prev = (ws.brand_kit || {}) as Record<string, unknown>;
-    const kit = {
-      ...prev,
+    const kit: BrandKit = {
       ...preset.brand_kit,
-      logo_url: prev.logo_url || preset.brand_kit.logo_url,
-      site_url: prev.site_url || preset.brand_kit.site_url,
+      source: "preset",
       extracted_at: new Date().toISOString(),
     };
 
@@ -68,6 +70,61 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
       workspace: publicWorkspace(fresh),
       preset: { id: preset.id, label: preset.label },
     };
+  });
+
+  /**
+   * Caminho sem site: gera identidade a partir de Config + Research + Estratégia.
+   * Substitui a brand_kit antiga (ex. ProntEPI verde).
+   */
+  app.post<{ Body: { keep_logo?: boolean } }>("/generate-brand", async (req, reply) => {
+    const ws = await getWorkspaceForUser(getUserId(req));
+    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    if (!ws.nicho?.trim() || !ws.produto?.trim()) {
+      return reply.status(400).send({ error: "Preencha nicho e produto antes de gerar identidade." });
+    }
+
+    const research = await query<{ report: ResearchReport }>(
+      `SELECT report FROM research_runs
+       WHERE workspace_id = $1 AND status = 'done'
+       ORDER BY id DESC LIMIT 1`,
+      [ws.id]
+    );
+    const strategy = await query<{ plan: StrategyPlan }>(
+      `SELECT plan FROM strategies WHERE workspace_id = $1 ORDER BY id DESC LIMIT 1`,
+      [ws.id]
+    );
+
+    const prev = (ws.brand_kit || {}) as BrandKit;
+    const keepLogo =
+      req.body?.keep_logo !== false && prev.logo_url && !/prontepi/i.test(String(prev.logo_url))
+        ? prev.logo_url
+        : undefined;
+
+    try {
+      const kit = await generateBrandIdentity({
+        ctx: {
+          nicho: ws.nicho,
+          produto: ws.produto,
+          oferta: ws.oferta,
+          tom_voz: ws.tom_voz,
+          cta: ws.cta,
+        },
+        report: research.rows[0]?.report ?? null,
+        strategy: strategy.rows[0]?.plan ?? null,
+        keepLogoUrl: keepLogo,
+      });
+
+      await query(`UPDATE workspaces SET brand_kit = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
+        ws.id,
+        JSON.stringify(kit),
+      ]);
+      const fresh = await getWorkspaceForUser(getUserId(req));
+      return { workspace: publicWorkspace(fresh), brand_kit: kit };
+    } catch (err) {
+      return reply.status(400).send({
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   });
 
   app.put<{

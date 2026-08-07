@@ -37,6 +37,7 @@ export const PLANNER_MULHER_PRESET: ProductPreset = {
       "Estética soft editorial feminina: bege areia, terracotta suave, off-white e marrom café. Mood calmo, luminoso, acolhedor — café da manhã, Bíblia aberta, planner manuscrito, luz natural de janela. Tipografia clean sans com toque serif em títulos. Sem visual industrial, sem neon, sem estética tech B2B.",
     product_ui_notes:
       "Cenas: mulher em quiet time com planner e caneca; close de páginas com versículo; mesa com flores secas e Bíblia; rotina matinal acolhedora; gratidão escrita à mão. Evitar mockup de celular e dashboards.",
+    source: "preset",
     extracted_at: new Date().toISOString(),
   },
 };

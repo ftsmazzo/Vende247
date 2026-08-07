@@ -1,5 +1,7 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { query } from "../db/index.js";
+import { brandMismatchReason } from "./brandIdentity.js";
+import type { BrandKit } from "./brandFromUrl.js";
 
 export type JwtUser = { sub: number; email: string };
 
@@ -48,6 +50,7 @@ export async function getWorkspaceForUser(userId: number) {
 
 export function publicWorkspace(ws: Awaited<ReturnType<typeof getWorkspaceForUser>>) {
   if (!ws) return null;
+  const brand = (ws.brand_kit || {}) as BrandKit;
   return {
     id: ws.id,
     name: ws.name,
@@ -61,6 +64,13 @@ export function publicWorkspace(ws: Awaited<ReturnType<typeof getWorkspaceForUse
     ig_username: ws.ig_username,
     has_ig_token: Boolean(ws.ig_access_token?.trim()),
     brand_kit: ws.brand_kit,
+    brand_warning: brandMismatchReason(brand, {
+      nicho: ws.nicho,
+      produto: ws.produto,
+      oferta: ws.oferta,
+      tom_voz: ws.tom_voz,
+      cta: ws.cta,
+    }),
     onboarding_done: ws.onboarding_done,
   };
 }

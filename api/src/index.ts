@@ -50,7 +50,12 @@ async function build() {
       try {
         const kit = await extractBrandFromUrl(url);
         if (req.body?.logo_url?.trim()) kit.logo_url = req.body.logo_url.trim();
-        const merged = { ...(ws.brand_kit || {}), ...kit };
+        // Caminho com referência: substitui identidade (não mescla ProntEPI residual)
+        const merged: Record<string, unknown> = {
+          ...kit,
+          source: "url",
+          logo_url: kit.logo_url || req.body?.logo_url?.trim() || undefined,
+        };
         await query(`UPDATE workspaces SET brand_kit = $2::jsonb, updated_at = NOW() WHERE id = $1`, [
           ws.id,
           JSON.stringify(merged),
