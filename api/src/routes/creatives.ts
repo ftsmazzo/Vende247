@@ -4,6 +4,7 @@ import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHel
 import type { BrandKit } from "../services/brandFromUrl.js";
 import { gerarImagemViral } from "../services/imageGen.js";
 import { publishCarousel, publishImage } from "../services/instagram.js";
+import { filterResearchCues, lockVisualToNiche } from "../services/nicheVisual.js";
 import type { ResearchReport } from "../services/research.js";
 import {
   normalizeCarouselSlides,
@@ -11,7 +12,11 @@ import {
   type StrategyPlan,
 } from "../services/strategy.js";
 
-async function latestResearchCues(workspaceId: number): Promise<string[]> {
+async function latestResearchCues(
+  workspaceId: number,
+  nicho: string,
+  produto: string
+): Promise<string[]> {
   const r = await query<{ report: ResearchReport }>(
     `SELECT report FROM research_runs
      WHERE workspace_id = $1 AND status = 'done'
@@ -19,7 +24,12 @@ async function latestResearchCues(workspaceId: number): Promise<string[]> {
     [workspaceId]
   );
   const d = r.rows[0]?.report?.direcao_visual;
-  return Array.isArray(d) ? d.filter((x): x is string => typeof x === "string" && !!x) : [];
+  const raw = Array.isArray(d) ? d.filter((x): x is string => typeof x === "string" && !!x) : [];
+  return filterResearchCues(raw, { nicho, produto });
+}
+
+function nicheFromWs(ws: { nicho: string; produto: string; oferta: string }) {
+  return { nicho: ws.nicho, produto: ws.produto, oferta: ws.oferta };
 }
 
 const CREATIVE_COLS = `id, strategy_id, day_index, format, hook, caption, visual_prompt,
@@ -84,16 +94,18 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     );
 
     const brand = (ws.brand_kit || {}) as BrandKit;
-    const researchCues = await latestResearchCues(ws.id);
+    const niche = nicheFromWs(ws);
+    const researchCues = await latestResearchCues(ws.id, ws.nicho, ws.produto);
     const created: unknown[] = [];
     const errors: Array<{ day: number; error: string }> = [];
 
     for (const post of posts) {
       const caption = [post.caption, post.cta].filter(Boolean).join("\n\n").trim();
       const formato = post.formato || "feed";
-      const visual =
+      const visualRaw =
         post.visual_prompt ||
         `Viral Instagram creative about ${ws.produto}. Hook text: "${post.hook}". Niche: ${ws.nicho}.`;
+      const visual = lockVisualToNiche(visualRaw, niche, brand, post.hook);
       const dayIdx = Math.max(0, (post.day || 1) - 1);
       const researchCue =
         researchCues[dayIdx % Math.max(researchCues.length, 1)] || undefined;
@@ -122,13 +134,21 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             (post.cena_tipo as CreativeBrief["cena_tipo"]) || "hero_pessoa"
           );
           for (let i = 0; i < slides.length; i++) {
-            const url = await gerarImagemViral(slides[i].visual_prompt, brand, {
+            const slidePrompt = lockVisualToNiche(
+              slides[i].visual_prompt,
+              niche,
+              brand,
+              slides[i].texto || post.hook
+            );
+            const url = await gerarImagemViral(slidePrompt, brand, {
               purpose: i === 0 ? "cover" : "volume",
               mode: "ad",
               diversityIndex: dayIdx * 5 + i,
               researchCue:
                 researchCues[(dayIdx + i) % Math.max(researchCues.length, 1)] ||
                 researchCue,
+              niche,
+              hook: slides[i].texto || post.hook,
             });
             mediaUrls.push(url);
           }
@@ -140,6 +160,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             aspectRatio: formato === "reels" ? "9:16" : "4:5",
             diversityIndex: dayIdx,
             researchCue,
+            niche,
+            hook: post.hook,
           });
           mediaUrls = mediaUrl ? [mediaUrl] : [];
         }
@@ -234,8 +256,9 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
 
     try {
       const brand = (ws.brand_kit || {}) as BrandKit;
+      const niche = nicheFromWs(ws);
       const row = cur.rows[0];
-      const researchCues = await latestResearchCues(ws.id);
+      const researchCues = await latestResearchCues(ws.id, ws.nicho, ws.produto);
       let mediaUrl = "";
       let mediaUrls: string[] = [];
 
@@ -243,28 +266,37 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
         const existing = asUrlList(row.media_urls);
         const count = Math.max(existing.length, 4);
         for (let i = 0; i < count; i++) {
-          const prompt =
+          const promptRaw =
             i === 0
               ? row.visual_prompt
               : `${row.visual_prompt}. Carousel slide ${i + 1} of ${count}, different angle, bold Portuguese text related to "${row.hook}"`;
+          const prompt = lockVisualToNiche(promptRaw, niche, brand, row.hook);
           mediaUrls.push(
             await gerarImagemViral(prompt, brand, {
               purpose: i === 0 ? "cover" : "volume",
               mode: "ad",
               diversityIndex: id * 3 + i + Date.now() % 7,
               researchCue: researchCues[i % Math.max(researchCues.length, 1)],
+              niche,
+              hook: row.hook,
             })
           );
         }
         mediaUrl = mediaUrls[0] || "";
       } else {
-        mediaUrl = await gerarImagemViral(row.visual_prompt, brand, {
-          purpose: "cover",
-          mode: "ad",
-          aspectRatio: row.format === "reels" ? "9:16" : "4:5",
-          diversityIndex: id + (Date.now() % 8),
-          researchCue: researchCues[0],
-        });
+        mediaUrl = await gerarImagemViral(
+          lockVisualToNiche(row.visual_prompt, niche, brand, row.hook),
+          brand,
+          {
+            purpose: "cover",
+            mode: "ad",
+            aspectRatio: row.format === "reels" ? "9:16" : "4:5",
+            diversityIndex: id + (Date.now() % 8),
+            researchCue: researchCues[0],
+            niche,
+            hook: row.hook,
+          }
+        );
         mediaUrls = [mediaUrl];
       }
 
@@ -313,13 +345,21 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
 
       try {
         const brand = (ws.brand_kit || {}) as BrandKit;
-        const researchCues = await latestResearchCues(ws.id);
-        const prompt = `${cur.rows[0].visual_prompt}. Carousel slide ${slideIndex + 1}, bold Portuguese hook "${cur.rows[0].hook}", unique composition`;
+        const niche = nicheFromWs(ws);
+        const researchCues = await latestResearchCues(ws.id, ws.nicho, ws.produto);
+        const prompt = lockVisualToNiche(
+          `${cur.rows[0].visual_prompt}. Carousel slide ${slideIndex + 1}, bold Portuguese hook "${cur.rows[0].hook}", unique composition`,
+          niche,
+          brand,
+          cur.rows[0].hook
+        );
         const newUrl = await gerarImagemViral(prompt, brand, {
           purpose: "volume",
           mode: "ad",
           diversityIndex: id + slideIndex * 2 + (Date.now() % 8),
           researchCue: researchCues[slideIndex % Math.max(researchCues.length, 1)],
+          niche,
+          hook: cur.rows[0].hook,
         });
         const next = [...urls];
         if (next.length === 0) next.push(newUrl);

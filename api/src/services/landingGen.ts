@@ -953,7 +953,13 @@ JSON estrito.`,
           .filter(Boolean)
           .join(" "),
         brand,
-        { mode: "photo", purpose: "photo", overlayLogo: false, aspectRatio: "4:5" }
+        {
+          mode: "photo",
+          purpose: "photo",
+          overlayLogo: false,
+          aspectRatio: "4:5",
+          niche: { nicho: ctx.nicho, produto: ctx.produto, oferta: ctx.oferta },
+        }
       );
     } catch {
       heroUrl = brand?.og_image_url || undefined;

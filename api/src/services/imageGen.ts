@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import sharp from "sharp";
 import { uploadMedia, isStorageConfigured } from "./storage.js";
 import type { BrandKit } from "./brandFromUrl.js";
+import { lockVisualToNiche, type NicheCtx } from "./nicheVisual.js";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GEMINI_API_KEY;
@@ -20,6 +21,9 @@ export type ImageGenOpts = {
   diversityIndex?: number;
   /** Cena inspirada na research (texto), se houver */
   researchCue?: string;
+  /** Contexto do workspace — trava nicho e bloqueia EPI residual */
+  niche?: NicheCtx;
+  hook?: string;
 };
 
 /**
@@ -261,11 +265,19 @@ function buildPrompt(
   prompt: string,
   brand: BrandKit | null | undefined,
   mode: "ad" | "photo",
-  extras?: { diversityIndex?: number; researchCue?: string }
+  extras?: {
+    diversityIndex?: number;
+    researchCue?: string;
+    niche?: NicheCtx;
+    hook?: string;
+  }
 ): string {
   const shot = diversityShot(extras?.diversityIndex ?? 0);
+  const locked = extras?.niche
+    ? lockVisualToNiche(prompt, extras.niche, brand, extras.hook)
+    : prompt;
   const cue = extras?.researchCue?.trim()
-    ? `Visual inspiration (mood only, do not copy a brand): ${extras.researchCue.trim().slice(0, 220)}.`
+    ? `Visual inspiration (mood only, do not copy a brand): ${extras.researchCue.trim().slice(0, 180)}.`
     : "";
 
   if (mode === "photo") {
@@ -275,9 +287,10 @@ function buildPrompt(
       "cinematic lighting, editorial quality, clean composition with negative space on the left,",
       `Camera: ${shot}.`,
       "FORBIDDEN: smartphone mockups, fake dashboards, graphic overlays, stickers, banners.",
+      "FORBIDDEN unless niche is industrial safety: hard hats, EPI/PPE, factories, warehouses, earmuffs.",
       brandPromptBits(brand),
       cue,
-      prompt.slice(0, 2200),
+      locked.slice(0, 2200),
     ]
       .filter(Boolean)
       .join(" ");
@@ -290,13 +303,14 @@ function buildPrompt(
     "photorealistic lifestyle scene matching the product niche (people, rituals, product in use) — follow brand mood if given,",
     `UNIQUE SHOT THIS IMAGE: ${shot} — must look different from other ads in the same campaign.`,
     "FORBIDDEN: smartphone mockups, fake app dashboards, invented UI, dark mats, widescreen bars,",
-    "FORBIDDEN: industrial PPE / hard hats / factory safety scenes unless the brand explicitly asks for them,",
+    "FORBIDDEN: industrial PPE, hard hats, earmuffs, factory floors, warehouse safety gear, yellow construction helmets — unless niche lock explicitly is industrial EPI/SST,",
+    "FORBIDDEN: overlay text about gestão de EPI / segurança industrial when niche is faith/planner/lifestyle,",
     "FORBIDDEN: text cut off, text overflowing edges, tiny unreadable type, watermark stamps,",
     "leave small clean space bottom-left for logo overlay only,",
     "no watermarks, no invented brand logos in the scene.",
     brandPromptBits(brand),
     cue,
-    prompt.slice(0, 2200),
+    locked.slice(0, 2200),
   ]
     .filter(Boolean)
     .join(" ");
@@ -318,6 +332,8 @@ export async function gerarImagemViral(
   const enriched = buildPrompt(prompt, brand, mode, {
     diversityIndex: opts?.diversityIndex,
     researchCue: opts?.researchCue,
+    niche: opts?.niche,
+    hook: opts?.hook,
   });
 
   let buffer: Buffer;

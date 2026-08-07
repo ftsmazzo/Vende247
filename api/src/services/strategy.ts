@@ -1,6 +1,11 @@
 import { chatJson } from "./llm.js";
 import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { BrandKit } from "./brandFromUrl.js";
+import {
+  filterResearchCues,
+  lockVisualToNiche,
+  looksIndustrialVisual,
+} from "./nicheVisual.js";
 
 export type CarouselSlide = {
   titulo: string;
@@ -129,14 +134,28 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     plan.pilares = plan.pilares.map((x) => (typeof x === "string" ? x : String(x)));
   }
   plan.resumo = typeof plan.resumo === "string" ? plan.resumo : String(plan.resumo ?? "");
+  const safeCues = filterResearchCues(report.direcao_visual || [], ctx);
+  const faithHooks = [
+    "Orei. E agora?",
+    "Fé na rotina",
+    "Organize com fé",
+    "Gratidão diária",
+    "Palavra no centro",
+    "Comece de novo",
+    "Ritual simples",
+  ];
   plan.posts = plan.posts.slice(0, n).map((p, i) => {
     const cena = normalizeCena(p.cena_tipo) || CENA_ROTATION[i % CENA_ROTATION.length];
-    const hook = coerceText(p.hook) || coerceText(p.titulo) || "Hook";
+    let hook = coerceText(p.hook) || coerceText(p.titulo) || "Hook";
+    if (looksIndustrialVisual(hook) && !looksIndustrialVisual(`${ctx.nicho} ${ctx.produto}`)) {
+      hook = faithHooks[i % faithHooks.length];
+    }
     const titulo = coerceText(p.titulo) || `Dia ${i + 1}`;
     let visual = coerceText(p.visual_prompt).trim();
     const lower = visual.toLowerCase();
     if (
       !visual ||
+      looksIndustrialVisual(visual) ||
       lower.includes("smartphone mockup") ||
       lower.includes("phone mockup") ||
       (lower.includes("smartphone") && lower.includes("dashboard")) ||
@@ -144,7 +163,7 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     ) {
       visual = fallbackVisual(ctx, brand, cena, hook);
     }
-    const cue = (report.direcao_visual || [])[i % Math.max(report.direcao_visual?.length || 1, 1)];
+    const cue = safeCues[i % Math.max(safeCues.length, 1)];
     if (cue && !visual.toLowerCase().includes(cue.slice(0, 24).toLowerCase())) {
       visual = `${visual}. Scene mood from research: ${cue.slice(0, 160)}`;
     }
@@ -158,6 +177,7 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
       "candid two-shot lifestyle",
     ];
     visual = `${visual}. Camera: ${angles[i % angles.length]}.`;
+    visual = lockVisualToNiche(visual, ctx, brand, hook);
 
     const formato = (["feed", "carrossel", "reels"].includes(String(p.formato))
       ? p.formato
@@ -168,8 +188,19 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
       slides = normalizeCarouselSlides(slides, visual, hook, ctx, brand, cena);
       slides = slides.map((s, si) => ({
         ...s,
-        visual_prompt: `${s.visual_prompt}. Camera: ${angles[(i + si + 1) % angles.length]}. Distinct from other slides.`,
+        texto: looksIndustrialVisual(s.texto) ? hook : s.texto,
+        visual_prompt: lockVisualToNiche(
+          `${s.visual_prompt}. Camera: ${angles[(i + si + 1) % angles.length]}. Distinct from other slides.`,
+          ctx,
+          brand,
+          s.texto || hook
+        ),
       }));
+    }
+
+    let caption = coerceText(p.caption);
+    if (looksIndustrialVisual(caption) && !looksIndustrialVisual(`${ctx.nicho} ${ctx.produto}`)) {
+      caption = `${hook}\n\n${coerceText(ctx.oferta) || "Um ritual simples de fé e organização."}\n\n${ctx.cta || "Quero o planner no Direct"}`;
     }
 
     return {
@@ -180,8 +211,8 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
       pilar: coerceText(p.pilar),
       objetivo: p.objetivo,
       estrutura: coerceText(p.estrutura),
-      caption: coerceText(p.caption),
-      cta: coerceText(p.cta),
+      caption,
+      cta: coerceText(p.cta) || ctx.cta,
       formato,
       cena_tipo: cena,
       visual_prompt: visual,
