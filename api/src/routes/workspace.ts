@@ -6,6 +6,7 @@ import {
   publicWorkspace,
   requireAuth,
 } from "../services/authHelpers.js";
+import { getProductPreset, listProductPresets } from "../services/brandPresets.js";
 
 function normalizeCompetitors(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
@@ -22,6 +23,51 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
     return publicWorkspace(ws);
+  });
+
+  app.get("/presets", async () => ({ presets: listProductPresets() }));
+
+  app.post<{ Body: { preset_id?: string } }>("/apply-preset", async (req, reply) => {
+    const ws = await getWorkspaceForUser(getUserId(req));
+    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const id = (req.body?.preset_id || "planner-mulher").trim();
+    const preset = getProductPreset(id);
+    if (!preset) return reply.status(400).send({ error: "Preset não encontrado." });
+
+    const prev = (ws.brand_kit || {}) as Record<string, unknown>;
+    const kit = {
+      ...prev,
+      ...preset.brand_kit,
+      logo_url: prev.logo_url || preset.brand_kit.logo_url,
+      site_url: prev.site_url || preset.brand_kit.site_url,
+      extracted_at: new Date().toISOString(),
+    };
+
+    await query(
+      `UPDATE workspaces SET
+         nicho = $2, produto = $3, oferta = $4, cta = $5, tom_voz = $6,
+         concorrentes = $7::jsonb,
+         brand_kit = $8::jsonb,
+         onboarding_done = TRUE,
+         updated_at = NOW()
+       WHERE id = $1`,
+      [
+        ws.id,
+        preset.nicho,
+        preset.produto,
+        preset.oferta,
+        preset.cta,
+        preset.tom_voz,
+        JSON.stringify(preset.concorrentes),
+        JSON.stringify(kit),
+      ]
+    );
+
+    const fresh = await getWorkspaceForUser(getUserId(req));
+    return {
+      workspace: publicWorkspace(fresh),
+      preset: { id: preset.id, label: preset.label },
+    };
   });
 
   app.put<{
@@ -43,7 +89,8 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
     const b = req.body ?? {};
-    const concorrentes = b.concorrentes !== undefined ? normalizeCompetitors(b.concorrentes) : ws.concorrentes;
+    const concorrentes =
+      b.concorrentes !== undefined ? normalizeCompetitors(b.concorrentes) : ws.concorrentes;
 
     await query(
       `UPDATE workspaces SET

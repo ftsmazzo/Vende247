@@ -108,10 +108,10 @@ function pickColors(brand?: BrandKit | null): {
     .sort((a, b) => saturation(b) - saturation(a));
 
   return {
-    accent: bright[0] || "#D4F34A",
-    deep: midDark[0] || "#0E3D38",
-    ink: "#060908",
-    surface: "#0C1412",
+    accent: bright[0] || "#C4A484",
+    deep: midDark[0] || "#5C4033",
+    ink: "#1A1410",
+    surface: "#120E0C",
   };
 }
 
@@ -165,7 +165,7 @@ function shortCta(label: string): string {
   const t = cleanPublicText(label).trim();
   if (!t) return "Quero uma demonstração";
   if (t.length <= 34) return t;
-  if (/whatsapp|wa\.me|direct|demo|demonstra|prontepi/i.test(t)) return "Quero uma demonstração";
+  if (/whatsapp|wa\.me|direct|demo|demonstra/i.test(t)) return t.length <= 34 ? t : "Quero saber mais";
   return t.slice(0, 32) + "…";
 }
 
@@ -282,8 +282,8 @@ function splitHeadline(headline: string, accent: string): { main: string; accent
     main = main.replace(new RegExp(acc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), "").trim();
     main = main.replace(/[\s*]+$/g, "").trim();
   }
-  if (!main) main = "Menos papel. Mais controle.";
-  if (!acc) acc = "Na entrega de EPIs.";
+  if (!main) main = "Rotina sem propósito?";
+  if (!acc) acc = "Organize com fé.";
   return { main, accent: acc };
 }
 
@@ -690,9 +690,10 @@ export async function generateLanding(opts: {
     : null;
 
   const copy = await chatJson<LandingCopy>(
-    `Você escreve landing pages B2B de SOFTWARE (Brasil) para o COMPRADOR do produto — gestor SST, técnico de segurança, consultor multi-cliente, comprador de EPI.
+    `Você escreve landing pages de conversão (Brasil) para o COMPRADOR do produto descrito no workspace.
 
 MISSÃO: vender o PRODUTO do workspace (descrição + oferta). NÃO vender "presença no Instagram".
+Adapte o tom ao nicho (B2C fé/lifestyle, B2B software, etc.) — NÃO force EPI/SST/indústria se o produto for outro.
 
 PROIBIDO ABSOLUTO nas dores/pains/pillars/angles:
 - perfil vazio, falta de conteúdo, engajamento, posts, reels, carrossel, bio, seguidores
@@ -701,13 +702,13 @@ PROIBIDO ABSOLUTO nas dores/pains/pillars/angles:
 - copy genérica tipo "tecnologia de ponta", "otimize seus gastos", "transforme sua gestão"
 
 OBRIGATÓRIO:
-- pains = 4 dores OPERACIONAIS curtas (máx 110 caracteres cada). Tom do COMPRADOR. PROIBIDO citar concorrentes, "ownar", research, nomes de @.
+- pains = 4 dores reais do público do nicho (máx 110 caracteres cada). Tom do COMPRADOR.
 - angles = frases comerciais curtas (máx 120 chars), SEM comentário de estrategista depois do travessão
 - headline com tensão concreta (máx 6 palavras na linha principal) + accent com benefício
-- subheadline = 1 frase completa (não truncar) com mecanismo (biometria / CA / multi-cliente)
-- benefits: título curto + body com resultado concreto (não feature vazia)
-- pillars: diferenciais do PRODUTO (não pilares editoriais de Instagram)
-- faq: objeções reais de compra B2B
+- subheadline = 1 frase completa com mecanismo/benefício do produto
+- benefits: título curto + body com resultado concreto
+- pillars: diferenciais do PRODUTO
+- faq: objeções reais de compra desse tipo de oferta
 - Preencha TODOS os arrays; nunca {}
 - Sem markdown, sem emoji, sem métricas inventadas (% / "500 empresas"), sem telefone inventado
 - hero_cta ≤ 32 caracteres; offer_title ≤ 8 palavras
@@ -723,8 +724,7 @@ JSON estrito.`,
           oferta: ctx.oferta,
           cta: ctx.cta,
           tom_voz: ctx.tom_voz,
-          publico_alvo:
-            "Consultores SST multi-cliente, técnicos de segurança e empresas que controlam entrega de EPI",
+          publico_alvo: `Público alinhado ao nicho: ${ctx.nicho}`,
         },
         sinais_de_mercado_somente_produto: productSignals,
         brand: brand
@@ -739,46 +739,47 @@ JSON estrito.`,
   );
 
   const brandName = cleanPublicText(copy.brand_name) || ctx.produto.split(/[—\-–]/)[0]?.trim() || "Produto";
+  const shortProduct = brandName;
 
   const defaultBenefits = [
     {
-      title: "Biometria na entrega",
-      body: "Registro facial na hora de entregar EPI — prova auditável para auditoria.",
+      title: "Comece hoje",
+      body: `${shortProduct} — acesso simples e imediato após a compra.`,
     },
     {
-      title: "Multi-cliente",
-      body: "Consultor SST gerencia várias empresas; cada uma com painel próprio.",
+      title: "Feito para você",
+      body: `Pensado para o público de ${ctx.nicho.split(/[—\-–]/)[0]?.trim() || "este nicho"}.`,
     },
     {
-      title: "Alertas de CA",
-      body: "Avisos de validade e vida útil antes da multa ou da falha na fiscalização.",
+      title: "Resultado prático",
+      body: cleanPublicText(ctx.oferta)?.slice(0, 120) || "Organização e constância no dia a dia.",
     },
     {
-      title: "Estoque e custo",
-      body: "Controle de EPI, consumo e custo sem planilha solta.",
+      title: "Suporte no Direct",
+      body: "Dúvidas? Fale direto — atendimento humano e rápido.",
     },
   ];
   const defaultSteps = [
-    { title: "Cadastre a operação", body: "Clientes, colaboradores e EPIs com CA no mesmo fluxo." },
-    { title: "Entregue com biometria", body: "Confirme identidade na entrega e gere o histórico." },
-    { title: "Opere com alertas", body: "CA e vida útil sob controle — menos surpresa na auditoria." },
+    { title: "Escolha", body: `Peça o ${shortProduct} pelo Direct.` },
+    { title: "Receba", body: "Acesso ao material digital após a confirmação." },
+    { title: "Use no dia a dia", body: "Aplique no ritmo da sua rotina e mantenha a constância." },
   ];
   const defaultFaq = [
     {
-      q: "Serve para consultor com vários clientes?",
-      a: "Sim. O modelo multi-cliente foi feito para consultores SST acompanharem várias empresas.",
+      q: "É digital?",
+      a: "Sim. Você recebe o material em formato digital para usar no celular ou imprimir.",
     },
     {
-      q: "A biometria substitui assinatura em papel?",
-      a: "Ela registra a entrega com identificação facial, gerando prova mais forte que planilha.",
+      q: "Quando recebo?",
+      a: "Assim que a compra for confirmada — acesso imediato por link.",
     },
     {
-      q: "Como ajuda com CA vencido?",
-      a: "Alertas de validade e vida útil ajudam a agir antes da fiscalização.",
+      q: "Serve para iniciantes?",
+      a: "Sim. Foi pensado para quem quer começar com clareza, sem complicação.",
     },
     {
-      q: "Dá para ver demonstração?",
-      a: "Sim. Peça uma demo e veja o fluxo de entrega e o painel ao vivo.",
+      q: "Como compro?",
+      a: cleanPublicText(ctx.cta) || "Chame no Direct e peça o planner.",
     },
   ];
 
@@ -801,10 +802,10 @@ JSON estrito.`,
   copy.faq = normalizeFaq(copy.faq).filter((f) => !isIgOrInternalNoise(`${f.q} ${f.a}`));
 
   const defaultPains = [
-    "Entrega de EPI sem prova auditável — risco na fiscalização",
-    "CA vencido ou vida útil estourada sem alerta a tempo",
-    "Planilha que não escala quando o consultor tem vários clientes",
-    "Estoque e custo de EPI sem visão clara por empresa",
+    "Quer crescer na fé, mas a rotina engole o tempo",
+    "Começa o mês animada e abandona na segunda semana",
+    "Planner genérico que não fala a linguagem do seu coração",
+    "Falta um ritual simples de oração, gratidão e organização",
   ];
 
   if (copy.pains.length < 3) {
@@ -822,16 +823,16 @@ JSON estrito.`,
   if (!copy.pillars.length) {
     copy.pillars = [
       {
-        title: "Prova na entrega",
-        body: "Biometria facial e histórico — base mais forte que assinatura em papel.",
+        title: "Fé no centro",
+        body: "Páginas de oração, gratidão e Palavra — não só checklist de tarefas.",
       },
       {
-        title: "Operação multi-cliente",
-        body: "Consultor SST com vários painéis no mesmo fluxo, sem planilha paralela.",
+        title: "Rotina leve",
+        body: "Estrutura mensal simples para manter constância sem sobrecarregar.",
       },
       {
-        title: "Alerta antes da multa",
-        body: "CA e vida útil no radar operacional — não no susto da auditoria.",
+        title: "Acesso imediato",
+        body: "PDF digital — use no celular ou imprima no conforto de casa.",
       },
     ];
   }
@@ -840,25 +841,25 @@ JSON estrito.`,
     copy.angles = filterProductLines([
       ...copy.angles,
       ...normalizeStrings(report?.hooks_vencedores),
-      "Auditoria sem prova de entrega é risco caro",
-      "Biometria na entrega muda o jogo da conformidade",
-      "CA vencido não pode ser surpresa",
-      "Multi-cliente sem planilha solta",
+      "Constância começa com um ritual simples",
+      "Organize o mês sem perder a fé de vista",
+      "Um planner que fala a língua do seu coração",
+      "Do Direct ao PDF — acesso imediato",
     ]).slice(0, 6);
   }
 
   if (!copy.proof_items.length) {
     copy.proof_items = [
-      "Entrega com identificação facial e histórico",
-      "Alertas de CA e vida útil no fluxo operacional",
-      "Painel multi-cliente para consultores SST",
+      "Páginas de oração, gratidão e estudo bíblico",
+      "Formato digital com acesso imediato",
+      "Feito para a mulher cristã na correria do dia a dia",
     ];
   }
   if (!copy.metrics.length) {
     copy.metrics = [
-      { value: "Biometria", label: "na entrega de EPI" },
-      { value: "CA", label: "com alerta de validade" },
-      { value: "Multi-cliente", label: "para consultores SST" },
+      { value: "PDF", label: "acesso imediato" },
+      { value: "Mensal", label: "ritual renovado" },
+      { value: "Direct", label: "compra simples" },
     ];
   }
 
@@ -870,70 +871,70 @@ JSON estrito.`,
     cleanPublicText(copy.headline).split(/\s+/).length < 2;
 
   const head = splitHeadline(
-    weakHeadline ? "CA vencido na auditoria?" : copy.headline,
+    weakHeadline ? "Rotina sem propósito?" : copy.headline,
     weakHeadline || !copy.headline_accent
-      ? "Controle EPI com prova."
+      ? "Organize com fé."
       : copy.headline_accent
   );
   copy.headline = head.main;
   copy.headline_accent = head.accent;
   copy.eyebrow = cleanPublicText(copy.eyebrow);
   if (!copy.eyebrow || isIgOrInternalNoise(copy.eyebrow)) {
-    copy.eyebrow = "Software de gestão de EPI";
+    copy.eyebrow = shortProduct;
   }
   copy.subheadline = cleanPublicText(copy.subheadline);
   if (!copy.subheadline || isIgOrInternalNoise(copy.subheadline) || copy.subheadline.length < 40) {
     copy.subheadline =
       cleanPublicText(ctx.oferta)?.slice(0, 180) ||
-      "Biometria na entrega, alerta de CA e painel multi-cliente — menos papel, menos multa, mais controle.";
+      "Planner digital com oração, gratidão e organização — para a mulher que quer constância na fé e no dia a dia.";
   }
   copy.audience = cleanPublicText(copy.audience);
   if (isIgOrInternalNoise(copy.audience)) copy.audience = "";
   if (!copy.audience) {
-    copy.audience = "Para consultores SST e times de segurança do trabalho";
+    copy.audience = `Para quem se identifica com: ${ctx.nicho.split(/[—\-–]/)[0]?.trim() || "este nicho"}`;
   }
   copy.differentiator = cleanPublicText(copy.differentiator);
   if (isIgOrInternalNoise(copy.differentiator)) copy.differentiator = "";
   if (!copy.differentiator) {
-    copy.differentiator = "Prova na entrega + CA sob alerta";
+    copy.differentiator = "Fé + organização no mesmo ritual";
   }
-  copy.hero_cta = shortCta(copy.hero_cta || "Quero demonstração");
-  copy.hero_cta_secondary = cleanPublicText(copy.hero_cta_secondary) || "Ver o problema";
+  copy.hero_cta = shortCta(copy.hero_cta || ctx.cta || "Quero o planner");
+  copy.hero_cta_secondary = cleanPublicText(copy.hero_cta_secondary) || "Ver como funciona";
   copy.final_cta = shortCta(copy.final_cta || copy.hero_cta);
-  copy.pain_title = cleanPublicText(copy.pain_title) || "Isso ainda trava a sua operação?";
+  copy.pain_title = cleanPublicText(copy.pain_title) || "Isso ainda te trava?";
   if (isIgOrInternalNoise(copy.pain_title)) {
-    copy.pain_title = "Isso ainda trava a sua operação?";
+    copy.pain_title = "Isso ainda te trava?";
   }
   copy.solution_title = cleanPublicText(copy.solution_title) || "O que muda na prática";
   copy.how_title = cleanPublicText(copy.how_title) || "Como funciona";
-  copy.pillars_title = cleanPublicText(copy.pillars_title) || "Por que o produto";
-  copy.angles_title = cleanPublicText(copy.angles_title) || "O que o mercado responde";
-  copy.proof_title = cleanPublicText(copy.proof_title) || "Prova sem enrolação";
+  copy.pillars_title = cleanPublicText(copy.pillars_title) || "Por que este planner";
+  copy.angles_title = cleanPublicText(copy.angles_title) || "O que ressoa com você";
+  copy.proof_title = cleanPublicText(copy.proof_title) || "O que você recebe";
   copy.faq_title = cleanPublicText(copy.faq_title) || "Perguntas frequentes";
-  copy.offer_title = shortTitle(copy.offer_title || "Peça uma demonstração", 48);
+  copy.offer_title = shortTitle(copy.offer_title || "Quero o planner", 48);
   copy.offer_body =
     cleanPublicText(copy.offer_body) ||
     cleanPublicText(ctx.oferta) ||
-    "Veja o fluxo de entrega com biometria e o painel multi-cliente ao vivo.";
+    "Peça no Direct e receba o PDF com acesso imediato.";
   if (isIgOrInternalNoise(copy.offer_body)) {
     copy.offer_body =
       cleanPublicText(ctx.oferta) ||
-      "Veja o fluxo de entrega com biometria e o painel multi-cliente ao vivo.";
+      "Peça no Direct e receba o PDF com acesso imediato.";
   }
   if (copy.offer_title.length > 60 || isIgOrInternalNoise(copy.offer_title)) {
-    copy.offer_title = "Peça uma demonstração";
+    copy.offer_title = "Quero o planner";
   }
-  copy.final_sub = cleanPublicText(copy.final_sub) || "Resposta rápida para times SST.";
-  copy.whatsapp_hint = cleanPublicText(copy.whatsapp_hint || ctx.cta) || "Chama no WhatsApp e peça uma demo";
+  copy.final_sub = cleanPublicText(copy.final_sub) || "Resposta rápida no Direct.";
+  copy.whatsapp_hint = cleanPublicText(copy.whatsapp_hint || ctx.cta) || "Chama no Direct e peça o planner";
   if (isIgOrInternalNoise(copy.whatsapp_hint)) {
-    copy.whatsapp_hint = "Peça uma demonstração do produto";
+    copy.whatsapp_hint = "Peça o planner no Direct";
   }
   copy.whatsapp_url = copy.whatsapp_url && !isFakePhone(String(copy.whatsapp_url).replace(/\D/g, ""))
     ? copy.whatsapp_url
     : undefined;
   copy.seo_title =
     cleanPublicText(copy.seo_title) ||
-    `${brandName} — gestão de EPI com biometria`;
+    `${brandName} — planner digital com fé e organização`;
   copy.seo_description =
     cleanPublicText(copy.seo_description) || copy.subheadline.slice(0, 155);
 
@@ -942,11 +943,15 @@ JSON estrito.`,
     try {
       heroUrl = await gerarImagemViral(
         [
-          "Workers wearing hard hats and EPI on a clean modern factory floor.",
-          "Cinematic lighting, shallow depth of field, premium editorial photo.",
+          brand?.product_ui_notes ||
+            "Woman in a calm morning quiet time with open planner, coffee and soft window light.",
+          "Warm beige and terracotta tones, editorial lifestyle photo, shallow depth of field.",
           "Empty visual space on the left third for website text overlay.",
           `Mood for product: ${ctx.produto.slice(0, 120)}`,
-        ].join(" "),
+          brand?.visual_summary ? `Brand mood: ${brand.visual_summary.slice(0, 180)}` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         brand,
         { mode: "photo", purpose: "photo", overlayLogo: false, aspectRatio: "4:5" }
       );

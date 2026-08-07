@@ -10,8 +10,8 @@ export function OnboardingPage() {
   const [nicho, setNicho] = useState("");
   const [produto, setProduto] = useState("");
   const [oferta, setOferta] = useState("");
-  const [cta, setCta] = useState("Chama no Direct");
-  const [tom, setTom] = useState("direto, confiante, sem enrolação");
+  const [cta, setCta] = useState("Quero o planner no Direct");
+  const [tom, setTom] = useState("acolhedor, inspirador, feminino, sem piegas");
   const [concorrentes, setConcorrentes] = useState("");
   const [igUsername, setIgUsername] = useState("");
   const [igUserId, setIgUserId] = useState("");
@@ -55,9 +55,9 @@ export function OnboardingPage() {
       </p>
 
       <form onSubmit={onSubmit} className="space-y-4">
-        <Field label="Nicho *" value={nicho} onChange={setNicho} placeholder="Ex.: imóveis luxo Curitiba" required />
-        <Field label="Produto / oferta *" value={produto} onChange={setProduto} placeholder="O que você vende" required />
-        <Field label="Oferta / diferencial" value={oferta} onChange={setOferta} placeholder="Ex.: consultoria gratuita" />
+        <Field label="Nicho *" value={nicho} onChange={setNicho} placeholder="Ex.: planner cristão para mulheres" required />
+        <Field label="Produto / oferta *" value={produto} onChange={setProduto} placeholder="Ex.: Planner Mulher Cristã (PDF mensal)" required />
+        <Field label="Oferta / diferencial" value={oferta} onChange={setOferta} placeholder="Ex.: acesso imediato + páginas de oração" />
         <Field label="CTA padrão" value={cta} onChange={setCta} />
         <Field label="Tom de voz" value={tom} onChange={setTom} />
         <label className="block">
@@ -65,12 +65,12 @@ export function OnboardingPage() {
           <textarea
             className="field min-h-[100px]"
             required
-            placeholder={"@concorrente1\n@concorrente2\n@concorrente3"}
+            placeholder={"@belafebiblia\n@viviandoliveira\n@saratorres"}
             value={concorrentes}
             onChange={(e) => setConcorrentes(e.target.value)}
           />
           <p className="text-xs text-white/40 mt-1">
-            Quanto mais perfis relevantes, melhor a pesquisa. Pode editar depois em Configurações.
+            Ou aplique o preset Planner Mulher em Configurações. Pode editar depois.
           </p>
         </label>
 

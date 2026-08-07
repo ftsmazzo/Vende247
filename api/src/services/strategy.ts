@@ -24,10 +24,10 @@ export type CreativeBrief = {
   slides?: CarouselSlide[];
   /** Tipo de cena para diversidade */
   cena_tipo:
-    | "trabalhador_epi"
-    | "biometria_entrega"
-    | "estoque_ca"
-    | "gestor_alerta"
+    | "hero_pessoa"
+    | "produto_detalhe"
+    | "rotina"
+    | "emocao"
     | "antes_depois"
     | "prova_social"
     | "oferta";
@@ -41,10 +41,10 @@ export type StrategyPlan = {
 };
 
 const CENA_ROTATION: CreativeBrief["cena_tipo"][] = [
-  "trabalhador_epi",
-  "biometria_entrega",
-  "estoque_ca",
-  "gestor_alerta",
+  "hero_pessoa",
+  "produto_detalhe",
+  "rotina",
+  "emocao",
   "antes_depois",
   "prova_social",
   "oferta",
@@ -59,28 +59,29 @@ export async function generateStrategy(
   const n = Math.min(Math.max(days, 7), 14);
 
   const plan = await chatJson<StrategyPlan>(
-    `Você é diretor criativo de anúncios Instagram para software SST/EPI (Brasil, 2026).
+    `Você é diretor criativo de anúncios Instagram (Brasil, 2026).
 Produto a vender: use SOMENTE ângulos do produto informado + research (oportunidades_unicas, direcao_visual, hooks).
+Nicho: ${ctx.nicho}. NÃO force software B2B / EPI / indústria se o produto for outro.
 
 Plano de exatamente ${n} dias. Cada post DEVE ser visualmente e tematicamente diferente do anterior.
 
 PROIBIDO:
 - visual_prompt com mockup de celular / "smartphone showing dashboard" / telas inventadas de app
-- captions genéricas tipo "transforme sua gestão" sem dor concreta
+- captions genéricas tipo "transforme sua vida" sem dor concreta do nicho
 - repetir o mesmo layout visual, mesma locação ou mesmo ângulo de câmera em vários dias
 - prometer vídeo gerado / motion / reels animado (o sistema ainda NÃO gera vídeo)
 - copiar arte de concorrente; só reaproveitar ÂNGULOS de mensagem da research
+- cenas industriais / EPI / fábrica salvo se o nicho for isso
 
 OBRIGATÓRIO em cada post:
-- hook específico (dor: CA vencido, planilha, multa, biometria, consultor multi-cliente, auditoria)
+- hook específico à dor/desejo do público do nicho
 - caption curta (máx 320 caracteres), 1ª linha = hook, CTA no fim
-- visual_prompt = FOTO/CENA realista ÚNICA — use 1 item diferente de research.direcao_visual por dia:
-  trabalhador com capacete/luvas/óculos, entrega com reconhecimento facial, estoque de EPI, gestor no pátio, auditoria — cores vivas
+- visual_prompt = FOTO/CENA realista ÚNICA — use 1 item diferente de research.direcao_visual por dia;
+  alinhe ao brand.visual_summary se existir; cores vivas ou soft conforme a marca
   texto no visual: 3–6 palavras em português, tipografia bold, longe das bordas
-  especifique: local concreto + ângulo de câmera + hora do dia (ex.: "close mãos no estoque, luz matinal")
-- cena_tipo: um de trabalhador_epi | biometria_entrega | estoque_ca | gestor_alerta | antes_depois | prova_social | oferta
-  — varie: no máximo 1 post com celular E só se for mão de operador no pátio (não mockup 3D de marketing)
-- NÃO repita a mesma cena_tipo em dias consecutivos
+  especifique: local concreto + ângulo de câmera + hora do dia
+- cena_tipo: um de hero_pessoa | produto_detalhe | rotina | emocao | antes_depois | prova_social | oferta
+  — varie: não repita a mesma cena_tipo em dias consecutivos
 
 FORMATOS:
 - Mix: ~40% feed, 30% carrossel, 30% reels
@@ -106,11 +107,12 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
               colors: brand.colors,
               visual_summary: brand.visual_summary,
               estilo: brand.visual_summary,
+              product_ui_notes: brand.product_ui_notes,
             }
           : null,
         cena_rotation_sugerida: CENA_ROTATION.slice(0, n),
         regra_diversidade:
-          "Cada visual_prompt deve citar uma cena distinta de direcao_visual; se faltar, invente variação de local/ângulo.",
+          "Cada visual_prompt deve citar uma cena distinta de direcao_visual; se faltar, invente variação de local/ângulo alinhada ao nicho.",
       },
       null,
       2
@@ -128,7 +130,7 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
   }
   plan.resumo = typeof plan.resumo === "string" ? plan.resumo : String(plan.resumo ?? "");
   plan.posts = plan.posts.slice(0, n).map((p, i) => {
-    const cena = CENA_ROTATION[i % CENA_ROTATION.length];
+    const cena = normalizeCena(p.cena_tipo) || CENA_ROTATION[i % CENA_ROTATION.length];
     const hook = coerceText(p.hook) || coerceText(p.titulo) || "Hook";
     const titulo = coerceText(p.titulo) || `Dia ${i + 1}`;
     let visual = coerceText(p.visual_prompt).trim();
@@ -140,21 +142,20 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
       (lower.includes("smartphone") && lower.includes("dashboard")) ||
       (lower.match(/phone/g) || []).length >= 2
     ) {
-      visual = fallbackVisual(ctx, cena, hook);
+      visual = fallbackVisual(ctx, brand, cena, hook);
     }
     const cue = (report.direcao_visual || [])[i % Math.max(report.direcao_visual?.length || 1, 1)];
     if (cue && !visual.toLowerCase().includes(cue.slice(0, 24).toLowerCase())) {
       visual = `${visual}. Scene mood from research: ${cue.slice(0, 160)}`;
     }
-    // Força variação de câmera no prompt (mesmo se o LLM repetir cena)
     const angles = [
       "wide shot morning light",
       "medium eye-level documentary",
       "close-up details shallow DOF",
-      "low angle dramatic side light",
-      "over-shoulder supervisor view",
-      "high angle shelves",
-      "candid two-shot plant floor",
+      "low angle warm side light",
+      "over-shoulder quiet moment",
+      "high angle flat lay",
+      "candid two-shot lifestyle",
     ];
     visual = `${visual}. Camera: ${angles[i % angles.length]}.`;
 
@@ -164,7 +165,7 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
 
     let slides = Array.isArray(p.slides) ? p.slides : undefined;
     if (formato === "carrossel") {
-      slides = normalizeCarouselSlides(slides, visual, hook, ctx, cena);
+      slides = normalizeCarouselSlides(slides, visual, hook, ctx, brand, cena);
       slides = slides.map((s, si) => ({
         ...s,
         visual_prompt: `${s.visual_prompt}. Camera: ${angles[(i + si + 1) % angles.length]}. Distinct from other slides.`,
@@ -182,13 +183,32 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
       caption: coerceText(p.caption),
       cta: coerceText(p.cta),
       formato,
-      cena_tipo: p.cena_tipo || cena,
+      cena_tipo: cena,
       visual_prompt: visual,
       slides,
     };
   });
 
   return plan;
+}
+
+function normalizeCena(raw: unknown): CreativeBrief["cena_tipo"] | null {
+  const s = String(raw || "");
+  const map: Record<string, CreativeBrief["cena_tipo"]> = {
+    hero_pessoa: "hero_pessoa",
+    produto_detalhe: "produto_detalhe",
+    rotina: "rotina",
+    emocao: "emocao",
+    antes_depois: "antes_depois",
+    prova_social: "prova_social",
+    oferta: "oferta",
+    // legado EPI → equivalentes genéricos
+    trabalhador_epi: "hero_pessoa",
+    biometria_entrega: "produto_detalhe",
+    estoque_ca: "produto_detalhe",
+    gestor_alerta: "emocao",
+  };
+  return map[s] ?? null;
 }
 
 function coerceText(v: unknown): string {
@@ -221,34 +241,35 @@ export function normalizeCarouselSlides(
   coverVisual: string,
   hook: string,
   ctx: WorkspaceContext,
+  brand: BrandKit | null | undefined,
   cena: CreativeBrief["cena_tipo"]
 ): CarouselSlide[] {
-  const h = (hook || "ProntEPI").slice(0, 36);
+  const h = (hook || ctx.produto.split(/[—\-–]/)[0] || "Oferta").slice(0, 36);
   const defaults: CarouselSlide[] = [
     {
       titulo: "Hook",
       texto: h,
-      visual_prompt: coverVisual || fallbackVisual(ctx, cena, h),
+      visual_prompt: coverVisual || fallbackVisual(ctx, brand, cena, h),
     },
     {
       titulo: "Dor",
-      texto: "CA vencido e planilha?",
-      visual_prompt: fallbackVisual(ctx, "gestor_alerta", "PARE DE CORRER RISCO"),
+      texto: "Sem constância no dia a dia?",
+      visual_prompt: fallbackVisual(ctx, brand, "emocao", "PARE DE ADIAR"),
     },
     {
       titulo: "Solução",
-      texto: "Controle real de EPI",
-      visual_prompt: fallbackVisual(ctx, "biometria_entrega", "ENTREGA COM BIOMETRIA"),
+      texto: ctx.produto.split(/[—\-–]/)[0]?.trim().slice(0, 40) || "Seu novo ritual",
+      visual_prompt: fallbackVisual(ctx, brand, "produto_detalhe", "COMECE HOJE"),
     },
     {
       titulo: "Prova",
-      texto: "Estoque + CA na mão",
-      visual_prompt: fallbackVisual(ctx, "estoque_ca", "CA EM DIA"),
+      texto: "Feito para a sua rotina",
+      visual_prompt: fallbackVisual(ctx, brand, "rotina", "ROTINA COM PROPÓSITO"),
     },
     {
       titulo: "CTA",
       texto: ctx.cta || "Chama no Direct",
-      visual_prompt: fallbackVisual(ctx, "oferta", (ctx.cta || "PEÇA DEMO").slice(0, 28)),
+      visual_prompt: fallbackVisual(ctx, brand, "oferta", (ctx.cta || "QUERO AGORA").slice(0, 28)),
     },
   ];
 
@@ -258,7 +279,11 @@ export function normalizeCarouselSlides(
     .map((s, i) => ({
       titulo: (s.titulo || `Slide ${i + 1}`).slice(0, 40),
       texto: (s.texto || s.titulo || h).slice(0, 80),
-      visual_prompt: (s.visual_prompt || coverVisual || fallbackVisual(ctx, cena, s.texto || h)).trim(),
+      visual_prompt: (
+        s.visual_prompt ||
+        coverVisual ||
+        fallbackVisual(ctx, brand, cena, s.texto || h)
+      ).trim(),
     }))
     .filter((s) => s.visual_prompt);
 
@@ -270,18 +295,23 @@ export function normalizeCarouselSlides(
 
 function fallbackVisual(
   ctx: WorkspaceContext,
+  brand: BrandKit | null | undefined,
   cena: CreativeBrief["cena_tipo"],
   hook: string
 ): string {
-  const h = (hook || "ProntEPI").slice(0, 40);
+  const h = (hook || ctx.produto.split(/[—\-–]/)[0] || "Oferta").slice(0, 40);
+  const mood =
+    brand?.visual_summary?.slice(0, 160) ||
+    "warm soft editorial lighting, authentic lifestyle, Instagram 4:5";
+  const product = ctx.produto.slice(0, 100);
   const scenes: Record<CreativeBrief["cena_tipo"], string> = {
-    trabalhador_epi: `Industrial worker wearing hard hat, safety glasses and gloves on factory floor, bold Portuguese text "${h}", vibrant safety yellow and deep blue, cinematic lighting, Instagram 4:5, no phone mockups`,
-    biometria_entrega: `PPE delivery moment: worker face recognition at warehouse counter with safety gear on shelf, supervisor tablet discreetly in background, text "${h}", high contrast, documentary photo style, no fake app UI`,
-    estoque_ca: `Organized EPI warehouse shelves with helmets and gloves, label tags for CA certificates, inspector checking validity, text "${h}", colorful industrial photo`,
-    gestor_alerta: `Safety manager on plant floor looking concerned at clipboard/alerts, workers with PPE behind, urgent bold text "${h}", dramatic light`,
-    antes_depois: `Split concept: messy paper spreadsheets vs calm organized PPE control operation, workers with EPI, text "${h}", bold graphic photo collage`,
-    prova_social: `Diverse industrial team in full PPE smiling after successful safety check, authentic workplace, text "${h}", warm energetic colors`,
-    oferta: `Confident SST consultant presenting to plant managers in hard hats, handshake energy, product ${ctx.produto.slice(0, 80)}, CTA text "${h}", bright commercial photo`,
+    hero_pessoa: `Woman in a calm lifestyle moment connected to "${product}", bold Portuguese text "${h}", ${mood}, cinematic photo, no phone mockups`,
+    produto_detalhe: `Close-up of digital planner / journal pages and cozy props for "${product}", text "${h}", ${mood}, shallow depth of field`,
+    rotina: `Morning quiet-time ritual with coffee, open notebook and soft natural light for "${product}", text "${h}", ${mood}`,
+    emocao: `Emotional authentic portrait, hopeful soft expression, warm tones, text "${h}", product mood: ${product}, ${mood}`,
+    antes_depois: `Split concept: scattered notes and overwhelm vs calm organized faith routine with planner, text "${h}", ${mood}`,
+    prova_social: `Warm community / friendship moment of women sharing encouragement, authentic photo, text "${h}", ${mood}`,
+    oferta: `Inviting product showcase of "${product}" with clear CTA text "${h}", bright commercial lifestyle photo, ${mood}`,
   };
   return scenes[cena];
 }

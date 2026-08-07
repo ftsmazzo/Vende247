@@ -12,7 +12,7 @@ export type ResearchReport = {
   hooks_vencedores: string[];
   ctas_comuns: string[];
   pilares_conteudo: string[];
-  /** Direcao visual: cenas humanas, EPI, fabrica — NAO lista de mockups de celular */
+  /** Direcao visual: cenas humanas do nicho — NAO lista de mockups de celular */
   direcao_visual: string[];
   padrao_perfil_engajador: {
     bio_sugerida: string;
@@ -50,10 +50,11 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
   const adQueries = [
     ctx.nicho,
     ctx.produto.split(/[—\-–|/]/).map((s) => s.trim()).find(Boolean) || "",
-    "gestao de EPI",
-    "software SST",
-    "entrega de EPI",
-    "EPI biometria",
+    ...ctx.produto
+      .split(/[\s,;—\-–|/]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 4)
+      .slice(0, 3),
   ].filter((q) => q.length > 3);
 
   // Preferencia: Apify scrape da Ad Library publica (ads comerciais BR).
@@ -88,19 +89,21 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
   }));
 
   const report = await chatJson<ResearchReport>(
-    `Voce e estrategista de conteudo B2B para Instagram no Brasil (SST / EPI / software industrial).
-Sua missao: insights DECISIVOS para vender ESTE produto — nao platitudes de marketing.
+    `Voce e estrategista de conteudo para Instagram no Brasil.
+Sua missao: insights DECISIVOS para vender ESTE produto (nicho/produto do workspace) — nao platitudes de marketing.
 
 PROIBIDO (generico demais):
 - "seguranca e compromisso", "videos e imagens", "saiba mais na bio" sem contexto
 - listas vagas tipo "formatos: video, carrossel"
 - repetir o obvio do nicho sem amarrar ao produto
+- assumir software B2B / EPI / SST se o produto nao for isso
 
 OBRIGATORIO:
 - Citar padroes REAIS vistos nas captions/posts dos concorrentes (temas, angulos, provas)
 - Separar o que concorrentes fazem bem vs o que o produto pode ganhar (oportunidades_unicas)
-- Hooks concretos, no tom do produto (ex.: biometria na entrega, CA vencendo, consultor multi-cliente, planilha vs painel)
-- direcao_visual: 8–12 cenas HUMANAS / operacao DIFERENTES entre si (trabalhador EPI, entrega facial, estoque, auditoria, gestor patio, consultor, antes/depois documental, close de CA, equipe em checklist). Cada item = 1 frase de cena concreta. PROIBIDO: "mockup de celular", "dashboard generico", "foto profissional generica"
+- Hooks concretos, no tom do produto e do publico informado
+- direcao_visual: 8–12 cenas HUMANAS / lifestyle / produto-em-uso DIFERENTES entre si, alinhadas ao nicho.
+  Cada item = 1 frase de cena concreta. PROIBIDO: "mockup de celular", "dashboard generico", "foto profissional generica"
 - Inferir o que as midias dos top posts sugerem pelo tipo (GraphImage/Video/Sidecar) + caption — mesmo sem ver o JPEG
 - Bio e pilares especificos do produto informado
 

@@ -118,7 +118,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
               concorrentes: ws.concorrentes || [],
               ig_username: ws.ig_username,
             },
-            post.cena_tipo || "trabalhador_epi"
+            brand,
+            (post.cena_tipo as CreativeBrief["cena_tipo"]) || "hero_pessoa"
           );
           for (let i = 0; i < slides.length; i++) {
             const url = await gerarImagemViral(slides[i].visual_prompt, brand, {

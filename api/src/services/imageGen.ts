@@ -98,14 +98,14 @@ async function bufferFromOpenAIGenerate(
 
 /** Sufixos de diversidade (ângulo / luz / locação) — evita lote “tudo igual”. */
 const DIVERSITY_SHOTS = [
-  "wide establishing shot, morning industrial light",
-  "medium shot, eye-level, soft daylight through warehouse windows",
-  "close-up on hands and EPI gear, shallow depth of field",
-  "slight low angle, dramatic side light, high contrast",
-  "documentary candid, over-the-shoulder of supervisor",
-  "two-shot conversation on plant floor, natural colors",
-  "top-down / high angle on organized EPI shelves",
-  "golden hour outdoor yard with workers in PPE",
+  "wide establishing shot, soft morning window light",
+  "medium shot, eye-level, gentle natural daylight",
+  "close-up on hands and product details, shallow depth of field",
+  "slight low angle, warm side light, high contrast",
+  "documentary candid, over-the-shoulder quiet moment",
+  "two-shot conversation, natural colors, authentic lifestyle",
+  "top-down / flat lay of journal pages, coffee and soft props",
+  "golden hour outdoor portrait, calm and warm tones",
 ];
 
 export function diversityShot(index = 0): string {
@@ -287,9 +287,10 @@ function buildPrompt(
     "scroll-stopping, vivid colors, emotional impact,",
     "SAFE ZONE: keep ALL text and faces inside a 12% margin from every edge — nothing important near the border,",
     "bold short Portuguese hook (3–6 words) in the UPPER-CENTER, fully readable, large clean sans typography,",
-    "photorealistic workplace / industrial safety scene with real people wearing EPI when relevant,",
+    "photorealistic lifestyle scene matching the product niche (people, rituals, product in use) — follow brand mood if given,",
     `UNIQUE SHOT THIS IMAGE: ${shot} — must look different from other ads in the same campaign.`,
     "FORBIDDEN: smartphone mockups, fake app dashboards, invented UI, dark mats, widescreen bars,",
+    "FORBIDDEN: industrial PPE / hard hats / factory safety scenes unless the brand explicitly asks for them,",
     "FORBIDDEN: text cut off, text overflowing edges, tiny unreadable type, watermark stamps,",
     "leave small clean space bottom-left for logo overlay only,",
     "no watermarks, no invented brand logos in the scene.",

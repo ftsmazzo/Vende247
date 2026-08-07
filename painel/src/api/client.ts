@@ -86,6 +86,14 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ url, logo_url }),
       }),
+    applyPreset: (preset_id = "planner-mulher") =>
+      request<{ workspace: Workspace; preset: { id: string; label: string } }>(
+        "/api/workspace/apply-preset",
+        {
+          method: "POST",
+          body: JSON.stringify({ preset_id }),
+        }
+      ),
   },
   research: {
     latest: () => request<{ run: ResearchRun | null }>("/api/research/latest"),
