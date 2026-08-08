@@ -35,10 +35,11 @@ APIFY_TOKEN=
 | `IMAGE_PROVIDER` | não | `openai` | `openai`, `gemini` ou `openrouter` |
 | `OPENAI_IMAGE_MODEL` | não | `gpt-image-2` | Preferir `gpt-image-2` (size 4:5 nativo). Alt: `gpt-image-1.5` |
 | `OPENROUTER_API_KEY` | alt | — | Obrigatória se `IMAGE_PROVIDER=openrouter` |
-| `OR_MODEL_VOLUME` | não | `bytedance-seed/seedream-4.5` | Slides / volume |
-| `OR_MODEL_COVER` | não | `google/gemini-3-pro-image` | Feed / capa |
-| `OR_MODEL_PHOTO` | não | `black-forest-labs/flux.2-pro` | Hero landing |
-| `OR_MODEL_DRAFT` | não | `google/gemini-3.1-flash-image` | Rascunhos |
+| `OR_MODEL_VOLUME` | não | `qwen/qwen-image-3` | Slides / volume (~$0,03) — texto PT |
+| `OR_MODEL_COVER` | não | `qwen/qwen-image-3-pro` | Feed / capa (~$0,04) |
+| `OR_MODEL_PHOTO` | não | `krea/krea-2-large` | Hero landing (~$0,06) fotoreal |
+| `OR_MODEL_DRAFT` | não | `krea/krea-2-medium-turbo` | Rascunhos (~$0,015) |
+| `OR_COMPARE_MODELS` | não | (4 modelos acima) | A/B em Criativos → “Testar modelos” |
 | `GEMINI_IMAGE_MODEL` | não | `gemini-3.1-flash-image` | Nano Banana 2; ou `imagen-4.0-generate-001` |
 | `APIFY_TOKEN` | recomendado | — | Scrape de perfis IG + Ad Library comercial |
 | `APIFY_IG_ACTOR` | não | `apify/instagram-profile-scraper` | Actor Instagram |

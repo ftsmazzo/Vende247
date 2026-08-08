@@ -142,6 +142,15 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ slide_index }),
       }),
+    compareModels: (body?: { prompt?: string; models?: string[]; hook?: string }) =>
+      request<{
+        prompt_preview: string;
+        results: Array<{ model: string; url?: string; error?: string; ms: number }>;
+        hint: string;
+      }>("/api/creatives/compare-models", {
+        method: "POST",
+        body: JSON.stringify(body || {}),
+      }),
   },
   landing: {
     latest: () => request<{ landing: Landing | null }>("/api/landing/latest"),

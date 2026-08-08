@@ -159,17 +159,74 @@ function brandPromptBits(brand?: BrandKit | null): string {
 }
 
 function openRouterModelFor(purpose: ImagePurpose): string {
+  // Defaults otimizados custo×texto PT (criativos IG) — ago/2026
   const map: Record<ImagePurpose, string> = {
-    volume:
-      process.env.OR_MODEL_VOLUME?.trim() || "bytedance-seed/seedream-4.5",
-    cover:
-      process.env.OR_MODEL_COVER?.trim() || "google/gemini-3-pro-image",
-    photo:
-      process.env.OR_MODEL_PHOTO?.trim() || "black-forest-labs/flux.2-pro",
-    draft:
-      process.env.OR_MODEL_DRAFT?.trim() || "google/gemini-3.1-flash-image",
+    volume: process.env.OR_MODEL_VOLUME?.trim() || "qwen/qwen-image-3",
+    cover: process.env.OR_MODEL_COVER?.trim() || "qwen/qwen-image-3-pro",
+    photo: process.env.OR_MODEL_PHOTO?.trim() || "krea/krea-2-large",
+    draft: process.env.OR_MODEL_DRAFT?.trim() || "krea/krea-2-medium-turbo",
   };
   return map[purpose];
+}
+
+/** Modelos candidatos para A/B (override via OR_COMPARE_MODELS=id1,id2). */
+export function openRouterCompareModels(): string[] {
+  const raw = process.env.OR_COMPARE_MODELS?.trim();
+  if (raw) {
+    return raw
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+  }
+  return [
+    "krea/krea-2-medium-turbo", // ~$0.015 — rascunho rápido
+    "qwen/qwen-image-3", // ~$0.03 — texto fino
+    "qwen/qwen-image-3-pro", // ~$0.04 — capa com hook
+    "krea/krea-2-large", // ~$0.06 — foto lifestyle
+  ];
+}
+
+export async function gerarImagemComModelo(
+  prompt: string,
+  model: string,
+  brand?: BrandKit | null,
+  opts?: ImageGenOpts
+): Promise<{ url: string; model: string }> {
+  if (!isStorageConfigured()) {
+    throw new Error("Storage de mídia não configurado.");
+  }
+  if (!OPENROUTER_API_KEY?.trim()) {
+    throw new Error("OPENROUTER_API_KEY não configurada.");
+  }
+  const mode = opts?.mode ?? "ad";
+  const aspectRatio = opts?.aspectRatio ?? "4:5";
+  const enriched = buildPrompt(prompt, brand, mode, {
+    diversityIndex: opts?.diversityIndex,
+    researchCue: opts?.researchCue,
+    niche: opts?.niche,
+    hook: opts?.hook,
+  });
+  const resolution =
+    opts?.purpose === "draft"
+      ? process.env.OR_RESOLUTION_VOLUME?.trim() || "1K"
+      : process.env.OR_RESOLUTION_HQ?.trim() || "2K";
+  // Krea Turbo só 1K
+  const res =
+    model.includes("turbo") || model.includes("krea-2-medium-turbo")
+      ? "1K"
+      : resolution;
+  const buffer = await bufferFromOpenRouter(enriched.slice(0, 4000), {
+    model,
+    aspectRatio,
+    resolution: res,
+  });
+  let jpeg = await toFeedJpeg(buffer);
+  const doLogo = opts?.overlayLogo ?? mode === "ad";
+  const logo = brand?.logo_url || brand?.og_image_url;
+  if (doLogo && logo) jpeg = await overlayLogo(jpeg, logo);
+  const url = await uploadMedia(jpeg, "image/jpeg", ".jpg");
+  return { url, model };
 }
 
 async function bufferFromOpenRouter(

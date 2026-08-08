@@ -15,6 +15,10 @@ export function CreativesPage() {
   const [loading, setLoading] = useState(true);
   const [batching, setBatching] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [comparing, setComparing] = useState(false);
+  const [compareResults, setCompareResults] = useState<
+    Array<{ model: string; url?: string; error?: string; ms: number }>
+  >([]);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -35,7 +39,7 @@ export function CreativesPage() {
     void load();
   }, []);
 
-  const locked = batching || clearing || busyId !== null;
+  const locked = batching || clearing || comparing || busyId !== null;
 
   async function batch() {
     if (locked) return;
@@ -147,6 +151,25 @@ export function CreativesPage() {
     }
   }
 
+  async function compareModels() {
+    if (locked) return;
+    setComparing(true);
+    setError("");
+    setMsg("Testando 4 modelos OpenRouter (~$0,15 no total)…");
+    setCompareResults([]);
+    try {
+      const r = await api.creatives.compareModels();
+      setCompareResults(r.results);
+      const ok = r.results.filter((x) => x.url).length;
+      setMsg(`${ok}/${r.results.length} gerados. Escolha o melhor e configure no EasyPanel. ${r.hint}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha no compare");
+      setMsg("");
+    } finally {
+      setComparing(false);
+    }
+  }
+
   async function saveCaption(id: number, caption: string) {
     if (locked) return;
     setBusyId(id);
@@ -170,6 +193,9 @@ export function CreativesPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-ghost" disabled={locked} onClick={() => void compareModels()}>
+            {comparing ? "Testando modelos…" : "Testar modelos (custo)"}
+          </button>
           <button type="button" className="btn-ghost" disabled={locked || items.length === 0} onClick={() => void clearLote()}>
             {clearing ? "Limpando…" : "Limpar lote"}
           </button>
@@ -178,6 +204,25 @@ export function CreativesPage() {
           </button>
         </div>
       </div>
+
+      {compareResults.length > 0 && (
+        <div className="card space-y-3">
+          <h2 className="font-display text-lg font-semibold">A/B modelos OpenRouter</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {compareResults.map((r) => (
+              <div key={r.model} className="space-y-2">
+                <p className="text-xs text-white/50 break-all">{r.model}</p>
+                <p className="text-[11px] text-white/35">{(r.ms / 1000).toFixed(1)}s</p>
+                {r.url ? (
+                  <img src={r.url} alt={r.model} className="w-full rounded-lg aspect-[4/5] object-cover" />
+                ) : (
+                  <p className="text-coral text-xs">{r.error || "erro"}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && <p className="text-coral text-sm">{error}</p>}
       {msg && <p className="text-signal text-sm">{msg}</p>}

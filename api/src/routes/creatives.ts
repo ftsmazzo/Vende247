@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { query } from "../db/index.js";
 import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHelpers.js";
 import type { BrandKit } from "../services/brandFromUrl.js";
-import { gerarImagemViral } from "../services/imageGen.js";
+import { gerarImagemViral, gerarImagemComModelo, openRouterCompareModels } from "../services/imageGen.js";
 import { publishCarousel, publishImage } from "../services/instagram.js";
 import { filterResearchCues, lockVisualToNiche } from "../services/nicheVisual.js";
 import type { ResearchReport } from "../services/research.js";
@@ -55,6 +55,73 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       [ws.id]
     );
     return { creatives: r.rows };
+  });
+
+  /**
+   * A/B de modelos OpenRouter com o mesmo prompt (custo baixo: 3–4 imgs).
+   * Body: { prompt?, models?, hook? } — se omitir prompt, usa 1º post da estratégia.
+   */
+  app.post<{
+    Body: { prompt?: string; models?: string[]; hook?: string; overlay_logo?: boolean };
+  }>("/compare-models", async (req, reply) => {
+    const ws = await getWorkspaceForUser(getUserId(req));
+    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+
+    const brand = (ws.brand_kit || {}) as BrandKit;
+    const niche = nicheFromWs(ws);
+    let prompt = (req.body?.prompt || "").trim();
+    let hook = (req.body?.hook || "").trim();
+
+    if (!prompt) {
+      const s = await query<{ plan: StrategyPlan }>(
+        `SELECT plan FROM strategies WHERE workspace_id = $1 ORDER BY id DESC LIMIT 1`,
+        [ws.id]
+      );
+      const post = (s.rows[0]?.plan?.posts?.[0] || null) as CreativeBrief | null;
+      if (!post?.visual_prompt) {
+        return reply.status(400).send({
+          error: "Informe prompt ou gere uma estratégia antes do teste.",
+        });
+      }
+      prompt = lockVisualToNiche(post.visual_prompt, niche, brand, post.hook);
+      hook = hook || post.hook || "";
+    } else {
+      prompt = lockVisualToNiche(prompt, niche, brand, hook);
+    }
+
+    const models = (req.body?.models?.length
+      ? req.body.models
+      : openRouterCompareModels()
+    ).slice(0, 4);
+
+    const results: Array<{ model: string; url?: string; error?: string; ms: number }> = [];
+    for (const model of models) {
+      const t0 = Date.now();
+      try {
+        const r = await gerarImagemComModelo(prompt, model, brand, {
+          purpose: "cover",
+          mode: "ad",
+          aspectRatio: "4:5",
+          overlayLogo: req.body?.overlay_logo ?? false,
+          niche,
+          hook,
+          diversityIndex: 0,
+        });
+        results.push({ model: r.model, url: r.url, ms: Date.now() - t0 });
+      } catch (err) {
+        results.push({
+          model,
+          error: err instanceof Error ? err.message : String(err),
+          ms: Date.now() - t0,
+        });
+      }
+    }
+
+    return {
+      prompt_preview: prompt.slice(0, 280),
+      results,
+      hint: "Escolha o melhor e set OR_MODEL_COVER / OR_MODEL_VOLUME no EasyPanel.",
+    };
   });
 
   app.post<{ Body: { strategy_id?: number } }>("/batch", async (req, reply) => {
