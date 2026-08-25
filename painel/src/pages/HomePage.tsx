@@ -1,6 +1,7 @@
 import { FormEvent, MouseEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, Campaign, getCampaignId, setCampaignId } from "../api/client";
+import { CampaignTypePicker, NICHO_HINT } from "../components/CampaignTypePicker";
 import { BRAND } from "../config/brand";
 
 export function HomePage() {
@@ -115,16 +116,17 @@ export function HomePage() {
         </label>
         <label className="block">
           <span className="label">Tipo</span>
-          <select className="field" value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="produto">produto</option>
-            <option value="servico">serviço</option>
-            <option value="candidato">candidato</option>
-            <option value="oferta">oferta</option>
-          </select>
+          <CampaignTypePicker value={type} onChange={setType} />
         </label>
         <label className="block">
           <span className="label">Nicho</span>
-          <input className="field" value={nicho} onChange={(e) => setNicho(e.target.value)} />
+          <input
+            className="field"
+            placeholder="Ex.: EPI para construtoras; nutrição para mulheres 30+"
+            value={nicho}
+            onChange={(e) => setNicho(e.target.value)}
+          />
+          <p className="text-xs text-white/40 mt-1.5 leading-relaxed">{NICHO_HINT}</p>
         </label>
         <button type="submit" className="btn-primary" disabled={creating}>
           {creating ? "Criando…" : "Criar"}

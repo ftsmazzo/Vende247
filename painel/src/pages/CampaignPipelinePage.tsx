@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, Campaign, setCampaignId } from "../api/client";
+import { CampaignTypePicker, NICHO_HINT } from "../components/CampaignTypePicker";
 
 const STEPS: Array<{ key: keyof NonNullable<Campaign["pipeline"]>; n: string; title: string; to: string; desc: string }> = [
   { key: "briefing", n: "1", title: "Campanha", to: ".", desc: "Briefing" },
@@ -93,7 +94,22 @@ export function CampaignPipelinePage() {
       <form onSubmit={saveBrief} className="card space-y-3 max-w-xl">
         <h2 className="font-display text-lg font-semibold">Briefing</h2>
         <Field label="Nome" value={campaign.name} onChange={(v) => setCampaign({ ...campaign, name: v })} />
-        <Field label="Nicho" value={campaign.nicho} onChange={(v) => setCampaign({ ...campaign, nicho: v })} />
+        <label className="block">
+          <span className="label">Tipo</span>
+          <CampaignTypePicker
+            value={campaign.type}
+            onChange={(type) => setCampaign({ ...campaign, type })}
+          />
+        </label>
+        <label className="block">
+          <span className="label">Nicho</span>
+          <input
+            className="field"
+            value={campaign.nicho || ""}
+            onChange={(e) => setCampaign({ ...campaign, nicho: e.target.value })}
+          />
+          <p className="text-xs text-white/40 mt-1.5 leading-relaxed">{NICHO_HINT}</p>
+        </label>
         <Field
           label="Produto / oferta"
           value={campaign.produto}

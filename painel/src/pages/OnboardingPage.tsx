@@ -1,9 +1,8 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, setCampaignId } from "../api/client";
-import { StyleBits } from "../components/StyleBits";
-
-export { StyleBits };
+import { CampaignTypePicker, NICHO_HINT } from "../components/CampaignTypePicker";
+export { StyleBits } from "../components/StyleBits";
 
 export function OnboardingPage() {
   const navigate = useNavigate();
@@ -71,14 +70,18 @@ export function OnboardingPage() {
         <Field label="Nome da campanha *" value={name} onChange={setName} required />
         <label className="block">
           <span className="label">Tipo</span>
-          <select className="field" value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="produto">produto</option>
-            <option value="servico">serviço</option>
-            <option value="candidato">candidato</option>
-            <option value="oferta">oferta</option>
-          </select>
+          <CampaignTypePicker value={type} onChange={setType} />
         </label>
-        <Field label="Nicho" value={nicho} onChange={setNicho} />
+        <label className="block">
+          <span className="label">Nicho</span>
+          <input
+            className="field"
+            placeholder="Ex.: EPI para construtoras; nutrição para mulheres 30+"
+            value={nicho}
+            onChange={(e) => setNicho(e.target.value)}
+          />
+          <p className="text-xs text-white/40 mt-1.5 leading-relaxed">{NICHO_HINT}</p>
+        </label>
         <Field label="Produto / oferta" value={produto} onChange={setProduto} />
         <Field label="Oferta / diferencial" value={oferta} onChange={setOferta} />
         <Field label="CTA padrão" value={cta} onChange={setCta} />
