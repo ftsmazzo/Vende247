@@ -11,7 +11,7 @@ Você **não** cria brand. Lê o contrato ativo (`identity_versions.model` + `cs
 
 ## Landing
 
-- Injetar CSS de tokens no HTML (`renderLandingHtml` extraCss).
+- Cores da LP vêm de `identityPickColors` (tema claro/escuro com contraste). Não injete CSS bruto que sobrescreva `--ink`/`--surface`.
 - Cores: `design_tokens.colors` (`brand_yellow`, `brand_blue`, `ink`, `surface`).
 - Copy e seções alinhadas a `landing_page_style_spec` e listas `do` / `dont`.
 - Proibido contradizer paleta, tipografia ou mood do contrato.
