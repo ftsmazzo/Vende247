@@ -6,7 +6,7 @@ const STEPS: Array<{ key: keyof NonNullable<Campaign["pipeline"]>; n: string; ti
   { key: "briefing", n: "1", title: "Campanha", to: ".", desc: "Briefing" },
   { key: "research", n: "2", title: "Research", to: "/research", desc: "Mercado e concorrentes" },
   { key: "strategy", n: "3", title: "Estratégia", to: "/estrategia", desc: "Plano de conteúdo" },
-  { key: "identity", n: "4", title: "Identidade", to: "identidade", desc: "Gerar a partir de research + estratégia" },
+  { key: "identity", n: "4", title: "Identidade", to: "identidade", desc: "Agente: research + estratégia + referências" },
   { key: "landing", n: "5", title: "Geração", to: "/landing", desc: "LP + criativos" },
 ];
 
@@ -63,7 +63,8 @@ export function CampaignPipelinePage() {
         </Link>
         <h1 className="font-display text-3xl font-bold mt-2">{campaign.name}</h1>
         <p className="text-white/50 mt-1">
-          Ordem: briefing → research → estratégia → identidade → LP/criativos
+          Pesquisa descreve o mercado. O agente de identidade cruza isso com a estratégia e o que você
+          anexar (site, imagens, notas) e cria o visual — do zero se não houver peça.
         </p>
       </div>
       {error && <p className="text-coral text-sm">{error}</p>}

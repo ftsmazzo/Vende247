@@ -1,25 +1,40 @@
 ---
 name: visual-identity-audit
 description: >-
-  Gera ou consolida identidade visual DEPOIS de research e estratégia da campanha.
-  Contrato: identity_signature, design_tokens, landing_page_style_spec,
-  generation_prompt, negative_prompt. Não rode na etapa de pesquisa.
+  Agente de identidade: cruza research + estratégia + qualquer referência
+  (sites, imagens, notas, brandbook). Saída = contrato rico (schema operacional).
+  Não copia outra campanha. Ponto de partida cego se não houver peça.
 ---
 
-# Skill A — Identidade visual (depois de research + estratégia)
+# Skill A — Agente de identidade
 
-No produto Vende247 a ordem é: **Campanha → Research → Estratégia → Identidade → LP/criativos**.
+Ordem no Vende247: **Campanha → Research → Estratégia → Identidade → LP/criativos**.
 
-Não injete identidade na pesquisa. A pesquisa descreve o mercado; a identidade nasce do briefing + research + estratégia (+ peças/JSON se houver).
+Identidade **não** é importar um JSON de outra marca. Identidade é o agente cruzar:
 
-## Gerar (API)
+1. Briefing da campanha
+2. Research (mercado, concorrentes, direção visual observada no setor)
+3. Estratégia (pilares, hooks, formatos)
+4. Qualquer referência solta: URLs de site, URLs de imagem, notas, trechos de PDF
 
-`POST /api/campaigns/:id/identity/generate` — exige research `done` e uma strategy.
+O contrato final é a **saída** desse cruzamento, no mesmo *shape* de um brandbook operacional
+(`identity_signature`, `design_tokens`, `landing_page_style_spec`, `generation_prompt`,
+`negative_prompt`, `do`/`dont`, `evidence_policy` observed|inferred|recommended).
 
-## Importar
+Um JSON muito rico que alguém já gerou (ex.: GPT com gigabytes de material de *uma* campanha)
+é **exemplo de qualidade de schema**, não carimbo para outras campanhas. Só reaplicar JSON se
+for output do agente **desta** marca.
 
-JSON já pronto só se for DESTA marca (ex. brandbook Flávio numa campanha Flávio).
+## Ponto de partida cego
 
-## Saída
+Sem peça oficial: criar sistema visual `recommended`, alinhado a produto, tom e cenas do research.
+Não recusar. Não inventar conflito com outra marca.
 
-Mesmo schema: identity_signature, design_tokens.colors[].value, landing_page_style_spec, generation_prompt, negative_prompt, do/dont.
+## API
+
+`POST /api/campaigns/:id/identity/generate` com `{ notes, reference_urls, image_urls }`.
+Exige research `done` e uma strategy.
+
+## Importar JSON
+
+Só reaplicar contrato já gerado para **esta** campanha.

@@ -130,10 +130,13 @@ export const api = {
       }),
     identity: (id: number) =>
       request<{ versions: unknown[]; active: IdentityActive | null }>(`/api/campaigns/${id}/identity`),
-    generateIdentity: (id: number, notes?: string) =>
+    generateIdentity: (
+      id: number,
+      body?: { notes?: string; reference_urls?: string[]; image_urls?: string[] }
+    ) =>
       request<{ identity: unknown }>(`/api/campaigns/${id}/identity/generate`, {
         method: "POST",
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify(body || {}),
       }),
     importIdentity: (id: number, body: { model?: unknown; css?: string; seed?: string }) =>
       request<{ identity: unknown }>(`/api/campaigns/${id}/identity/import`, {

@@ -42,13 +42,8 @@ export function identityToBrandKit(model: IdentityModel | null | undefined): Bra
 
 export function identityLooksCampaignLayout(model: IdentityModel | null | undefined): boolean {
   if (!model) return false;
-  const num = (model.candidate as { number?: string } | undefined)?.number;
-  if (num === "22") return true;
-  const spec = model.landing_page_style_spec as { page_personality?: string[] } | undefined;
-  const personality = (spec?.page_personality || []).join(" ").toLowerCase();
-  if (/polít|politic|energét|brasileira/.test(personality) && /confian/.test(personality)) return true;
-  const list = identityColors(model).map((c) => c.toLowerCase());
-  return list.includes("#ffcb05") && list.includes("#005baa");
+  const num = String((model.candidate as { number?: string } | undefined)?.number || "");
+  return num === "22";
 }
 
 export function identityGenerationHints(model: IdentityModel | null | undefined): {

@@ -194,7 +194,10 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
     return { identity };
   });
 
-  app.post<{ Params: { id: string }; Body: { notes?: string } }>("/:id/identity/generate", async (req, reply) => {
+  app.post<{
+    Params: { id: string };
+    Body: { notes?: string; reference_urls?: string[]; image_urls?: string[] };
+  }>("/:id/identity/generate", async (req, reply) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
     const id = Number(req.params.id);
@@ -224,6 +227,8 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
         report: research.rows[0].report,
         strategy: strategy.rows[0].plan,
         notes: req.body?.notes,
+        reference_urls: req.body?.reference_urls,
+        image_urls: req.body?.image_urls,
       });
       const identity = await saveActiveIdentity(id, model, css, "generated");
       await query(`UPDATE campaigns SET status = 'active', updated_at = NOW() WHERE id = $1`, [id]);

@@ -10,6 +10,8 @@ export function IdentityPage() {
   const [jsonText, setJsonText] = useState("");
   const [cssText, setCssText] = useState("");
   const [notes, setNotes] = useState("");
+  const [urls, setUrls] = useState("");
+  const [imageUrls, setImageUrls] = useState("");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,13 +33,24 @@ export function IdentityPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Erro"));
   }, [campaignId]);
 
+  function splitUrls(raw: string) {
+    return raw
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter((s) => /^https?:\/\//i.test(s));
+  }
+
   async function generate() {
     setLoading(true);
     setError("");
     setMsg("");
     try {
-      await api.campaigns.generateIdentity(campaignId, notes || undefined);
-      setMsg("Identidade gerada a partir de research + estratégia.");
+      await api.campaigns.generateIdentity(campaignId, {
+        notes: notes || undefined,
+        reference_urls: splitUrls(urls),
+        image_urls: splitUrls(imageUrls),
+      });
+      setMsg("Agente gerou o contrato desta campanha.");
       const r = await api.campaigns.identity(campaignId);
       setActive(r.active);
       if (r.active?.model) setJsonText(JSON.stringify(r.active.model, null, 2));
@@ -59,7 +72,7 @@ export function IdentityPage() {
     try {
       const model = JSON.parse(jsonText);
       await api.campaigns.importIdentity(campaignId, { model, css: cssText });
-      setMsg("Contrato JSON importado e ativado.");
+      setMsg("Contrato reaplicado.");
       const r = await api.campaigns.identity(campaignId);
       setActive(r.active);
     } catch (err) {
@@ -74,15 +87,14 @@ export function IdentityPage() {
       <Link to={`/campanha/${campaignId}`} className="text-sm text-white/45 hover:text-white">
         ← Pipeline
       </Link>
-      <h1 className="font-display text-3xl font-bold">Identidade</h1>
+      <h1 className="font-display text-3xl font-bold">Agente de identidade</h1>
       <p className="text-white/55">
-        {campaign?.name}. Ordem: pesquisa → estratégia → <strong className="text-white/80">esta etapa</strong> →
-        landing/criativos. Não usa cores da Conta.
+        {campaign?.name}. O agente cruza <strong className="text-white/80">research + estratégia</strong> com
+        qualquer referência que você tiver (site, imagens, notas). Se não tiver peça, parte do zero e
+        cria o contrato. O JSON rico é a <em>saída</em> do agente — não um modelo de outra campanha.
       </p>
       {!canGenerate && (
-        <p className="text-sm text-coral">
-          Complete research e estratégia nesta campanha para gerar identidade.
-        </p>
+        <p className="text-sm text-coral">Pesquisa e estratégia desta campanha precisam estar prontas.</p>
       )}
       {active && (
         <p className="text-sm text-white/60">
@@ -93,39 +105,60 @@ export function IdentityPage() {
       {msg && <p className="text-signal text-sm">{msg}</p>}
 
       <div className="card space-y-3">
-        <h2 className="font-display text-lg font-semibold">Gerar desta campanha</h2>
+        <h2 className="font-display text-lg font-semibold">Referências (opcional)</h2>
         <p className="text-sm text-white/50">
-          Usa o relatório de research e o plano de estratégia. Cole notas de peças, site de referência
-          ou mood (opcional).
+          Quanto mais material, mais o contrato se parece com um brandbook. Sem nada, o agente inventa
+          um sistema alinhado ao mercado que a pesquisa viu.
         </p>
-        <textarea
-          className="field min-h-[80px]"
-          placeholder="Ex.: site de referência, cores que gosto, PDF do brandbook…"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
+        <label className="block">
+          <span className="label">Sites / páginas públicas</span>
+          <textarea
+            className="field min-h-[72px]"
+            placeholder={"https://exemplo.com\nhttps://outra-referencia.com"}
+            value={urls}
+            onChange={(e) => setUrls(e.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="label">URLs de imagens (mood, peça, print)</span>
+          <textarea
+            className="field min-h-[72px]"
+            placeholder="https://…/mood.jpg"
+            value={imageUrls}
+            onChange={(e) => setImageUrls(e.target.value)}
+          />
+        </label>
+        <label className="block">
+          <span className="label">Notas, trechos de PDF, o que o cliente falou</span>
+          <textarea
+            className="field min-h-[100px]"
+            placeholder="Ex.: gosto de papel, sem neon; público 25–40; evitar rosa chiclete…"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </label>
         <button type="button" className="btn-primary" disabled={loading || !canGenerate} onClick={() => void generate()}>
-          {loading ? "Gerando…" : "Gerar identidade (research + estratégia)"}
+          {loading ? "Agente gerando…" : "Rodar agente de identidade"}
         </button>
       </div>
 
       <form onSubmit={importJson} className="space-y-3">
-        <h2 className="font-display text-lg font-semibold">Ou importar contrato pronto</h2>
+        <h2 className="font-display text-lg font-semibold">Reaplicar um contrato já gerado</h2>
         <p className="text-xs text-white/40">
-          Só use JSON de OUTRA marca se esta campanha for realmente essa marca (ex.: brandbook Flávio
-          numa campanha Flávio — não no Planner).
+          Cole o JSON que este (ou outro) agente já produziu para <em>esta</em> campanha. Não cole
+          contrato de outra marca.
         </p>
         <label className="block">
           <span className="label">Modelo JSON</span>
           <textarea
-            className="field min-h-[180px] font-mono text-xs"
+            className="field min-h-[160px] font-mono text-xs"
             value={jsonText}
             onChange={(e) => setJsonText(e.target.value)}
           />
         </label>
         <label className="block">
-          <span className="label">Tokens CSS (opcional)</span>
-          <textarea className="field min-h-[80px] font-mono text-xs" value={cssText} onChange={(e) => setCssText(e.target.value)} />
+          <span className="label">CSS</span>
+          <textarea className="field min-h-[72px] font-mono text-xs" value={cssText} onChange={(e) => setCssText(e.target.value)} />
         </label>
         <button type="submit" className="btn-primary" disabled={loading || !jsonText.trim()}>
           Ativar este JSON
