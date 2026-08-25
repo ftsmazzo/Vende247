@@ -17,9 +17,9 @@ Identidade **não** é importar um JSON de outra marca. Identidade é o agente c
 3. Estratégia (pilares, hooks, formatos)
 4. Qualquer referência solta: URLs de site, URLs de imagem, notas, trechos de PDF
 
-O contrato final é a **saída** desse cruzamento, no mesmo *shape* de um brandbook operacional
-(`identity_signature`, `design_tokens`, `landing_page_style_spec`, `generation_prompt`,
-`negative_prompt`, `do`/`dont`, `evidence_policy` observed|inferred|recommended).
+O contrato é **síntese**: decisões visuais no schema operacional, curto.
+Não é ensaio nem dump do research. Shape: `identity_signature`, `design_tokens`,
+`generation_prompt`, `negative_prompt`, `do`/`dont`.
 
 Um JSON muito rico que alguém já gerou (ex.: GPT com gigabytes de material de *uma* campanha)
 é **exemplo de qualidade de schema**, não carimbo para outras campanhas. Só reaplicar JSON se

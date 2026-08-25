@@ -4,18 +4,37 @@ import type { IdentityModel } from "./identityContract.js";
 import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { StrategyPlan } from "./strategy.js";
 
-/** Schema de saída do agente (riqueza). Não é a marca Flávio — só a estrutura do contrato. */
-const CONTRACT_SHAPE = `
-identity_signature { summary, recognition_cues[] }
-design_tokens.colors { cada chave: { value: "#hex" } } — use brand_primary, brand_secondary, brand_accent, ink, surface e mais se fizer sentido
-hierarchy_rules[] { rule, status: observed|inferred|recommended }
-image_treatment { observed, hero_recipe, mobile, prohibited[] }
-iconography_and_graphics { diagonal_bands?, icons?, forbidden[] }
-landing_page_style_spec { page_personality[], content_density, reading_flow, sections {header,hero,priorities,cta,footer}, components {button_primary,button_secondary,card} }
-responsive_strategy { desktop[], tablet[], mobile[] }
-do[], dont[], generation_prompt, negative_prompt, acceptance_criteria[], overall_confidence
-evidence_policy: marcar cada decisão como observed (viu na referência) | inferred (research/estratégia) | recommended (ponto de partida cego)
-`;
+function clip(s: unknown, n: number): string {
+  return String(s || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, n);
+}
+
+function clipList(xs: unknown, n: number, each = 120): string[] {
+  if (!Array.isArray(xs)) return [];
+  return xs
+    .map((x) => clip(typeof x === "string" ? x : JSON.stringify(x), each))
+    .filter(Boolean)
+    .slice(0, n);
+}
+
+/**
+ * Contrato operacional sintetizado — mesmo shape, sem ensaio.
+ * Qualidade = decisão certa, não volume.
+ */
+const CONTRACT_SHAPE = `{
+  identity_signature: { summary: string<=180, recognition_cues: string[3..5] },
+  design_tokens: { colors: { brand_primary, brand_secondary, brand_accent, ink, surface: { value: "#hex" } } },
+  image_treatment: { hero_recipe: string<=160, prohibited: string[2..4] },
+  landing_page_style_spec: { page_personality: string[2..4], content_density: string, reading_flow: string<=80 },
+  do: string[3..6],
+  dont: string[3..6],
+  generation_prompt: string<=280,
+  negative_prompt: string<=180,
+  overall_confidence: "high"|"medium"|"low",
+  evidence_policy: "observed"|"inferred"|"recommended"
+}`;
 
 export function tokensCssFromModel(model: IdentityModel): string {
   const colors =
@@ -29,12 +48,12 @@ export function tokensCssFromModel(model: IdentityModel): string {
 
 function parseUrls(text: string): string[] {
   const found = text.match(/https?:\/\/[^\s)]+/gi) || [];
-  return [...new Set(found.map((u) => u.replace(/[.,;]+$/, "")))].slice(0, 8);
+  return [...new Set(found.map((u) => u.replace(/[.,;]+$/, "")))].slice(0, 5);
 }
 
 async function gatherUrlEvidence(urls: string[]): Promise<BrandKit[]> {
   const out: BrandKit[] = [];
-  for (const url of urls.slice(0, 5)) {
+  for (const url of urls.slice(0, 3)) {
     try {
       out.push(await extractBrandFromUrl(url));
     } catch {
@@ -44,11 +63,6 @@ async function gatherUrlEvidence(urls: string[]): Promise<BrandKit[]> {
   return out;
 }
 
-/**
- * Agente de identidade: cruza research + estratégia + referências soltas
- * (sites, URLs de imagem, notas). Ponto de partida cego se não houver peça.
- * Não aplica contrato de outra campanha.
- */
 export async function generateCampaignIdentity(opts: {
   ctx: WorkspaceContext;
   report: ResearchReport;
@@ -59,70 +73,55 @@ export async function generateCampaignIdentity(opts: {
 }): Promise<{ model: IdentityModel; css: string }> {
   const { ctx, report, strategy, notes } = opts;
   const fromNotes = parseUrls(notes || "");
-  const urls = [...new Set([...(opts.reference_urls || []), ...fromNotes])].slice(0, 8);
-  const imageUrls = (opts.image_urls || []).filter((u) => /^https?:\/\//i.test(u)).slice(0, 12);
+  const urls = [...new Set([...(opts.reference_urls || []), ...fromNotes])].slice(0, 5);
+  const imageUrls = (opts.image_urls || []).filter((u) => /^https?:\/\//i.test(u)).slice(0, 6);
   const siteEvidence = urls.length ? await gatherUrlEvidence(urls) : [];
   const blind = !notes?.trim() && !urls.length && !imageUrls.length;
 
   const model = await chatJson<IdentityModel>(
-    `Você é o AGENTE DE IDENTIDADE VISUAL desta campanha (skill visual-identity-audit).
+    `Você é o AGENTE DE IDENTIDADE. Trabalho = SINTETIZAR, não expandir.
 
-ENTRADAS (cruzar TUDO):
-1) Briefing da campanha
-2) Research de mercado (o que concorrentes fazem, direcao_visual, hooks)
-3) Estratégia (pilares, hooks, formatos)
-4) Referências soltas se existirem: sites lidos, URLs de imagem, notas do usuário
-   — peças, brandbook, moodboard, print, o que vier. Não precisa estar completo.
+Cruze briefing + research + estratégia + referências. Extraia decisões visuais. Descarte repetição.
 
-PONTO DE PARTIDA CEGO: se não houver peça oficial, CRIE um sistema visual recomendado alinhado ao produto, tom_voz e cenas do research. Marque recommended. Não recuse gerar. Não invente "conflito com outra marca".
+Ponto cego (sem peça): invente um sistema recommended. Não recuse. Não copie Flávio/22/#005BAA/#FFCB05 nem ProntEPI/teal SaaS se o briefing não for isso.
 
-PROIBIDO:
-- Copiar Flávio Bolsonaro, numeral 22, paleta #005BAA/#FFCB05/#12B24B, retrato político, Gotham de campanha — a menos que ESTA campanha seja claramente essa candidatura no briefing.
-- Copiar ProntEPI / teal hospitalar / dashboard SaaS se o produto não for isso.
-- Dizer que falta identidade e parar. Seu trabalho É criar o contrato.
+PROIBIDO: brandbook longo, nested specs enormes, listas de 10+, parágrafos, markdown.
+OBRIGATÓRIO: um JSON no shape abaixo, denso, operacional. Cabe em ~2k tokens de saída.
 
-SAÍDA: um único JSON compacto (sem quebras decorativas, sem markdown). Arrays com no máximo 8 itens. Strings com no máximo 350 caracteres.
-Shape:
-${CONTRACT_SHAPE}
-
-generation_prompt = um parágrafo para gerador de imagem DESTA marca.
-negative_prompt = o que essa marca não é.
-Feche todas as chaves. JSON válido é obrigatório.`
-    JSON.stringify(
-      {
-        ponto_de_partida_cego: blind,
-        campanha: ctx,
-        notas_e_intencao: notes || null,
-        urls_pedidas: urls,
-        imagens_referencia_urls: imageUrls,
-        evidencias_de_sites: siteEvidence.map((k) => ({
-          site_url: k.site_url,
-          colors: k.colors,
-          visual_summary: k.visual_summary,
-          product_ui_notes: k.product_ui_notes,
-          logo_url: k.logo_url,
-        })),
-        research: {
-          resumo: report.resumo,
-          oportunidades_unicas: (report.oportunidades_unicas || []).slice(0, 6),
-          direcao_visual: (report.direcao_visual || []).slice(0, 8),
-          hooks_vencedores: (report.hooks_vencedores || []).slice(0, 6),
-          pilares_conteudo: Array.isArray(report.pilares_conteudo)
-            ? report.pilares_conteudo.slice(0, 6)
-            : report.pilares_conteudo,
-          o_que_concorrentes_fazem_bem: (report.o_que_concorrentes_fazem_bem || []).slice(0, 5),
-        },
-        strategy: {
-          resumo: strategy.resumo,
-          pilares: strategy.pilares,
-          hooks: (strategy.posts || []).slice(0, 6).map((p) => p.hook),
-          formatos: (strategy.posts || []).slice(0, 6).map((p) => p.formato),
-          visual_prompts: (strategy.posts || []).slice(0, 4).map((p) => p.visual_prompt),
-        },
+${CONTRACT_SHAPE}`,
+    JSON.stringify({
+      cego: blind,
+      campanha: {
+        nome: clip(ctx.produto || ctx.name, 80),
+        tipo: ctx.type,
+        nicho: clip(ctx.nicho, 100),
+        oferta: clip(ctx.oferta, 120),
+        tom: clip(ctx.tom_voz, 80),
       },
-      null,
-      2
-    )
+      notas: clip(notes, 400) || null,
+      urls,
+      imagens: imageUrls,
+      sites: siteEvidence.map((k) => ({
+        url: k.site_url,
+        cores: (k.colors || []).slice(0, 5),
+        resumo: clip(k.visual_summary, 160),
+      })),
+      research: {
+        resumo: clip(report.resumo, 280),
+        visual: clipList(report.direcao_visual, 4, 90),
+        hooks: clipList(report.hooks_vencedores, 4, 90),
+      },
+      strategy: {
+        resumo: clip(strategy.resumo, 200),
+        pilares: clipList(strategy.pilares, 4, 80),
+        formatos: clipList(
+          (strategy.posts || []).map((p) => p.formato),
+          4,
+          40
+        ),
+      },
+    }),
+    3500
   );
 
   return { model, css: tokensCssFromModel(model) };

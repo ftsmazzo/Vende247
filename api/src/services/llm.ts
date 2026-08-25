@@ -22,28 +22,28 @@ function anthropicModel() {
   return process.env.LLM_MODEL?.trim() || "claude-sonnet-4-6";
 }
 
-type AnthropicMessage = { role: "user" | "assistant"; content: string };
-
-async function anthropicOnce(model: string, system: string, messages: AnthropicMessage[], maxTokens: number) {
+async function chatJsonAnthropic<T>(system: string, user: string, maxTokens: number): Promise<T> {
+  if (!ANTHROPIC_API_KEY?.trim()) {
+    throw new Error("ANTHROPIC_API_KEY não configurada.");
+  }
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY!.trim(),
+      "x-api-key": ANTHROPIC_API_KEY.trim(),
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model,
+      model: anthropicModel(),
       max_tokens: maxTokens,
-      temperature: 0.7,
-      system,
-      messages,
+      temperature: 0.4,
+      system: `${system}\n\nResponda APENAS com JSON compacto e válido. Sem markdown. Sintetize.`,
+      messages: [{ role: "user", content: user }],
     }),
   });
   const json = (await res.json()) as {
     content?: Array<{ type?: string; text?: string }>;
     error?: { message?: string };
-    stop_reason?: string;
   };
   if (!res.ok) {
     throw new Error(json.error?.message || `Anthropic HTTP ${res.status}`);
@@ -52,39 +52,13 @@ async function anthropicOnce(model: string, system: string, messages: AnthropicM
     .filter((b) => b.type === "text" && b.text)
     .map((b) => b.text)
     .join("\n");
-  return { text, stop_reason: json.stop_reason || "" };
-}
-
-async function chatJsonAnthropic<T>(system: string, user: string): Promise<T> {
-  if (!ANTHROPIC_API_KEY?.trim()) {
-    throw new Error("ANTHROPIC_API_KEY não configurada.");
-  }
-  const model = anthropicModel();
-  const sys = `${system}\n\nResponda APENAS com um objeto JSON válido, compacto, sem markdown e sem texto fora do JSON. Sem vírgula pendurada.`;
-  const maxTokens = Number(process.env.LLM_MAX_TOKENS || 16384);
-  let { text, stop_reason } = await anthropicOnce(model, sys, [{ role: "user", content: user }], maxTokens);
-
-  if (stop_reason === "max_tokens" && text.trim()) {
-    const cont = await anthropicOnce(
-      model,
-      sys,
-      [
-        { role: "user", content: user },
-        { role: "assistant", content: text },
-        { role: "user", content: "Continue EXATAMENTE de onde parou. Só o restante do JSON, sem repetir o começo." },
-      ],
-      maxTokens
-    );
-    text += cont.text;
-  }
-
   return parseLlmJson<T>(text || "{}");
 }
 
-export async function chatJson<T>(system: string, user: string): Promise<T> {
+export async function chatJson<T>(system: string, user: string, maxTokens = 4096): Promise<T> {
   const prov = provider();
   if (prov === "anthropic") {
-    return chatJsonAnthropic<T>(system, user);
+    return chatJsonAnthropic<T>(system, user, maxTokens);
   }
   if (prov === "gemini") {
     if (!GEMINI_API_KEY?.trim()) throw new Error("GEMINI_API_KEY não configurada.");
