@@ -4,7 +4,7 @@ import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { StrategyPlan } from "./strategy.js";
 import { gerarImagemViral } from "./imageGen.js";
 import { isStorageConfigured } from "./storage.js";
-import { identityPickColors, identityPromptBlock, type IdentityModel } from "./identityContract.js";
+import { identityContextForLlm, identityPickColors, type IdentityModel } from "./identityContract.js";
 
 export type LandingCopy = {
   brand_name: string;
@@ -285,8 +285,8 @@ function splitHeadline(headline: string, accent: string): { main: string; accent
     main = main.replace(new RegExp(acc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), "").trim();
     main = main.replace(/[\s*]+$/g, "").trim();
   }
-  if (!main) main = "Rotina sem propósito?";
-  if (!acc) acc = "Organize com fé.";
+  if (!main) main = "O que falta no seu dia?";
+  if (!acc) acc = "Comece agora.";
   return { main, accent: acc };
 }
 
@@ -299,9 +299,15 @@ export function renderLandingHtml(
     ctaUrl: string;
     concorrentes: string[];
     extraCss?: string;
+    identityLayout?: boolean;
   }
 ): string {
   const { accent, deep, ink, surface } = opts.colors;
+  const fonts = opts.identityLayout
+    ? "family=Barlow+Condensed:wght@600;700;800;900&family=Barlow:wght@400;500;600;700"
+    : "family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600;700;800";
+  const displayFont = opts.identityLayout ? '"Barlow Condensed",Impact,sans-serif' : '"Fraunces",Georgia,serif';
+  const bodyFont = opts.identityLayout ? '"Barlow",system-ui,sans-serif' : '"Outfit",system-ui,sans-serif';
   const ctaHref = opts.ctaUrl;
   const ctaPrimary = shortCta(copy.hero_cta);
   const ctaFinal = shortCta(copy.final_cta || copy.hero_cta);
@@ -393,30 +399,31 @@ export function renderLandingHtml(
 <meta name="description" content="${esc(copy.seo_description || copy.subheadline)}"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?${fonts}&display=swap" rel="stylesheet"/>
 <style>
 :root{
   --accent:${accent};
   --deep:${deep};
   --ink:${ink};
   --surface:${surface};
-  --paper:#F4F6F5;
-  --muted:rgba(244,246,245,.68);
+  --paper:${opts.identityLayout ? "#F7F8FA" : "#F4F6F5"};
+  --muted:${opts.identityLayout ? "rgba(255,255,255,.82)" : "rgba(244,246,245,.68)"};
   --line:rgba(255,255,255,.10);
-  --radius:1.25rem;
+  --radius:${opts.identityLayout ? "6px" : "1.25rem"};
+  --cta-ink:${opts.identityLayout ? deep : ink};
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{
-  font-family:"Outfit",system-ui,sans-serif;
+  font-family:${bodyFont};
   background:var(--ink);
   color:var(--paper);
   line-height:1.55;
   -webkit-font-smoothing:antialiased;
 }
 a{color:inherit;text-decoration:none}
-.wrap{width:min(1080px,92vw);margin:0 auto}
-.display{font-family:"Fraunces",Georgia,serif;font-weight:600;letter-spacing:-.03em;line-height:1.05}
+.wrap{width:min(${opts.identityLayout ? "1200px" : "1080px"},92vw);margin:0 auto}
+.display{font-family:${displayFont};font-weight:${opts.identityLayout ? "800" : "600"};letter-spacing:${opts.identityLayout ? "-.02em" : "-.03em"};line-height:1.05}
 .ico{width:1.15rem;height:1.15rem;flex-shrink:0;display:block}
 .ico-wrap{
   width:2.35rem;height:2.35rem;border-radius:.75rem;display:grid;place-items:center;
@@ -431,17 +438,27 @@ a{color:inherit;text-decoration:none}
 }
 .brand{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .logo{height:32px;width:auto;object-fit:contain}
-.logo-text{font-family:"Fraunces",serif;font-size:1.25rem;color:var(--accent)}
+.logo-text{font-family:${displayFont};font-size:1.25rem;color:var(--accent)}
 .nav-cta{
-  font-size:.78rem;font-weight:700;padding:.55rem .95rem;border-radius:999px;
-  background:var(--accent);color:var(--ink);
+  font-size:.78rem;font-weight:800;padding:.55rem .95rem;border-radius:${opts.identityLayout ? "6px" : "999px"};
+  background:var(--accent);color:var(--cta-ink);
 }
 .hero{
   position:relative;isolation:isolate;
   padding:2.25rem 0 1.75rem;
-  background:
-    radial-gradient(55% 70% at 85% 15%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 60%),
-    linear-gradient(180deg,var(--ink),var(--surface));
+  background:${
+    opts.identityLayout
+      ? `linear-gradient(165deg,var(--deep) 0%,var(--ink) 55%,var(--surface) 100%)`
+      : `radial-gradient(55% 70% at 85% 15%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 60%),
+    linear-gradient(180deg,var(--ink),var(--surface))`
+  };
+}
+.hero::after{
+  content:${opts.identityLayout ? '""' : "none"};
+  position:absolute;left:0;right:0;bottom:-2px;height:72px;
+  background:linear-gradient(104deg, #12B24B 0 38%, var(--accent) 38% 72%, var(--deep) 72% 100%);
+  clip-path:polygon(0 42%,100% 0,100% 100%,0 100%);
+  pointer-events:none;
 }
 .hero-grid{
   display:grid;gap:1.75rem;align-items:stretch;
@@ -465,15 +482,15 @@ a{color:inherit;text-decoration:none}
   border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
   background:color-mix(in srgb,var(--accent) 10%,transparent);
 }
-.hero h1{font-family:"Fraunces",Georgia,serif;font-weight:600;font-size:clamp(1.95rem,4.2vw,2.85rem);letter-spacing:-.035em;line-height:1.06;margin:0 0 .7rem}
-.accent-line{display:block;color:var(--accent);font-style:italic;font-weight:500;margin-top:.08em}
+.hero h1{font-family:${displayFont};font-weight:${opts.identityLayout ? "800" : "600"};font-size:clamp(1.95rem,4.2vw,2.85rem);letter-spacing:-.035em;line-height:1.06;margin:0 0 .7rem}
+.accent-line{display:block;color:var(--accent);font-style:${opts.identityLayout ? "normal" : "italic"};font-weight:${opts.identityLayout ? "800" : "500"};margin-top:.08em}
 .lead{font-size:1.02rem;color:var(--muted);margin-bottom:.85rem;font-weight:450;max-width:34rem;line-height:1.5}
 .meta-line{font-size:.84rem;color:rgba(244,246,245,.55);margin-bottom:1rem}
 .cta-row{display:flex;flex-wrap:wrap;gap:.65rem}
 .btn{
   display:inline-flex;align-items:center;justify-content:center;
-  background:var(--accent);color:var(--ink);font-weight:700;font-size:.92rem;
-  padding:.82rem 1.15rem;border-radius:999px;border:0;
+  background:var(--accent);color:var(--cta-ink);font-weight:800;font-size:.92rem;
+  padding:.82rem 1.15rem;border-radius:${opts.identityLayout ? "6px" : "999px"};border:0;
   box-shadow:0 8px 28px color-mix(in srgb,var(--accent) 22%,transparent);
   transition:transform .18s ease;
 }
@@ -490,7 +507,7 @@ a{color:inherit;text-decoration:none}
 }
 .metric{padding:.85rem .9rem;border-right:1px solid var(--line)}
 .metric:last-child{border-right:0}
-.metric strong{display:block;font-family:"Fraunces",serif;font-size:1.15rem;color:var(--accent);margin-bottom:.15rem}
+.metric strong{display:block;font-family:${displayFont};font-size:1.15rem;color:var(--accent);margin-bottom:.15rem}
 .metric span{font-size:.75rem;color:var(--muted);line-height:1.35}
 .pain{background:var(--surface)}
 .pain-split{display:grid;gap:1.5rem;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);align-items:start}
@@ -500,7 +517,7 @@ a{color:inherit;text-decoration:none}
   padding:.95rem 1rem;border-radius:1rem;border:1px solid var(--line);
   background:rgba(255,255,255,.03);
 }
-.pain-item .num{font-family:"Fraunces",serif;color:var(--accent);font-size:.95rem;line-height:1.2}
+.pain-item .num{font-family:${displayFont};color:var(--accent);font-size:.95rem;line-height:1.2}
 .pain-item p{font-weight:550;font-size:.95rem;line-height:1.4}
 .grid-4{display:grid;gap:.85rem;grid-template-columns:repeat(4,minmax(0,1fr))}
 .card{
@@ -517,7 +534,7 @@ a{color:inherit;text-decoration:none}
 }
 .step-n{
   width:2.2rem;height:2.2rem;border-radius:999px;display:grid;place-items:center;
-  font-family:"Fraunces",serif;font-weight:600;font-size:.95rem;background:var(--accent);color:var(--ink);
+  font-family:${displayFont};font-weight:600;font-size:.95rem;background:var(--accent);color:var(--cta-ink);
 }
 .pillars{display:grid;gap:.85rem;grid-template-columns:repeat(3,minmax(0,1fr))}
 .pillar{padding:1.15rem 1.05rem;border-radius:1rem;background:color-mix(in srgb,var(--deep) 50%,#000);border:1px solid color-mix(in srgb,var(--accent) 16%,transparent)}
@@ -530,7 +547,7 @@ a{color:inherit;text-decoration:none}
   display:flex;flex-direction:column;justify-content:center;
   background:
     radial-gradient(90% 120% at 100% 0%,color-mix(in srgb,var(--accent) 20%,transparent),transparent 55%),
-    linear-gradient(135deg,var(--deep),#071210);
+    linear-gradient(135deg,var(--deep),var(--ink));
   border:1px solid color-mix(in srgb,var(--accent) 20%,transparent);
 }
 .offer h2{margin-bottom:.75rem}
@@ -677,7 +694,8 @@ export async function generateLanding(opts: {
 }): Promise<LandingResult> {
   const { ctx, report, strategy, brand, identityModel, identityCss } = opts;
   const colors = pickColors(brand, identityModel);
-  const identityLock = identityPromptBlock(identityModel);
+  const identity = identityContextForLlm(identityModel);
+  const identityLayout = Boolean(identity);
 
   // Research de Instagram NÃO é brief de LP. Só ângulos de PRODUTO / mercado.
   const productSignals = report
@@ -698,50 +716,45 @@ export async function generateLanding(opts: {
     : null;
 
   const copy = await chatJson<LandingCopy>(
-    `Você escreve landing pages de conversão (Brasil) para o COMPRADOR do produto descrito no workspace.
+    `Você escreve landing pages de conversão (Brasil) para o público desta CAMPANHA.
 
-MISSÃO: vender o PRODUTO do workspace (descrição + oferta). NÃO vender "presença no Instagram".
-Skill campaign-design-apply: copy e seções devem respeitar landing_page_style_spec e do/dont da identidade.
-Adapte o tom ao nicho (B2C fé/lifestyle, B2B software, político, etc.) — NÃO force EPI/SST/indústria se o produto for outro.
+Skill campaign-design-apply: copy, tom e seções DEVEM seguir identidade_ativa (landing_page_style_spec, page_personality, do/dont). NÃO use paleta ou mood de outro produto.
 
-PROIBIDO ABSOLUTO nas dores/pains/pillars/angles:
+MISSÃO: vender o PRODUTO da campanha (${ctx.type || "produto"}: ${ctx.name || ctx.produto}). NÃO vender "presença no Instagram".
+Tom: use tom_voz da campanha + page_personality da identidade. Se a identidade for política/energética, write like a campaign — headlines curtas, verbos fortes, zero serifa piegas.
+
+PROIBIDO ABSOLUTO:
 - perfil vazio, falta de conteúdo, engajamento, posts, reels, carrossel, bio, seguidores
-- "estratégia de conteúdo", "prova social / depoimentos" como dor de marketing
-- research, Vende247, hooks internos, @ de concorrentes
-- copy genérica tipo "tecnologia de ponta", "otimize seus gastos", "transforme sua gestão"
+- copy genérica: "tecnologia de ponta", "otimize seus gastos", "transforme sua gestão", "feito para você", "comece hoje" sem substantivo do produto
+- "ritual de fé" / planner cristão se a identidade não for esse universo
+- métricas inventadas, telefone inventado, emoji, markdown
 
 OBRIGATÓRIO:
-- pains = 4 dores reais do público do nicho (máx 110 caracteres cada). Tom do COMPRADOR.
-- angles = frases comerciais curtas (máx 120 chars), SEM comentário de estrategista depois do travessão
-- headline com tensão concreta (máx 6 palavras na linha principal) + accent com benefício
-- subheadline = 1 frase completa com mecanismo/benefício do produto
-- benefits: título curto + body com resultado concreto
-- pillars: diferenciais do PRODUTO
-- faq: objeções reais de compra desse tipo de oferta
-- Preencha TODOS os arrays; nunca {}
-- Sem markdown, sem emoji, sem métricas inventadas (% / "500 empresas"), sem telefone inventado
+- brand_name = nome da campanha/produto real
+- headline concreta (máx 6 palavras) + accent com benefício tangível
+- subheadline = 1 frase com mecanismo do produto
+- pains = 4 dores reais DESTE público (máx 110 chars), com substantivos (não "falta de clareza" vago)
+- benefits/pillars/how_steps com resultado concreto citado no briefing
+- faq: objeções reais de compra
 - hero_cta ≤ 32 caracteres; offer_title ≤ 8 palavras
-- benefits/how_steps/pillars/faq: title+body (ou titulo+texto)
+- Preencha TODOS os arrays
 
 JSON estrito.`,
     JSON.stringify(
       {
-        produto: {
-          nome_sugerido: ctx.produto.split(/[—\-–]/)[0]?.trim(),
-          descricao_completa: ctx.produto,
+        campanha: {
+          tipo: ctx.type,
+          nome: ctx.name,
           nicho: ctx.nicho,
+          produto: ctx.produto,
           oferta: ctx.oferta,
           cta: ctx.cta,
           tom_voz: ctx.tom_voz,
-          publico_alvo: `Público alinhado ao nicho: ${ctx.nicho}`,
         },
         sinais_de_mercado_somente_produto: productSignals,
-        brand: brand
-          ? { colors: brand.colors, visual_summary: brand.visual_summary }
-          : null,
-        identidade_ativa: identityLock || null,
+        identidade_ativa: identity,
         lembrete:
-          "gaps do Instagram / pilares de conteúdo / plano de posts NÃO entram nesta LP.",
+          "Não use brand_kit legado. Identidade JSON manda nas cores e no visual; o briefing manda no produto.",
       },
       null,
       2
@@ -776,20 +789,20 @@ JSON estrito.`,
   ];
   const defaultFaq = [
     {
-      q: "É digital?",
-      a: "Sim. Você recebe o material em formato digital para usar no celular ou imprimir.",
+      q: "Como funciona?",
+      a: cleanPublicText(ctx.oferta) || `Você recebe ${shortProduct} conforme a oferta da campanha.`,
     },
     {
       q: "Quando recebo?",
-      a: "Assim que a compra for confirmada — acesso imediato por link.",
+      a: "Assim que a ação for confirmada — o próximo passo está no CTA.",
     },
     {
       q: "Serve para iniciantes?",
-      a: "Sim. Foi pensado para quem quer começar com clareza, sem complicação.",
+      a: "Sim, se o briefing descreve um público que está começando.",
     },
     {
-      q: "Como compro?",
-      a: cleanPublicText(ctx.cta) || "Chame no Direct e peça o planner.",
+      q: "Como sigo?",
+      a: cleanPublicText(ctx.cta) || "Use o botão principal desta página.",
     },
   ];
 
@@ -985,6 +998,7 @@ JSON estrito.`,
     ctaUrl: resolveCtaUrl(ctx, copy),
     concorrentes: [],
     extraCss: identityCss || "",
+    identityLayout,
   });
 
   return {

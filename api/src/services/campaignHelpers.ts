@@ -98,6 +98,8 @@ export async function resolveCampaignScope(
 
 export function campaignCtx(campaign: Campaign, workspaceIg?: string) {
   return {
+    type: campaign.type,
+    name: campaign.name,
     nicho: campaign.nicho,
     produto: campaign.produto || campaign.name,
     oferta: campaign.oferta,

@@ -1,6 +1,7 @@
 import { scrapeCompetitors, type CompetitorProfile } from "./apify.js";
 import { searchAdsForResearch, type AdSnippet } from "./adLibrary.js";
 import { chatJson } from "./llm.js";
+import { identityContextForLlm, type IdentityModel } from "./identityContract.js";
 
 export type ResearchReport = {
   resumo: string;
@@ -39,11 +40,13 @@ export type WorkspaceContext = {
   tom_voz: string;
   concorrentes: string[];
   ig_username: string;
+  type?: string;
+  name?: string;
 };
 
 export async function runResearchPipeline(
   ctx: WorkspaceContext,
-  identityLock = ""
+  identityModel?: IdentityModel | null
 ): Promise<{
   raw: { competitors: CompetitorProfile[]; ads: AdSnippet[] };
   report: ResearchReport;
@@ -91,28 +94,32 @@ export async function runResearchPipeline(
       })),
   }));
 
+  const identity = identityContextForLlm(identityModel);
+
   const report = await chatJson<ResearchReport>(
     `Voce e estrategista de conteudo para Instagram no Brasil.
-Sua missao: insights DECISIVOS para vender ESTE produto (nicho/produto do workspace) — nao platitudes de marketing.
+Skill campaign-design-apply: a identidade visual ATIVA (JSON) manda no mood, paleta e cenas. Nao use paleta de outro produto nem de brand_kit legado.
+
+Sua missao: insights DECISIVOS para vender ESTE produto (${ctx.type || "campanha"}: ${ctx.name || ctx.produto}) — nao platitudes.
 
 PROIBIDO (generico demais):
 - "seguranca e compromisso", "videos e imagens", "saiba mais na bio" sem contexto
 - listas vagas tipo "formatos: video, carrossel"
 - repetir o obvio do nicho sem amarrar ao produto
 - assumir software B2B / EPI / SST se o produto nao for isso
+- direcao_visual que contradiga recognition_cues, image_treatment ou dont da identidade
+- se a identidade for campanha politica (22, retrato, diagonais, azul/amarelo/verde), NAO sugerir planner cristão, serifas piegas, tons bege/terracota
 
 OBRIGATORIO:
 - Citar padroes REAIS vistos nas captions/posts dos concorrentes (temas, angulos, provas)
 - Separar o que concorrentes fazem bem vs o que o produto pode ganhar (oportunidades_unicas)
-- Hooks concretos, no tom do produto e do publico informado
-- direcao_visual: 8–12 cenas HUMANAS / lifestyle / produto-em-uso DIFERENTES entre si, alinhadas ao nicho.
-  Cada item = 1 frase de cena concreta. PROIBIDO: "mockup de celular", "dashboard generico", "foto profissional generica"
-- Inferir o que as midias dos top posts sugerem pelo tipo (GraphImage/Video/Sidecar) + caption — mesmo sem ver o JPEG
+- Hooks concretos, no tom do produto E no tom da identidade (landing_page_style_spec.page_personality)
+- direcao_visual: 8–12 cenas DIFERENTES que APLICAM a identidade ao produto (pessoa + paleta + composicao do contrato).
+  Cada item = 1 frase de cena concreta. PROIBIDO: mockup de celular, dashboard, "foto profissional generica"
+- Inferir o que as midias dos top posts sugerem pelo tipo + caption
 - Bio e pilares especificos do produto informado
 
-A direcao_visual DEVE ser compativel com a identidade visual ativa (contrato abaixo). Nao contradiga paleta, mood nem do/dont.
-
-Se dados Apify (perfis) estiverem vazios, diga isso em resumo e ainda proponha angulos com base no produto (nao invente likes).
+Se dados Apify (perfis) estiverem vazios, diga isso em resumo e ainda proponha angulos com base no produto + identidade (nao invente likes).
 
 Sobre ads / Ad Library (CRITICO):
 - Se ads_nicho TIVER itens (fonte Apify scrape ou Graph): use copy, CTA, landing e paginas como evidencia real de trafego pago. Cite padroes em insights_ads.
@@ -144,7 +151,7 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
           ad_library_nota: adLibraryNota,
         },
         nota: "Imagens dos concorrentes NAO sao reutilizadas pixel a pixel; use captions+tipo+ads para padroes.",
-        identidade_ativa: identityLock || null,
+        identidade_ativa: identity,
       },
       null,
       2

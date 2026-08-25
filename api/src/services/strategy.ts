@@ -1,7 +1,7 @@
 import { chatJson } from "./llm.js";
 import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { BrandKit } from "./brandFromUrl.js";
-import { identityPromptBlock, type IdentityModel } from "./identityContract.js";
+import { identityContextForLlm, identityGenerationHints, type IdentityModel } from "./identityContract.js";
 import {
   filterResearchCues,
   lockVisualToNiche,
@@ -64,14 +64,18 @@ export async function generateStrategy(
   identityModel?: IdentityModel | null
 ): Promise<StrategyPlan> {
   const n = Math.min(Math.max(days, 7), 14);
-  const identityLock = identityPromptBlock(identityModel);
+  const identity = identityContextForLlm(identityModel);
+  const hints = identityGenerationHints(identityModel);
 
   const plan = await chatJson<StrategyPlan>(
     `Você é diretor criativo de anúncios Instagram (Brasil, 2026).
-Skill: campaign-design-apply — aplique a identidade ativa; não invente outra paleta.
-Produto a vender: use SOMENTE ângulos do produto informado + research (oportunidades_unicas, direcao_visual, hooks).
-Nicho: ${ctx.nicho}. NÃO force software B2B / EPI / indústria se o produto for outro.
-${identityLock ? `IDENTIDADE (obrigatório respeitar): ${identityLock}` : ""}
+Skill campaign-design-apply: aplique a identidade ATIVA (JSON). Não invente outra paleta. Não use brand_kit legado se houver identidade.
+Campanha: tipo=${ctx.type || "?"} nome=${ctx.name || ctx.produto}.
+Produto a vender: ângulos do produto + research. Nicho: ${ctx.nicho}.
+NÃO force software B2B / EPI / indústria se o produto for outro.
+NÃO force planner cristão / fé se a identidade for política (22, diagonais, azul/amarelo/verde, retrato).
+
+Cada visual_prompt DEVE incorporar generation_prompt da identidade (mood, paleta, composição) e evitar negative_prompt.
 
 Plano de exatamente ${n} dias. Cada post DEVE ser visualmente e tematicamente diferente do anterior.
 
@@ -112,13 +116,9 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
           direcao_visual: report.direcao_visual,
           ctas_comuns: report.ctas_comuns,
         },
-        brand: brand
-          ? {
-              colors: brand.colors,
-              visual_summary: brand.visual_summary,
-              estilo: brand.visual_summary,
-              product_ui_notes: brand.product_ui_notes,
-            }
+        identidade_ativa: identity,
+        identity_prompts: hints.positive
+          ? { generation_prompt: hints.positive, negative_prompt: hints.negative, palette: hints.palette }
           : null,
         cena_rotation_sugerida: CENA_ROTATION.slice(0, n),
         regra_diversidade:
@@ -152,7 +152,11 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
   plan.posts = plan.posts.slice(0, n).map((p, i) => {
     const cena = normalizeCena(p.cena_tipo) || CENA_ROTATION[i % CENA_ROTATION.length];
     let hook = coerceText(p.hook) || coerceText(p.titulo) || "Hook";
-    if (looksIndustrialVisual(hook) && !looksIndustrialVisual(`${ctx.nicho} ${ctx.produto}`)) {
+    if (
+      !identityModel &&
+      looksIndustrialVisual(hook) &&
+      !looksIndustrialVisual(`${ctx.nicho} ${ctx.produto}`)
+    ) {
       hook = faithHooks[i % faithHooks.length];
     }
     const titulo = coerceText(p.titulo) || `Dia ${i + 1}`;
@@ -183,6 +187,9 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     ];
     visual = `${visual}. Camera: ${angles[i % angles.length]}.`;
     visual = lockVisualToNiche(visual, ctx, brand, hook);
+    if (hints.positive) {
+      visual = `${visual}. IDENTITY: ${hints.positive.slice(0, 400)}`;
+    }
 
     const formato = (["feed", "carrossel", "reels"].includes(String(p.formato))
       ? p.formato
@@ -204,7 +211,11 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     }
 
     let caption = coerceText(p.caption);
-    if (looksIndustrialVisual(caption) && !looksIndustrialVisual(`${ctx.nicho} ${ctx.produto}`)) {
+    if (
+      !identityModel &&
+      looksIndustrialVisual(caption) &&
+      !looksIndustrialVisual(`${ctx.nicho} ${ctx.produto}`)
+    ) {
       caption = `${hook}\n\n${coerceText(ctx.oferta) || "Um ritual simples de fé e organização."}\n\n${ctx.cta || "Quero o planner no Direct"}`;
     }
 

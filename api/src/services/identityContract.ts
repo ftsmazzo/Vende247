@@ -53,22 +53,40 @@ export function identityGenerationHints(model: IdentityModel | null | undefined)
   };
 }
 
-export function identityPromptBlock(model: IdentityModel | null | undefined): string {
-  if (!model || !Object.keys(model).length) return "";
-  const spec = model.landing_page_style_spec;
-  const doList = (model as { do?: string[] }).do || [];
-  const dont = (model as { dont?: string[] }).dont || [];
-  return JSON.stringify({
+export function identityContextForLlm(model: IdentityModel | null | undefined): Record<string, unknown> | null {
+  if (!model || !Object.keys(model).length) return null;
+  const sig = model.identity_signature as Record<string, unknown> | undefined;
+  const tokens = model.design_tokens as { colors?: Record<string, { value?: string }> } | undefined;
+  const colorMap: Record<string, string> = {};
+  if (tokens?.colors) {
+    for (const [k, v] of Object.entries(tokens.colors)) {
+      if (v?.value) colorMap[k] = v.value;
+    }
+  }
+  return {
     skill: "campaign-design-apply",
-    identity_summary:
-      (model.identity_signature as { summary?: string } | undefined)?.summary || "",
-    generation_prompt: String(model.generation_prompt || "").slice(0, 1200),
-    negative_prompt: String(model.negative_prompt || "").slice(0, 800),
-    landing_page_style_spec: spec,
-    do: doList.slice(0, 12),
-    dont: dont.slice(0, 12),
-    colors: identityColors(model).slice(0, 8),
-  });
+    candidate: model.candidate ?? null,
+    campaign_label: (model.campaign as { label?: string } | undefined)?.label ?? null,
+    identity_summary: sig?.summary || "",
+    recognition_cues: Array.isArray(sig?.recognition_cues) ? sig.recognition_cues.slice(0, 8) : [],
+    colors: colorMap,
+    color_list: identityColors(model).slice(0, 10),
+    hierarchy_rules: model.hierarchy_rules ?? null,
+    image_treatment: model.image_treatment ?? null,
+    iconography_and_graphics: model.iconography_and_graphics ?? null,
+    landing_page_style_spec: model.landing_page_style_spec ?? null,
+    responsive_strategy: model.responsive_strategy ?? null,
+    do: Array.isArray(model.do) ? model.do.slice(0, 16) : [],
+    dont: Array.isArray(model.dont) ? model.dont.slice(0, 16) : [],
+    generation_prompt: String(model.generation_prompt || "").slice(0, 2200),
+    negative_prompt: String(model.negative_prompt || "").slice(0, 1400),
+    acceptance_criteria: model.acceptance_criteria ?? null,
+  };
+}
+
+export function identityPromptBlock(model: IdentityModel | null | undefined): string {
+  const ctx = identityContextForLlm(model);
+  return ctx ? JSON.stringify(ctx) : "";
 }
 
 export function identityPickColors(model: IdentityModel | null | undefined): {
@@ -80,13 +98,24 @@ export function identityPickColors(model: IdentityModel | null | undefined): {
   const tokens = (model?.design_tokens as { colors?: unknown } | undefined)?.colors;
   const yellow = tokenValue(tokens, "brand_yellow");
   const blue = tokenValue(tokens, "brand_blue");
+  const green = tokenValue(tokens, "brand_green");
   const ink = tokenValue(tokens, "ink");
   const surface = tokenValue(tokens, "surface");
-  if (!yellow && !blue) return null;
+  const list = identityColors(model);
+  if (!yellow && !blue && list.length < 2) return null;
   return {
-    accent: yellow || "#FFCB05",
-    deep: blue || "#005BAA",
-    ink: ink || blue || "#12324A",
-    surface: surface || "#0A1F33",
+    accent: yellow || list.find((c) => luminanceGuess(c) > 0.4) || green || "#FFCB05",
+    deep: blue || list.find((c) => luminanceGuess(c) < 0.25) || "#005BAA",
+    ink: ink || blue || "#005BAA",
+    surface: surface || "#003D73",
   };
+}
+
+function luminanceGuess(hex: string): number {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return 0.5;
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
