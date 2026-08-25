@@ -130,6 +130,11 @@ export const api = {
       }),
     identity: (id: number) =>
       request<{ versions: unknown[]; active: IdentityActive | null }>(`/api/campaigns/${id}/identity`),
+    generateIdentity: (id: number, notes?: string) =>
+      request<{ identity: unknown }>(`/api/campaigns/${id}/identity/generate`, {
+        method: "POST",
+        body: JSON.stringify({ notes }),
+      }),
     importIdentity: (id: number, body: { model?: unknown; css?: string; seed?: string }) =>
       request<{ identity: unknown }>(`/api/campaigns/${id}/identity/import`, {
         method: "POST",

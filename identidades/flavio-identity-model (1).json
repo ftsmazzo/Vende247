@@ -1,0 +1,197 @@
+{
+  "model_version": "1.0.0-test",
+  "analyzed_at": "2026-08-20",
+  "candidate": {
+    "name": "Flávio Bolsonaro",
+    "role_in_source": "Presidente",
+    "number": "22"
+  },
+  "campaign": {
+    "label": "Flávio Bolsonaro 22",
+    "secondary_name_in_lockup": "VICE Alfredo Gaspar",
+    "classification_confidence": "high"
+  },
+  "status": "read_only_test_no_postgres_write",
+  "overall_confidence": "high_for_brand_medium_for_landing_page_extensions",
+  "evidence_policy": {
+    "observed": "Diretamente verificável em manual ou peça.",
+    "inferred": "Recorrência entre peças ou consequência operacional de regra observada.",
+    "recommended": "Decisão nova para landing page; não é regra histórica da campanha.",
+    "estimated": "Valor aproximado quando a fonte não fornece especificação exata."
+  },
+  "identity_signature": {
+    "summary": "Numeral 22 monumental, lettering proprietário Flávio, paleta brasileira saturada, grandes planos diagonais, retrato oficial recortado e chamadas curtas em faixas de alto contraste.",
+    "recognition_cues": [
+      "22 em sans pesada como maior massa tipográfica",
+      "lettering Flávio inclinado e exclusivo, com detalhe verde-amarelo",
+      "azul profundo como campo de contraste; amarelo e verde como planos ativos",
+      "retrato recortado em primeiro plano, luz uniforme e camisa azul-clara",
+      "diagonais largas e blocos compactos, sem ornamento fino"
+    ],
+    "evidence": ["brandbook:p2-p8", "brandbook:p15-p17", "bandeira-main:p1", "fly-banner-main:p1", "praguinha-main-v1:p1"]
+  },
+  "design_tokens": {
+    "colors": {
+      "brand_green": {"value": "#12B24B", "rgb": [18, 178, 75], "status": "observed_official", "use": "plano de marca, acento e confirmação positiva", "evidence": ["LEIA-ME", "brandbook:p10"]},
+      "brand_yellow": {"value": "#FFCB05", "rgb": [255, 203, 5], "status": "observed_official", "use": "número, CTA e destaque", "evidence": ["LEIA-ME", "brandbook:p10"]},
+      "brand_blue": {"value": "#005BAA", "rgb": [0, 91, 170], "status": "observed_official", "use": "fundo dominante, títulos e rodapé", "evidence": ["LEIA-ME", "brandbook:p10"]},
+      "brand_blue_2": {"value": "#0072BC", "rgb": [0, 114, 188], "status": "observed_official_secondary", "use": "variação de fundo e apoio", "evidence": ["brandbook:p10,p16"]},
+      "brand_turquoise": {"value": "#00B49D", "rgb": [0, 180, 157], "status": "observed_official_secondary", "use": "apoio controlado", "evidence": ["brandbook:p10,p16"]},
+      "brand_orange": {"value": "#FAA61A", "rgb": [250, 166, 26], "status": "observed_official_secondary", "use": "acento raro; não usar como fundo do lockup sem homologação", "evidence": ["brandbook:p10"]},
+      "white": {"value": "#FFFFFF", "status": "recommended_exact_web_value_observed_role", "use": "texto em fundos escuros e superfícies de conteúdo"},
+      "ink": {"value": "#12324A", "status": "recommended_estimated", "use": "texto corrido em superfície clara"},
+      "surface": {"value": "#F4F7F5", "status": "recommended_estimated", "use": "fundo claro alternado"},
+      "focus": {"value": "#8A3FFC", "status": "recommended_accessibility_only", "use": "anel de foco distinto da paleta política"}
+    },
+    "typography": {
+      "brand_family": {"value": "Gotham", "status": "observed_official_licensed", "evidence": ["LEIA-ME", "brandbook:p9"]},
+      "web_stack": {"value": "Gotham, Montserrat, Arial, sans-serif", "status": "recommended", "note": "Montserrat é fallback aproximado, não substituição do lettering."},
+      "display": {"weight": 800, "size": "clamp(2.5rem, 6vw, 5.5rem)", "line_height": 0.95, "tracking": "0", "status": "recommended"},
+      "h2": {"weight": 800, "size": "clamp(2rem, 4vw, 3.5rem)", "line_height": 1.0, "tracking": "0", "status": "recommended"},
+      "h3": {"weight": 700, "size": "clamp(1.25rem, 2vw, 1.75rem)", "line_height": 1.15, "tracking": "0", "status": "recommended"},
+      "body": {"weight": 400, "size": "clamp(1rem, 1.2vw, 1.125rem)", "line_height": 1.55, "tracking": "0", "status": "recommended"},
+      "label": {"weight": 700, "size": "0.8125rem", "line_height": 1.2, "text_transform": "uppercase", "tracking": "0.06em", "status": "recommended"},
+      "brand_lettering_rule": {"value": "Usar somente dentro do ativo oficial da marca; nunca digitar ou redesenhar.", "status": "observed_official"}
+    },
+    "spacing": {
+      "base": {"value": "4px", "status": "recommended"},
+      "scale_px": [4, 8, 12, 16, 24, 32, 48, 64, 96, 128],
+      "section_block": {"value": "clamp(64px, 9vw, 128px)", "status": "recommended"},
+      "content_gap": {"value": "clamp(24px, 4vw, 48px)", "status": "recommended"}
+    },
+    "shape": {
+      "radius_small": {"value": "4px", "status": "recommended"},
+      "radius_medium": {"value": "8px", "status": "recommended"},
+      "radius_pill": {"value": "999px", "status": "recommended_restricted_to_badges"},
+      "diagonal_angle": {"value": "12deg", "status": "estimated_from_pieces", "allowed_range": "10deg to 16deg"},
+      "border": {"value": "1px solid rgba(0,91,170,0.18)", "status": "recommended"}
+    },
+    "effects": {
+      "shadow_card": {"value": "0 8px 24px rgba(0,45,85,0.12)", "status": "recommended_restrained"},
+      "shadow_none_for_logo": {"value": "none", "status": "inferred_high_confidence"},
+      "gradient": {"value": "radial-gradient(circle at 50% 38%, #1C62B7 0%, #173E7D 100%)", "status": "observed_in_print_estimated_optional_for_web", "note": "Algumas peças usam modulação radial azul. Preferir fundo oficial #005BAA; quando usado, o gradiente deve permanecer exclusivamente tonal azul e discreto."},
+      "texture": {"value": "none", "status": "observed_and_recommended"}
+    },
+    "motion": {
+      "fast": {"value": "160ms", "status": "recommended"},
+      "standard": {"value": "240ms", "status": "recommended"},
+      "easing": {"value": "cubic-bezier(0.2, 0.8, 0.2, 1)", "status": "recommended"},
+      "rule": "Animação discreta de opacidade/posição; nunca deformar ou separar a marca."
+    }
+  },
+  "grid_system": {
+    "container": {"max_width": "1200px", "inline_padding": "24px desktop; 20px tablet; 16px mobile", "status": "recommended"},
+    "desktop": {"breakpoint": ">=1024px", "columns": 12, "gutter": "24px"},
+    "tablet": {"breakpoint": "768px-1023px", "columns": 8, "gutter": "20px"},
+    "mobile": {"breakpoint": "<768px", "columns": 4, "gutter": "16px"},
+    "alignment_rule": "Texto em eixo firme; retrato e diagonais podem extrapolar o container somente com foco facial preservado.",
+    "status": "recommended_from_print_compositions"
+  },
+  "hierarchy_rules": [
+    {"rule": "Um único elemento dominante por viewport: headline ou numeral 22, sem competição equivalente.", "status": "inferred", "evidence": ["brandbook:p3-p8", "fly-banner-main:p1", "praguinha-main-v1:p1"]},
+    {"rule": "No hero, texto e CTA ocupam 5-6 colunas e o retrato 5-7 colunas no desktop.", "status": "recommended"},
+    {"rule": "Faixas de slogan são compactas, retangulares, com contraste azul/amarelo ou verde/branco.", "status": "inferred", "evidence": ["bandeira-main:p1", "fly-banner-main:p1", "colinha-main-v1:p1"]},
+    {"rule": "Diagonais largas funcionam como transição entre planos, não como pequenos enfeites repetidos.", "status": "inferred", "evidence": ["bandeira-main:p1", "fly-banner-main:p1", "praguinha-main-v1:p1"]}
+  ],
+  "logo_rules": {
+    "asset_integrity": "Usar arquivo oficial inteiro; não recompor, redesenhar, separar nem trocar cores internas.",
+    "versions": ["vertical positiva", "vertical negativa", "horizontal positiva", "horizontal negativa", "extensões com Vote"],
+    "digital_minimum": {"vertical_height": "130px", "vertical_width_reference": "95px", "horizontal_width": "130px", "status": "observed_official", "evidence": ["brandbook:p11"]},
+    "safe_area": {"value": "módulo X em todos os lados", "numeric_value": null, "status": "observed_but_not_quantified", "evidence": ["brandbook:p12"]},
+    "allowed_backgrounds": ["claro/cinza claro", "#005BAA", "#12B24B", "#FFCB05", "#0072BC horizontal", "#00B49D horizontal"],
+    "forbidden_or_unvalidated": ["sobre fotografia sem placa sólida", "fundo laranja", "monocromia preta", "gradiente", "sombra", "contorno", "rotação", "transparência"]
+  },
+  "image_treatment": {
+    "observed": "Retrato oficial recortado com transparência, torso/cintura para cima, postura frontal levemente angulada, olhar para a câmera, luz de estúdio uniforme, cores naturais e camisa azul-clara.",
+    "hero_recipe": "Posicionar o recorte à direita no desktop, grande e sem moldura; integrar a base do recorte a um plano azul ou diagonal verde-amarela; reservar área limpa para rosto e marca.",
+    "mobile": "Empilhar texto e retrato; usar object-position center top; não cortar topo da cabeça, olhos, queixo ou gesto relevante.",
+    "prohibited": ["filtro duotone", "dessaturação intensa", "blur", "vinheta", "sombra pesada", "fundo stock genérico", "recorte circular"],
+    "confidence": "high_for_official_portrait_medium_for_web_composition"
+  },
+  "iconography_and_graphics": {
+    "diagonal_bands": {"status": "inferred_recurrent", "colors": ["#12B24B", "#FFCB05", "#005BAA"], "rule": "1 composição diagonal forte por seção, não padrão contínuo"},
+    "tri_color_rule": {"status": "inferred_from_brandbook", "rule": "linha fina verde-amarelo-azul pode dividir seções"},
+    "icons": {"status": "recommended", "rule": "ícones lineares simples, 1.75px-2px, sem ilustração decorativa"},
+    "forbidden": ["texturas", "bokeh", "ornamentos 3D", "glassmorphism", "neon", "gradientes multicoloridos", "ondas orgânicas genéricas"]
+  },
+  "landing_page_style_spec": {
+    "page_personality": ["direta", "popular", "energética", "confiante", "brasileira", "fotográfica"],
+    "content_density": "média; títulos grandes, parágrafos curtos e listas escaneáveis",
+    "reading_flow": "header compacto -> hero de alto contraste -> prioridades/propostas -> biografia -> agenda/mídia -> formulário/CTA -> footer azul",
+    "sections": {
+      "header": "Fundo branco ou azul; logo horizontal oficial >=130px; navegação curta; CTA amarelo ou verde.",
+      "hero": "Campo azul principal, headline branca com acentos amarelos, retrato oficial recortado à direita, uma diagonal larga e CTA dominante.",
+      "priorities": "Grade editorial de 3 colunas; itens sem card dentro de card; número/ícone como marcador.",
+      "biography": "Faixa clara, fotografia documental apenas se fornecida; caso contrário, reutilizar retrato oficial com enquadramento diferente sem filtro.",
+      "agenda_media": "Lista cronológica ou grade simples; miniaturas reais e legíveis; evitar mosaico decorativo.",
+      "form": "Campos de 48px-56px, rótulos sempre visíveis, foco distinto e consentimento explícito.",
+      "cta": "Banda azul ou verde; uma ação primária; alto contraste e frase curta.",
+      "footer": "Azul principal; marca negativa oficial; links e textos legais preservados exatamente como fornecidos."
+    },
+    "components": {
+      "button_primary": "Fundo #FFCB05, texto #005BAA, Gotham Bold/700, altura 52px, raio 6px, padding 24px.",
+      "button_secondary": "Fundo transparente, borda branca ou azul conforme superfície, altura 52px, raio 6px.",
+      "card": "Superfície branca, raio <=8px, borda sutil; sombra somente quando necessária; não aninhar cards.",
+      "badge": "Compacto, pill permitido, fundo verde ou amarelo; rótulo curto em caixa alta.",
+      "nav": "Texto 15px-16px Medium/Bold, espaçamento amplo, estado ativo por sublinhado sólido.",
+      "form_control": "Altura mínima 48px, raio 4px, borda azul a 18%, label externa, erro textual e cromático.",
+      "number_highlight": "Numerais em peso 800/900, azul ou amarelo, sem imitar a geometria proprietária do 22 da marca."
+    }
+  },
+  "responsive_strategy": {
+    "desktop": ["Hero em duas áreas assimétricas, sem card envolvente", "Retrato ocupa 42%-55% da largura e pode tocar a borda inferior", "Logo horizontal no header; vertical apenas em espaços amplos"],
+    "tablet": ["Grid de 8 colunas", "Hero mantém duas áreas se texto couber; caso contrário empilha", "Diagonais simplificadas para evitar ruído"],
+    "mobile": ["Grid de 4 colunas", "Header com logo horizontal >=130px e menu por ícone", "Hero empilhado, CTA com largura total, retrato abaixo do texto", "Títulos sem escala por viewport; usar breakpoints/clamp com limites", "Cards em coluna única e formulário sem duas colunas"]
+  },
+  "accessibility": {
+    "minimum_body_size": "16px",
+    "minimum_touch_target": "44px x 44px",
+    "contrast_rule": "WCAG 2.2 AA; não usar amarelo ou verde como texto pequeno sobre branco.",
+    "focus_rule": "Foco visível de 3px; não depender apenas de cor.",
+    "image_rule": "Alt descritivo; imagem decorativa com alt vazio; não embutir texto essencial na fotografia.",
+    "motion_rule": "Respeitar prefers-reduced-motion."
+  },
+  "do": [
+    "Usar os lockups oficiais e respeitar mínimos digitais.",
+    "Fazer o 22, a headline ou o retrato dominar cada composição.",
+    "Usar cores chapadas e diagonais largas.",
+    "Preservar o recorte e a luz natural do retrato oficial.",
+    "Manter textos legais, nomes, número e slogans exatamente como fornecidos."
+  ],
+  "dont": [
+    "Digitar Flávio com uma fonte cursiva substituta.",
+    "Aplicar gradientes, glassmorphism, texturas ou sombras na marca; o fundo pode usar apenas modulação radial azul discreta.",
+    "Usar as seis cores com o mesmo peso.",
+    "Colocar a marca diretamente sobre fotografia sem versão homologada e contraste sólido.",
+    "Criar cartões excessivos, seções flutuantes ou hero dentro de card.",
+    "Cortar o rosto ou reduzir o lockup abaixo de 130px."
+  ],
+  "allowed_variations": ["Alternância de fundo claro, azul, verde ou amarelo com lockup correspondente", "Uso controlado de azul secundário ou turquesa em bandas", "Hero com retrato à direita ou centralizado abaixo do texto em mobile", "Diagonais entre 10deg e 16deg como recomendação"],
+  "open_questions": ["Valor geométrico exato do módulo X da área de segurança", "Arquivos web oficiais em SVG e regras de licenciamento/carregamento da Gotham", "Conteúdo e textos legais definitivos da landing page", "Acervo homologado de fotografias documentais", "Uso oficial de ícones, motion e estados de interface"],
+  "generation_prompt": "Crie uma landing page responsiva para a campanha Flávio Bolsonaro 22 usando exclusivamente os ativos oficiais da marca. A assinatura deve combinar numeral 22 dominante, lettering oficial Flávio como imagem imutável, paleta chapada #005BAA, #12B24B e #FFCB05, diagonais largas e retrato oficial recortado com luz natural de estúdio. Use Gotham quando licenciada; títulos em peso 800, corpo em peso 400/500. Construa header compacto com lockup horizontal mínimo de 130 px, hero azul de alto contraste com headline branca/amarela, CTA amarelo, retrato grande à direita e uma transição diagonal verde-amarela. Estruture conteúdo em container de 1200 px, grid 12/8/4 colunas e seções com bastante respiro. Use cards apenas para itens repetidos, raio máximo 8 px, formulários acessíveis e footer azul com marca negativa. Preserve nomes, número, slogans e textos legais exatamente como fornecidos. Em mobile, empilhe conteúdo, mantenha o rosto inteiro e CTA em largura total. Atenda WCAG 2.2 AA.",
+  "negative_prompt": "Não recriar ou digitar o lettering Flávio; não alterar, separar, distorcer ou recolorir o lockup; não usar marca menor que 130 px; não usar gradientes multicoloridos ou gradiente dentro da marca, glassmorphism, neon, texturas, bokeh, 3D, sombras na marca, outlines, recortes circulares, duotone, fotografia stock genérica, fundo laranja não homologado, paleta roxa ou monocromática, hero em card, excesso de cartões, cards aninhados, cantos muito arredondados, tipografia serifada editorial, texto amarelo/verde pequeno sobre branco, CTA sem contraste, corte do rosto, texto legal inventado ou conteúdo político resumido/reinterpretado. Permitir somente modulação radial azul discreta, quando necessária.",
+  "acceptance_criteria": [
+    {"id": "AC-01", "criterion": "Lockup é arquivo oficial, não recomposto, e atende mínimo de 130px.", "severity": "critical"},
+    {"id": "AC-02", "criterion": "Paleta dominante usa #005BAA, #12B24B e #FFCB05; qualquer gradiente é apenas tonal azul discreto e nunca afeta a marca.", "severity": "critical"},
+    {"id": "AC-03", "criterion": "Hero mostra retrato oficial sem corte de rosto e com CTA claramente dominante.", "severity": "relevant"},
+    {"id": "AC-04", "criterion": "Gotham é usada quando licenciada; fallback não tenta imitar o lettering.", "severity": "relevant"},
+    {"id": "AC-05", "criterion": "Desktop/tablet/mobile respeitam grid 12/8/4 e não apresentam sobreposição ou overflow.", "severity": "critical"},
+    {"id": "AC-06", "criterion": "Texto e controles atendem WCAG 2.2 AA, foco visível e alvo mínimo 44px.", "severity": "critical"},
+    {"id": "AC-07", "criterion": "Não há hero em card, cards aninhados, excesso de raios ou decoração genérica.", "severity": "relevant"},
+    {"id": "AC-08", "criterion": "Nomes, número, slogans e textos legais coincidem exatamente com as fontes aprovadas.", "severity": "critical"},
+    {"id": "AC-09", "criterion": "Regras recomendadas não são apresentadas como normas oficiais da campanha.", "severity": "relevant"},
+    {"id": "AC-10", "criterion": "Lighthouse/axe não identifica erros de contraste, labels ou navegação por teclado.", "severity": "critical"}
+  ],
+  "source_traceability": [
+    {"id": "1R67sN_70mNjBtQkzaJycUBObwRmtc_dA", "name": "fb_brandbook.pdf", "url": "https://drive.google.com/file/d/1R67sN_70mNjBtQkzaJycUBObwRmtc_dA", "pages_used": "1-17", "role": "normative"},
+    {"id": "1izqavxV6g4vKhxeFpk1GVC98rDJ-I-yS", "name": "LEIA-ME.txt", "url": "https://drive.google.com/file/d/1izqavxV6g4vKhxeFpk1GVC98rDJ-I-yS", "role": "normative_metadata"},
+    {"id": "1J8_b4JE38Vw1md7vHpQ4KTilO-9PRgEH", "name": "fb_bandeira_200x140cm_v2.pdf", "url": "https://drive.google.com/file/d/1J8_b4JE38Vw1md7vHpQ4KTilO-9PRgEH", "pages_used": "1", "role": "application_evidence"},
+    {"id": "1ov-GRuF_DRviY-LWwkgvvozJ_Kbo3Pvs", "name": "fb_fly_banner_30x70cm_ARQUIVO-REAL_v1.pdf", "url": "https://drive.google.com/file/d/1ov-GRuF_DRviY-LWwkgvvozJ_Kbo3Pvs", "pages_used": "1", "role": "application_evidence"},
+    {"id": "1EnSqIwDpDJ40MxfLjnSXgcqIzbpP1BpB", "name": "FB_praguinha_7cm_V1.pdf", "url": "https://drive.google.com/file/d/1EnSqIwDpDJ40MxfLjnSXgcqIzbpP1BpB", "pages_used": "1-2", "role": "application_evidence"},
+    {"id": "1LBNdOVF20SACumSDOqfsCj-tg8vKueh5", "name": "FB_praguinha_7cm_V3.pdf", "url": "https://drive.google.com/file/d/1LBNdOVF20SACumSDOqfsCj-tg8vKueh5", "pages_used": "1-2", "role": "application_evidence"},
+    {"id": "1XqzjkFTRGyeeGqb-AWVCwfOdPiCFk7J3", "name": "fb_colinha_9x5cm_v1.pdf", "url": "https://drive.google.com/file/d/1XqzjkFTRGyeeGqb-AWVCwfOdPiCFk7J3", "pages_used": "1-2", "role": "application_evidence"},
+    {"id": "1tp2TdXeqg77ZGgfy1-X3AaAK6UR3aBMM", "name": "fb_praguinha_vice_v1.pdf", "url": "https://drive.google.com/file/d/1tp2TdXeqg77ZGgfy1-X3AaAK6UR3aBMM", "pages_used": "1-2", "role": "joint_application_evidence"},
+    {"id": "1ajsnCPcSMWZgHya0Aurwg7k6S6A_k2i3", "name": "flavio22-foto-flavio-corte.png", "url": "https://drive.google.com/file/d/1ajsnCPcSMWZgHya0Aurwg7k6S6A_k2i3", "role": "official_photo_asset"},
+    {"id": "1aMz2vO1rsNMyZRuIwMDZcwdyuRXOG5GG", "name": "flavio22-logo-vetor.pdf", "url": "https://drive.google.com/file/d/1aMz2vO1rsNMyZRuIwMDZcwdyuRXOG5GG", "role": "official_logo_asset"}
+  ]
+}

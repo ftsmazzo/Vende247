@@ -1,7 +1,6 @@
 import { scrapeCompetitors, type CompetitorProfile } from "./apify.js";
 import { searchAdsForResearch, type AdSnippet } from "./adLibrary.js";
 import { chatJson } from "./llm.js";
-import { identityContextForLlm, type IdentityModel } from "./identityContract.js";
 
 export type ResearchReport = {
   resumo: string;
@@ -44,10 +43,7 @@ export type WorkspaceContext = {
   name?: string;
 };
 
-export async function runResearchPipeline(
-  ctx: WorkspaceContext,
-  identityModel?: IdentityModel | null
-): Promise<{
+export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
   raw: { competitors: CompetitorProfile[]; ads: AdSnippet[] };
   report: ResearchReport;
 }> {
@@ -94,52 +90,42 @@ export async function runResearchPipeline(
       })),
   }));
 
-  const identity = identityContextForLlm(identityModel);
-
   const report = await chatJson<ResearchReport>(
-    `Voce e estrategista de conteudo para Instagram no Brasil.
-Skill campaign-design-apply: a identidade visual ATIVA (JSON) manda no mood, paleta e cenas. Nao use paleta de outro produto nem de brand_kit legado.
+    `Você é pesquisador de mercado para Instagram (Brasil). NÃO há identidade visual ainda — NÃO fale de paleta, contrato de marca, conflito de identidade, Gotham, numeral 22, brand_kit.
 
-Sua missao: insights DECISIVOS para vender ESTE produto (${ctx.type || "campanha"}: ${ctx.name || ctx.produto}) — nao platitudes.
+Missão: o que o MERCADO (concorrentes + ads) faz, e o que ESTE produto pode ganhar. Campanha tipo=${ctx.type || "produto"} nome=${ctx.name || ctx.produto}.
 
-PROIBIDO (generico demais):
-- "seguranca e compromisso", "videos e imagens", "saiba mais na bio" sem contexto
-- listas vagas tipo "formatos: video, carrossel"
-- repetir o obvio do nicho sem amarrar ao produto
-- assumir software B2B / EPI / SST se o produto nao for isso
-- direcao_visual que contradiga recognition_cues, image_treatment ou dont da identidade
-- se a identidade for campanha politica (22, retrato, diagonais, azul/amarelo/verde), NAO sugerir planner cristão, serifas piegas, tons bege/terracota
+PROIBIDO:
+- abrir o resumo com "CONFLITO" / "identidade incompatível" / "skill campaign-design-apply"
+- platitudes ("segurança e compromisso", "vídeos e imagens")
+- assumir EPI/SaaS se o produto não for isso
+- inventar likes, % ou ads que não estão nos dados
 
-OBRIGATORIO:
-- Citar padroes REAIS vistos nas captions/posts dos concorrentes (temas, angulos, provas)
-- Separar o que concorrentes fazem bem vs o que o produto pode ganhar (oportunidades_unicas)
-- Hooks concretos, no tom do produto E no tom da identidade (landing_page_style_spec.page_personality)
-- direcao_visual: 8–12 cenas DIFERENTES que APLICAM a identidade ao produto (pessoa + paleta + composicao do contrato).
-  Cada item = 1 frase de cena concreta. PROIBIDO: mockup de celular, dashboard, "foto profissional generica"
-- Inferir o que as midias dos top posts sugerem pelo tipo + caption
-- Bio e pilares especificos do produto informado
+OBRIGATÓRIO:
+- resumo: 4–8 frases factuais sobre o que viu nos perfis (temas de caption, provas, CTAs)
+- o_que_concorrentes_fazem_bem: itens concretos citando @ ou tema de post
+- oportunidades_unicas: lacunas vs o produto informado
+- hooks_vencedores: frases no tom_voz do briefing (${ctx.tom_voz || "o tom declarado"})
+- direcao_visual: 8–12 CENAS do nicho/produto em uso (pessoa, objeto, lugar, hora). Sem mockup de celular. Sem paleta de outra campanha.
+- pilares_conteudo específicos deste produto
 
-Se dados Apify (perfis) estiverem vazios, diga isso em resumo e ainda proponha angulos com base no produto + identidade (nao invente likes).
+Ads: se ads_nicho vazio, diga que a coleta não retornou ads — não que o mercado não anuncia.
 
-Sobre ads / Ad Library (CRITICO):
-- Se ads_nicho TIVER itens (fonte Apify scrape ou Graph): use copy, CTA, landing e paginas como evidencia real de trafego pago. Cite padroes em insights_ads.
-- Se ads_nicho estiver VAZIO: NAO diga que "o nicho nao tem anuncios pagos". Diga que a coleta nao retornou ads ativos para as queries e baseie insights_ads no organico Apify + produto.
-- Nao confunda ausencia de dados com ausencia de mercado.
-
-JSON com chaves:
-resumo, o_que_concorrentes_fazem_bem[], oportunidades_unicas[], formatos_que_performam[],
+JSON: resumo, o_que_concorrentes_fazem_bem[], oportunidades_unicas[], formatos_que_performam[],
 hooks_vencedores[], ctas_comuns[], pilares_conteudo[], direcao_visual[],
 padrao_perfil_engajador { bio_sugerida, destaques[], ritmo_posts_semana, mix_formatos {feed,carrossel,reels} },
 gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado }.`,
     JSON.stringify(
       {
-        produto_a_vender: {
+        campanha: {
+          tipo: ctx.type,
+          nome: ctx.name,
           nicho: ctx.nicho,
           produto: ctx.produto,
           oferta: ctx.oferta,
           cta: ctx.cta,
           tom_voz: ctx.tom_voz,
-          meu_ig: ctx.ig_username || "(perfil quase vazio — construir do zero)",
+          meu_ig: ctx.ig_username || "(ainda sem perfil)",
         },
         concorrentes_analisados: compactCompetitors,
         ads_nicho: ads.slice(0, 15),
@@ -150,8 +136,6 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
           ad_library_status: adStatus,
           ad_library_nota: adLibraryNota,
         },
-        nota: "Imagens dos concorrentes NAO sao reutilizadas pixel a pixel; use captions+tipo+ads para padroes.",
-        identidade_ativa: identity,
       },
       null,
       2

@@ -44,7 +44,7 @@ export const researchRoutes: FastifyPluginAsync = async (app) => {
     const ctx = campaignCtx(scope.campaign, scope.workspace.ig_username);
 
     try {
-      const { raw, report } = await runResearchPipeline(ctx, scope.identity?.model);
+      const { raw, report } = await runResearchPipeline(ctx);
 
       await query(
         `UPDATE research_runs SET status = 'done', raw_data = $2::jsonb, report = $3::jsonb,

@@ -89,9 +89,7 @@ export async function resolveCampaignScope(
   if (!campaign) return { error: "Campanha não encontrada.", status: 404 };
 
   const identity = await getActiveIdentity(campaign.id);
-  const brand = identity
-    ? identityToBrandKit(identity.model as IdentityModel)
-    : ((ws.brand_kit || {}) as BrandKit);
+  const brand = identity ? identityToBrandKit(identity.model as IdentityModel) : {};
 
   return { workspace: ws, campaign, identity, brand };
 }

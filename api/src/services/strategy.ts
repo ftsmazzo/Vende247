@@ -1,7 +1,6 @@
 import { chatJson } from "./llm.js";
 import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { BrandKit } from "./brandFromUrl.js";
-import { identityContextForLlm, identityGenerationHints, type IdentityModel } from "./identityContract.js";
 import {
   filterResearchCues,
   lockVisualToNiche,
@@ -60,53 +59,34 @@ export async function generateStrategy(
   ctx: WorkspaceContext,
   report: ResearchReport,
   days = 7,
-  brand?: BrandKit | null,
-  identityModel?: IdentityModel | null
+  brand?: BrandKit | null
 ): Promise<StrategyPlan> {
   const n = Math.min(Math.max(days, 7), 14);
-  const identity = identityContextForLlm(identityModel);
-  const hints = identityGenerationHints(identityModel);
 
   const plan = await chatJson<StrategyPlan>(
-    `Você é diretor criativo de anúncios Instagram (Brasil, 2026).
-Skill campaign-design-apply: aplique a identidade ATIVA (JSON). Não invente outra paleta. Não use brand_kit legado se houver identidade.
-Campanha: tipo=${ctx.type || "?"} nome=${ctx.name || ctx.produto}.
-Produto a vender: ângulos do produto + research. Nicho: ${ctx.nicho}.
-NÃO force software B2B / EPI / indústria se o produto for outro.
-NÃO force planner cristão / fé se a identidade for política (22, diagonais, azul/amarelo/verde, retrato).
+    `Você é diretor de conteúdo Instagram (Brasil). A identidade visual AINDA NÃO EXISTE — planeje MENSAGEM e CENAS do produto, não paleta de outra campanha.
 
-Cada visual_prompt DEVE incorporar generation_prompt da identidade (mood, paleta, composição) e evitar negative_prompt.
-
-Plano de exatamente ${n} dias. Cada post DEVE ser visualmente e tematicamente diferente do anterior.
+Campanha: tipo=${ctx.type || "?"} nome=${ctx.name || ctx.produto}. Nicho: ${ctx.nicho}. Tom: ${ctx.tom_voz}.
+Use research (hooks, oportunidades, direcao_visual). Plano de exatamente ${n} dias, cada post diferente.
 
 PROIBIDO:
-- visual_prompt com mockup de celular / "smartphone showing dashboard" / telas inventadas de app
-- captions genéricas tipo "transforme sua vida" sem dor concreta do nicho
-- repetir o mesmo layout visual, mesma locação ou mesmo ângulo de câmera em vários dias
-- prometer vídeo gerado / motion / reels animado (o sistema ainda NÃO gera vídeo)
-- copiar arte de concorrente; só reaproveitar ÂNGULOS de mensagem da research
-- cenas industriais / EPI / fábrica salvo se o nicho for isso
+- mockup de celular / dashboard
+- "transforme sua vida" sem dor do nicho
+- copiar arte de concorrente
+- EPI/fábrica se o nicho não for isso
+- falar de identidade visual oficial, numeral 22, Gotham, conflito de brand
 
-OBRIGATÓRIO em cada post:
-- hook específico à dor/desejo do público do nicho
-- caption curta (máx 320 caracteres), 1ª linha = hook, CTA no fim
-- visual_prompt = FOTO/CENA realista ÚNICA — use 1 item diferente de research.direcao_visual por dia;
-  alinhe ao brand.visual_summary se existir; cores vivas ou soft conforme a marca
-  texto no visual: 3–6 palavras em português, tipografia bold, longe das bordas
-  especifique: local concreto + ângulo de câmera + hora do dia
-- cena_tipo: um de hero_pessoa | produto_detalhe | rotina | emocao | antes_depois | prova_social | oferta
-  — varie: não repita a mesma cena_tipo em dias consecutivos
-
-FORMATOS:
-- Mix: ~40% feed, 30% carrossel, 30% reels
-- feed = 1 imagem
-- carrossel = OBRIGATÓRIO campo slides[] com 4 ou 5 itens { titulo, texto, visual_prompt } — cada slide com cena/ângulo/texto DIFERENTE
-- reels = ainda é IMAGEM ESTÁTICA estilo capa de reel (9:16 vibe em 4:5); NÃO descreva como vídeo
+OBRIGATÓRIO:
+- hook concreto no tom_voz
+- caption ≤ 320 chars
+- visual_prompt = cena realista de direcao_visual + local + câmera + hora; texto PT 3–6 palavras
+- cena_tipo variado
+- mix ~40% feed, 30% carrossel (slides[] 4–5), 30% reels (imagem estática)
 
 JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, hook, estrutura, caption, cta, visual_prompt, slides?, cena_tipo }] }`,
     JSON.stringify(
       {
-        workspace: ctx,
+        campanha: ctx,
         research: {
           resumo: report.resumo,
           oportunidades_unicas: report.oportunidades_unicas,
@@ -116,13 +96,7 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
           direcao_visual: report.direcao_visual,
           ctas_comuns: report.ctas_comuns,
         },
-        identidade_ativa: identity,
-        identity_prompts: hints.positive
-          ? { generation_prompt: hints.positive, negative_prompt: hints.negative, palette: hints.palette }
-          : null,
         cena_rotation_sugerida: CENA_ROTATION.slice(0, n),
-        regra_diversidade:
-          "Cada visual_prompt deve citar uma cena distinta de direcao_visual; se faltar, invente variação de local/ângulo alinhada ao nicho.",
       },
       null,
       2
@@ -140,24 +114,14 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
   }
   plan.resumo = typeof plan.resumo === "string" ? plan.resumo : String(plan.resumo ?? "");
   const safeCues = filterResearchCues(report.direcao_visual || [], ctx);
-  const faithHooks = [
-    "Orei. E agora?",
-    "Fé na rotina",
-    "Organize com fé",
-    "Gratidão diária",
-    "Palavra no centro",
-    "Comece de novo",
-    "Ritual simples",
-  ];
   plan.posts = plan.posts.slice(0, n).map((p, i) => {
     const cena = normalizeCena(p.cena_tipo) || CENA_ROTATION[i % CENA_ROTATION.length];
     let hook = coerceText(p.hook) || coerceText(p.titulo) || "Hook";
     if (
-      !identityModel &&
       looksIndustrialVisual(hook) &&
       !looksIndustrialVisual(`${ctx.nicho} ${ctx.produto}`)
     ) {
-      hook = faithHooks[i % faithHooks.length];
+      hook = `${ctx.produto.split(/[—\-–]/)[0]?.trim() || "Oferta"} · dia ${i + 1}`;
     }
     const titulo = coerceText(p.titulo) || `Dia ${i + 1}`;
     let visual = coerceText(p.visual_prompt).trim();
@@ -187,9 +151,6 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     ];
     visual = `${visual}. Camera: ${angles[i % angles.length]}.`;
     visual = lockVisualToNiche(visual, ctx, brand, hook);
-    if (hints.positive) {
-      visual = `${visual}. IDENTITY: ${hints.positive.slice(0, 400)}`;
-    }
 
     const formato = (["feed", "carrossel", "reels"].includes(String(p.formato))
       ? p.formato
@@ -212,11 +173,10 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
 
     let caption = coerceText(p.caption);
     if (
-      !identityModel &&
       looksIndustrialVisual(caption) &&
       !looksIndustrialVisual(`${ctx.nicho} ${ctx.produto}`)
     ) {
-      caption = `${hook}\n\n${coerceText(ctx.oferta) || "Um ritual simples de fé e organização."}\n\n${ctx.cta || "Quero o planner no Direct"}`;
+      caption = `${hook}\n\n${coerceText(ctx.oferta) || ctx.produto}\n\n${ctx.cta || "Saiba mais"}`;
     }
 
     return {

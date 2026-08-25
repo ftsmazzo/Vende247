@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api, Workspace } from "../api/client";
 import { StyleBits } from "./OnboardingPage";
 
@@ -50,11 +49,7 @@ export function SettingsPage() {
       <div>
         <h1 className="font-display text-3xl font-bold">Conta</h1>
         <p className="text-white/55 mt-1">
-          Instagram da conta. Identidade visual, briefing e paleta ficam na{" "}
-          <Link to="/" className="text-signal">
-            campanha
-          </Link>{" "}
-          (etapa Identidade / seed JSON).
+          Instagram da conta. Identidade visual nasce na campanha depois de research e estratégia.
         </p>
       </div>
 

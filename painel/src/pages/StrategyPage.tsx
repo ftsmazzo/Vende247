@@ -175,7 +175,9 @@ export function StrategyPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold">Estratégia</h1>
-          <p className="text-white/55 mt-1">Plano diário com brief de cada criativo.</p>
+          <p className="text-white/55 mt-1">
+            Plano de conteúdo a partir do research. Identidade visual vem depois.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <select

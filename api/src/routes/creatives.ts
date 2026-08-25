@@ -166,6 +166,12 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       plan = s.rows[0].plan;
     }
 
+    if (!scope.identity) {
+      return reply.status(400).send({
+        error: "Gere a identidade da campanha (após research e estratégia) antes dos criativos.",
+      });
+    }
+
     const posts = (plan?.posts ?? []) as CreativeBrief[];
     if (!posts.length) return reply.status(400).send({ error: "Plano sem posts." });
 

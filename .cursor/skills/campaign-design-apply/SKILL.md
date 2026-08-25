@@ -24,6 +24,8 @@ Você **não** cria brand. Lê o contrato ativo (`identity_versions.model` + `cs
 
 ## Research / estratégia
 
-- Injetar o JSON completo compacto (`identityContextForLlm`): paleta nomeada, recognition_cues, image_treatment, landing_page_style_spec, generation_prompt / negative_prompt, do/dont.
-- `direcao_visual` e `visual_prompt` aplicam a identidade AO produto — não sugerem outra marca.
-- Não usar `brand_kit` da conta (cores de site antigo) quando houver identidade ativa.
+Não usam esta skill. Pesquisa e plano vêm antes da identidade.
+
+## Geração (LP / criativos)
+
+Só depois da identidade ativa. Sem `brand_kit` da conta.

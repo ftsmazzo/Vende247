@@ -3,10 +3,10 @@ import { Link, useParams } from "react-router-dom";
 import { api, Campaign, setCampaignId } from "../api/client";
 
 const STEPS: Array<{ key: keyof NonNullable<Campaign["pipeline"]>; n: string; title: string; to: string; desc: string }> = [
-  { key: "briefing", n: "1", title: "Campanha", to: ".", desc: "Briefing editável abaixo" },
-  { key: "identity", n: "2", title: "Identidade", to: "identidade", desc: "Importar JSON + CSS" },
-  { key: "research", n: "3", title: "Research", to: "/research", desc: "Rodar pesquisa" },
-  { key: "strategy", n: "4", title: "Estratégia", to: "/estrategia", desc: "Gerar plano" },
+  { key: "briefing", n: "1", title: "Campanha", to: ".", desc: "Briefing" },
+  { key: "research", n: "2", title: "Research", to: "/research", desc: "Mercado e concorrentes" },
+  { key: "strategy", n: "3", title: "Estratégia", to: "/estrategia", desc: "Plano de conteúdo" },
+  { key: "identity", n: "4", title: "Identidade", to: "identidade", desc: "Gerar a partir de research + estratégia" },
   { key: "landing", n: "5", title: "Geração", to: "/landing", desc: "LP + criativos" },
 ];
 
@@ -62,7 +62,9 @@ export function CampaignPipelinePage() {
           ← Campanhas
         </Link>
         <h1 className="font-display text-3xl font-bold mt-2">{campaign.name}</h1>
-        <p className="text-white/50 mt-1">Pipeline da campanha · {campaign.type}</p>
+        <p className="text-white/50 mt-1">
+          Ordem: briefing → research → estratégia → identidade → LP/criativos
+        </p>
       </div>
       {error && <p className="text-coral text-sm">{error}</p>}
 

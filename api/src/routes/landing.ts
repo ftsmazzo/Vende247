@@ -28,8 +28,10 @@ export const landingRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Body: { with_hero_image?: boolean } }>("/generate", async (req, reply) => {
     const scope = await resolveCampaignScope(getUserId(req), req);
     if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
-    if (!scope.campaign.produto?.trim() && !scope.campaign.nicho?.trim() && !scope.campaign.name) {
-      return reply.status(400).send({ error: "Complete o briefing da campanha antes." });
+    if (!scope.identity) {
+      return reply.status(400).send({
+        error: "Gere ou importe a identidade da campanha (depois de research e estratégia) antes da landing.",
+      });
     }
 
     const research = await query<{ report: ResearchReport }>(

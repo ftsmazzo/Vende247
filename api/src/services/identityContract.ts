@@ -40,6 +40,17 @@ export function identityToBrandKit(model: IdentityModel | null | undefined): Bra
   };
 }
 
+export function identityLooksCampaignLayout(model: IdentityModel | null | undefined): boolean {
+  if (!model) return false;
+  const num = (model.candidate as { number?: string } | undefined)?.number;
+  if (num === "22") return true;
+  const spec = model.landing_page_style_spec as { page_personality?: string[] } | undefined;
+  const personality = (spec?.page_personality || []).join(" ").toLowerCase();
+  if (/polít|politic|energét|brasileira/.test(personality) && /confian/.test(personality)) return true;
+  const list = identityColors(model).map((c) => c.toLowerCase());
+  return list.includes("#ffcb05") && list.includes("#005baa");
+}
+
 export function identityGenerationHints(model: IdentityModel | null | undefined): {
   positive: string;
   negative: string;
@@ -96,9 +107,12 @@ export function identityPickColors(model: IdentityModel | null | undefined): {
   surface: string;
 } | null {
   const tokens = (model?.design_tokens as { colors?: unknown } | undefined)?.colors;
-  const yellow = tokenValue(tokens, "brand_yellow");
-  const blue = tokenValue(tokens, "brand_blue");
-  const green = tokenValue(tokens, "brand_green");
+  const yellow = tokenValue(tokens, "brand_yellow") || tokenValue(tokens, "brand_accent");
+  const blue =
+    tokenValue(tokens, "brand_blue") ||
+    tokenValue(tokens, "brand_primary") ||
+    tokenValue(tokens, "ink");
+  const green = tokenValue(tokens, "brand_green") || tokenValue(tokens, "brand_secondary");
   const ink = tokenValue(tokens, "ink");
   const surface = tokenValue(tokens, "surface");
   const list = identityColors(model);

@@ -4,7 +4,7 @@ import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { StrategyPlan } from "./strategy.js";
 import { gerarImagemViral } from "./imageGen.js";
 import { isStorageConfigured } from "./storage.js";
-import { identityContextForLlm, identityPickColors, type IdentityModel } from "./identityContract.js";
+import { identityContextForLlm, identityLooksCampaignLayout, identityPickColors, type IdentityModel } from "./identityContract.js";
 
 export type LandingCopy = {
   brand_name: string;
@@ -695,7 +695,7 @@ export async function generateLanding(opts: {
   const { ctx, report, strategy, brand, identityModel, identityCss } = opts;
   const colors = pickColors(brand, identityModel);
   const identity = identityContextForLlm(identityModel);
-  const identityLayout = Boolean(identity);
+  const identityLayout = identityLooksCampaignLayout(identityModel);
 
   // Research de Instagram NÃO é brief de LP. Só ângulos de PRODUTO / mercado.
   const productSignals = report

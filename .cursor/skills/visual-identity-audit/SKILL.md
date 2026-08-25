@@ -1,38 +1,25 @@
 ---
 name: visual-identity-audit
 description: >-
-  Consolida identidade visual (imagens, PDF, URL ou JSON) no contrato Flávio:
-  identity_signature, design_tokens, landing_page_style_spec, generation_prompt,
-  negative_prompt, acceptance_criteria. Use ao auditar ou importar brand para o Vende247.
+  Gera ou consolida identidade visual DEPOIS de research e estratégia da campanha.
+  Contrato: identity_signature, design_tokens, landing_page_style_spec,
+  generation_prompt, negative_prompt. Não rode na etapa de pesquisa.
 ---
 
-# Skill A — Identidade visual
+# Skill A — Identidade visual (depois de research + estratégia)
 
-Não invente uma marca nova se houver evidência. Separe `observed` (visto nas peças) de `recommended` (só se o rigor permitir).
+No produto Vende247 a ordem é: **Campanha → Research → Estratégia → Identidade → LP/criativos**.
 
-## Entrada
+Não injete identidade na pesquisa. A pesquisa descreve o mercado; a identidade nasce do briefing + research + estratégia (+ peças/JSON se houver).
 
-- JSON já pronto (modo import / validação)
-- URL de site (extração)
-- Peças (imagens, PDF) — consolidar depois
+## Gerar (API)
 
-## Saída (contrato único)
+`POST /api/campaigns/:id/identity/generate` — exige research `done` e uma strategy.
 
-JSON com no mínimo:
+## Importar
 
-- `identity_signature` (summary, personality)
-- `design_tokens.colors` (cada cor com `value` hex)
-- `landing_page_style_spec` (layout, type, components)
-- `generation_prompt` / `negative_prompt`
-- `do` / `dont` / `acceptance_criteria`
-- `overall_confidence`
+JSON já pronto só se for DESTA marca (ex. brandbook Flávio numa campanha Flávio).
 
-Opcional: CSS de tokens (`:root { --brand-blue: … }`).
+## Saída
 
-## Regras
-
-- Uma identidade por campanha; não misture paleta de outro cliente.
-- Político: não invente fato; só visual e tom observados.
-- Gaps e conflitos entram no modelo, não são omitidos.
-
-O painel importa este JSON via `POST /api/campaigns/:id/identity/import`. A API persiste em `identity_versions` (`status=active`).
+Mesmo schema: identity_signature, design_tokens.colors[].value, landing_page_style_spec, generation_prompt, negative_prompt, do/dont.

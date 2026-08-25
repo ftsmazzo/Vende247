@@ -56,8 +56,7 @@ export const strategyRoutes: FastifyPluginAsync = async (app) => {
       campaignCtx(scope.campaign, scope.workspace.ig_username),
       report!,
       days,
-      scope.brand,
-      scope.identity?.model
+      {}
     );
 
     const inserted = await query<{ id: number }>(

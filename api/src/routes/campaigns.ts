@@ -4,13 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { query } from "../db/index.js";
 import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHelpers.js";
-import {
-  getActiveIdentity,
-  getCampaign,
-  listCampaigns,
-  publicCampaign,
-} from "../services/campaignHelpers.js";
+import { campaignCtx, getActiveIdentity, getCampaign, listCampaigns, publicCampaign } from "../services/campaignHelpers.js";
 import type { IdentityModel } from "../services/identityContract.js";
+import { generateCampaignIdentity } from "../services/identityGen.js";
+import type { ResearchReport } from "../services/research.js";
+import type { StrategyPlan } from "../services/strategy.js";
 
 const TYPES = new Set(["produto", "servico", "candidato", "oferta"]);
 
@@ -194,6 +192,45 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
     const identity = await saveActiveIdentity(id, model, css, req.body?.source || "import");
     await query(`UPDATE campaigns SET status = 'active', updated_at = NOW() WHERE id = $1`, [id]);
     return { identity };
+  });
+
+  app.post<{ Params: { id: string }; Body: { notes?: string } }>("/:id/identity/generate", async (req, reply) => {
+    const ws = await getWorkspaceForUser(getUserId(req));
+    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const id = Number(req.params.id);
+    const campaign = await getCampaign(ws.id, id);
+    if (!campaign) return reply.status(404).send({ error: "Campanha não encontrada." });
+
+    const research = await query<{ report: ResearchReport; status: string }>(
+      `SELECT report, status FROM research_runs
+       WHERE workspace_id = $1 AND campaign_id = $2 AND status = 'done'
+       ORDER BY id DESC LIMIT 1`,
+      [ws.id, id]
+    );
+    if (!research.rows[0]) {
+      return reply.status(400).send({ error: "Rode a pesquisa desta campanha antes de gerar identidade." });
+    }
+    const strategy = await query<{ plan: StrategyPlan }>(
+      `SELECT plan FROM strategies WHERE workspace_id = $1 AND campaign_id = $2 ORDER BY id DESC LIMIT 1`,
+      [ws.id, id]
+    );
+    if (!strategy.rows[0]) {
+      return reply.status(400).send({ error: "Gere a estratégia desta campanha antes de gerar identidade." });
+    }
+
+    try {
+      const { model, css } = await generateCampaignIdentity({
+        ctx: campaignCtx(campaign, ws.ig_username),
+        report: research.rows[0].report,
+        strategy: strategy.rows[0].plan,
+        notes: req.body?.notes,
+      });
+      const identity = await saveActiveIdentity(id, model, css, "generated");
+      await query(`UPDATE campaigns SET status = 'active', updated_at = NOW() WHERE id = $1`, [id]);
+      return { identity };
+    } catch (err) {
+      return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
+    }
   });
 };
 
