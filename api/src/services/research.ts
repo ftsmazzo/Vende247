@@ -41,7 +41,10 @@ export type WorkspaceContext = {
   ig_username: string;
 };
 
-export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
+export async function runResearchPipeline(
+  ctx: WorkspaceContext,
+  identityLock = ""
+): Promise<{
   raw: { competitors: CompetitorProfile[]; ads: AdSnippet[] };
   report: ResearchReport;
 }> {
@@ -107,6 +110,8 @@ OBRIGATORIO:
 - Inferir o que as midias dos top posts sugerem pelo tipo (GraphImage/Video/Sidecar) + caption — mesmo sem ver o JPEG
 - Bio e pilares especificos do produto informado
 
+A direcao_visual DEVE ser compativel com a identidade visual ativa (contrato abaixo). Nao contradiga paleta, mood nem do/dont.
+
 Se dados Apify (perfis) estiverem vazios, diga isso em resumo e ainda proponha angulos com base no produto (nao invente likes).
 
 Sobre ads / Ad Library (CRITICO):
@@ -139,6 +144,7 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
           ad_library_nota: adLibraryNota,
         },
         nota: "Imagens dos concorrentes NAO sao reutilizadas pixel a pixel; use captions+tipo+ads para padroes.",
+        identidade_ativa: identityLock || null,
       },
       null,
       2

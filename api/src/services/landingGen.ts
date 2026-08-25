@@ -4,6 +4,7 @@ import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { StrategyPlan } from "./strategy.js";
 import { gerarImagemViral } from "./imageGen.js";
 import { isStorageConfigured } from "./storage.js";
+import { identityPickColors, identityPromptBlock, type IdentityModel } from "./identityContract.js";
 
 export type LandingCopy = {
   brand_name: string;
@@ -89,12 +90,14 @@ function saturation(hex: string): number {
 }
 
 /** Fundo quase preto; accent só cor viva; deep = teal escuro de apoio. */
-function pickColors(brand?: BrandKit | null): {
+function pickColors(brand?: BrandKit | null, identity?: IdentityModel | null): {
   accent: string;
   deep: string;
   ink: string;
   surface: string;
 } {
+  const fromIdentity = identityPickColors(identity || undefined);
+  if (fromIdentity) return fromIdentity;
   const raw = (brand?.colors ?? [])
     .map((c) => (c.startsWith("#") ? c.toLowerCase() : `#${c}`.toLowerCase()))
     .filter((c) => parseHex(c));
@@ -295,6 +298,7 @@ export function renderLandingHtml(
     heroUrl?: string;
     ctaUrl: string;
     concorrentes: string[];
+    extraCss?: string;
   }
 ): string {
   const { accent, deep, ink, surface } = opts.colors;
@@ -549,6 +553,7 @@ footer{padding:1.5rem 0 2rem;border-top:1px solid var(--line);color:var(--muted)
   .section{padding:2.15rem 0}
   .offer{padding:1.35rem}
 }
+${opts.extraCss || ""}
 </style>
 </head>
 <body>
@@ -666,10 +671,13 @@ export async function generateLanding(opts: {
   report?: ResearchReport | null;
   strategy?: StrategyPlan | null;
   brand?: BrandKit | null;
+  identityModel?: IdentityModel | null;
+  identityCss?: string;
   withHeroImage?: boolean;
 }): Promise<LandingResult> {
-  const { ctx, report, strategy, brand } = opts;
-  const colors = pickColors(brand);
+  const { ctx, report, strategy, brand, identityModel, identityCss } = opts;
+  const colors = pickColors(brand, identityModel);
+  const identityLock = identityPromptBlock(identityModel);
 
   // Research de Instagram NÃO é brief de LP. Só ângulos de PRODUTO / mercado.
   const productSignals = report
@@ -693,7 +701,8 @@ export async function generateLanding(opts: {
     `Você escreve landing pages de conversão (Brasil) para o COMPRADOR do produto descrito no workspace.
 
 MISSÃO: vender o PRODUTO do workspace (descrição + oferta). NÃO vender "presença no Instagram".
-Adapte o tom ao nicho (B2C fé/lifestyle, B2B software, etc.) — NÃO force EPI/SST/indústria se o produto for outro.
+Skill campaign-design-apply: copy e seções devem respeitar landing_page_style_spec e do/dont da identidade.
+Adapte o tom ao nicho (B2C fé/lifestyle, B2B software, político, etc.) — NÃO force EPI/SST/indústria se o produto for outro.
 
 PROIBIDO ABSOLUTO nas dores/pains/pillars/angles:
 - perfil vazio, falta de conteúdo, engajamento, posts, reels, carrossel, bio, seguidores
@@ -730,6 +739,7 @@ JSON estrito.`,
         brand: brand
           ? { colors: brand.colors, visual_summary: brand.visual_summary }
           : null,
+        identidade_ativa: identityLock || null,
         lembrete:
           "gaps do Instagram / pilares de conteúdo / plano de posts NÃO entram nesta LP.",
       },
@@ -974,6 +984,7 @@ JSON estrito.`,
     heroUrl,
     ctaUrl: resolveCtaUrl(ctx, copy),
     concorrentes: [],
+    extraCss: identityCss || "",
   });
 
   return {

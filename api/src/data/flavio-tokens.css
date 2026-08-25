@@ -1,0 +1,104 @@
+:root {
+  /* Oficiais: brandbook p.10 e LEIA-ME. */
+  --fb-green: #12b24b;
+  --fb-yellow: #ffcb05;
+  --fb-blue: #005baa;
+  --fb-blue-2: #0072bc;
+  --fb-turquoise: #00b49d;
+  --fb-orange: #faa61a;
+
+  /* Recomendados para interface; não são tokens históricos da campanha. */
+  --fb-white: #ffffff;
+  --fb-ink: #12324a;
+  --fb-surface: #f4f7f5;
+  --fb-focus: #8a3ffc;
+
+  --fb-font: "Gotham", "Montserrat", Arial, sans-serif;
+  --fb-display-size: clamp(2.5rem, 6vw, 5.5rem);
+  --fb-h2-size: clamp(2rem, 4vw, 3.5rem);
+  --fb-h3-size: clamp(1.25rem, 2vw, 1.75rem);
+  --fb-body-size: clamp(1rem, 1.2vw, 1.125rem);
+  --fb-display-leading: 0.95;
+  --fb-body-leading: 1.55;
+
+  --fb-space-1: 4px;
+  --fb-space-2: 8px;
+  --fb-space-3: 12px;
+  --fb-space-4: 16px;
+  --fb-space-6: 24px;
+  --fb-space-8: 32px;
+  --fb-space-12: 48px;
+  --fb-space-16: 64px;
+  --fb-space-24: 96px;
+  --fb-space-32: 128px;
+  --fb-section-space: clamp(64px, 9vw, 128px);
+
+  --fb-container: 1200px;
+  --fb-gutter-desktop: 24px;
+  --fb-gutter-tablet: 20px;
+  --fb-gutter-mobile: 16px;
+  --fb-radius-sm: 4px;
+  --fb-radius-md: 8px;
+  --fb-border: 1px solid rgb(0 91 170 / 18%);
+  --fb-shadow-card: 0 8px 24px rgb(0 45 85 / 12%);
+  --fb-blue-radial-print-derived: radial-gradient(circle at 50% 38%, #1c62b7 0%, #173e7d 100%);
+  --fb-diagonal-angle: 12deg;
+  --fb-motion-fast: 160ms;
+  --fb-motion-standard: 240ms;
+  --fb-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.fb-container {
+  width: min(100% - 48px, var(--fb-container));
+  margin-inline: auto;
+}
+
+.fb-button-primary {
+  min-height: 52px;
+  padding-inline: var(--fb-space-6);
+  border: 0;
+  border-radius: 6px;
+  background: var(--fb-yellow);
+  color: var(--fb-blue);
+  font: 700 1rem/1 var(--fb-font);
+  transition: transform var(--fb-motion-fast) var(--fb-easing);
+}
+
+.fb-button-primary:focus-visible {
+  outline: 3px solid var(--fb-focus);
+  outline-offset: 3px;
+}
+
+.fb-card {
+  border: var(--fb-border);
+  border-radius: var(--fb-radius-md);
+  background: var(--fb-white);
+}
+
+.fb-brand-lockup-horizontal {
+  width: max(130px, 10vw);
+  height: auto;
+}
+
+.fb-brand-lockup-vertical {
+  width: auto;
+  height: max(130px, 10vw);
+}
+
+@media (max-width: 1023px) {
+  .fb-container { width: min(100% - 40px, var(--fb-container)); }
+}
+
+@media (max-width: 767px) {
+  .fb-container { width: calc(100% - 32px); }
+  .fb-button-primary { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

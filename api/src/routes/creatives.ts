@@ -1,8 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
 import { query } from "../db/index.js";
 import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHelpers.js";
-import type { BrandKit } from "../services/brandFromUrl.js";
+import { campaignCtx, resolveCampaignScope, type CampaignScope } from "../services/campaignHelpers.js";
 import { gerarImagemViral, gerarImagemComModelo, openRouterCompareModels } from "../services/imageGen.js";
+import { identityGenerationHints } from "../services/identityContract.js";
 import { publishCarousel, publishImage } from "../services/instagram.js";
 import { filterResearchCues, lockVisualToNiche } from "../services/nicheVisual.js";
 import type { ResearchReport } from "../services/research.js";
@@ -14,22 +15,32 @@ import {
 
 async function latestResearchCues(
   workspaceId: number,
+  campaignId: number,
   nicho: string,
   produto: string
 ): Promise<string[]> {
   const r = await query<{ report: ResearchReport }>(
     `SELECT report FROM research_runs
-     WHERE workspace_id = $1 AND status = 'done'
+     WHERE workspace_id = $1 AND campaign_id = $2 AND status = 'done'
      ORDER BY id DESC LIMIT 1`,
-    [workspaceId]
+    [workspaceId, campaignId]
   );
   const d = r.rows[0]?.report?.direcao_visual;
   const raw = Array.isArray(d) ? d.filter((x): x is string => typeof x === "string" && !!x) : [];
   return filterResearchCues(raw, { nicho, produto });
 }
 
-function nicheFromWs(ws: { nicho: string; produto: string; oferta: string }) {
-  return { nicho: ws.nicho, produto: ws.produto, oferta: ws.oferta };
+function nicheFromCampaign(scope: CampaignScope) {
+  return {
+    nicho: scope.campaign.nicho,
+    produto: scope.campaign.produto || scope.campaign.name,
+    oferta: scope.campaign.oferta,
+  };
+}
+
+function identityImageOpts(scope: CampaignScope) {
+  const h = identityGenerationHints(scope.identity?.model);
+  return { identityPositive: h.positive || undefined, identityNegative: h.negative || undefined };
 }
 
 const CREATIVE_COLS = `id, strategy_id, day_index, format, hook, caption, visual_prompt,
@@ -45,14 +56,14 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", requireAuth);
 
   app.get("/", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const scope = await resolveCampaignScope(getUserId(req), req);
+    if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
     const r = await query(
       `SELECT ${CREATIVE_COLS}
-       FROM creatives WHERE workspace_id = $1
+       FROM creatives WHERE workspace_id = $1 AND campaign_id = $2
        ORDER BY strategy_id DESC NULLS LAST, day_index ASC, id ASC
        LIMIT 100`,
-      [ws.id]
+      [scope.workspace.id, scope.campaign.id]
     );
     return { creatives: r.rows };
   });
@@ -64,18 +75,19 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
   app.post<{
     Body: { prompt?: string; models?: string[]; hook?: string; overlay_logo?: boolean };
   }>("/compare-models", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const scope = await resolveCampaignScope(getUserId(req), req);
+    if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
 
-    const brand = (ws.brand_kit || {}) as BrandKit;
-    const niche = nicheFromWs(ws);
+    const brand = scope.brand;
+    const niche = nicheFromCampaign(scope);
+    const idOpts = identityImageOpts(scope);
     let prompt = (req.body?.prompt || "").trim();
     let hook = (req.body?.hook || "").trim();
 
     if (!prompt) {
       const s = await query<{ plan: StrategyPlan }>(
-        `SELECT plan FROM strategies WHERE workspace_id = $1 ORDER BY id DESC LIMIT 1`,
-        [ws.id]
+        `SELECT plan FROM strategies WHERE workspace_id = $1 AND campaign_id = $2 ORDER BY id DESC LIMIT 1`,
+        [scope.workspace.id, scope.campaign.id]
       );
       const post = (s.rows[0]?.plan?.posts?.[0] || null) as CreativeBrief | null;
       if (!post?.visual_prompt) {
@@ -106,6 +118,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
           niche,
           hook,
           diversityIndex: 0,
+          ...idOpts,
         });
         results.push({ model: r.model, url: r.url, ms: Date.now() - t0 });
       } catch (err) {
@@ -125,23 +138,26 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post<{ Body: { strategy_id?: number } }>("/batch", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const scope = await resolveCampaignScope(getUserId(req), req);
+    if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
+    const ws = scope.workspace;
+    const ctx = campaignCtx(scope.campaign, ws.ig_username);
+    const idOpts = identityImageOpts(scope);
 
     let strategyId = req.body?.strategy_id;
     let plan: StrategyPlan | null = null;
 
     if (strategyId) {
       const s = await query<{ id: number; plan: StrategyPlan }>(
-        `SELECT id, plan FROM strategies WHERE id = $1 AND workspace_id = $2`,
-        [strategyId, ws.id]
+        `SELECT id, plan FROM strategies WHERE id = $1 AND workspace_id = $2 AND campaign_id = $3`,
+        [strategyId, ws.id, scope.campaign.id]
       );
       if (!s.rows[0]) return reply.status(404).send({ error: "Estratégia não encontrada." });
       plan = s.rows[0].plan;
     } else {
       const s = await query<{ id: number; plan: StrategyPlan }>(
-        `SELECT id, plan FROM strategies WHERE workspace_id = $1 ORDER BY id DESC LIMIT 1`,
-        [ws.id]
+        `SELECT id, plan FROM strategies WHERE workspace_id = $1 AND campaign_id = $2 ORDER BY id DESC LIMIT 1`,
+        [ws.id, scope.campaign.id]
       );
       if (!s.rows[0]) {
         return reply.status(400).send({ error: "Gere uma estratégia antes dos criativos." });
@@ -155,14 +171,19 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
 
     await query(
       `DELETE FROM creatives
-       WHERE workspace_id = $1
+       WHERE workspace_id = $1 AND campaign_id = $2
          AND status IN ('draft', 'ready', 'error', 'approved', 'generating')`,
-      [ws.id]
+      [ws.id, scope.campaign.id]
     );
 
-    const brand = (ws.brand_kit || {}) as BrandKit;
-    const niche = nicheFromWs(ws);
-    const researchCues = await latestResearchCues(ws.id, ws.nicho, ws.produto);
+    const brand = scope.brand;
+    const niche = nicheFromCampaign(scope);
+    const researchCues = await latestResearchCues(
+      ws.id,
+      scope.campaign.id,
+      scope.campaign.nicho,
+      scope.campaign.produto
+    );
     const created: unknown[] = [];
     const errors: Array<{ day: number; error: string }> = [];
 
@@ -171,7 +192,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       const formato = post.formato || "feed";
       const visualRaw =
         post.visual_prompt ||
-        `Viral Instagram creative about ${ws.produto}. Hook text: "${post.hook}". Niche: ${ws.nicho}.`;
+        `Viral Instagram creative about ${ctx.produto}. Hook text: "${post.hook}". Niche: ${ctx.nicho}.`;
       const visual = lockVisualToNiche(visualRaw, niche, brand, post.hook);
       const dayIdx = Math.max(0, (post.day || 1) - 1);
       const researchCue =
@@ -189,13 +210,13 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             visual,
             post.hook || post.titulo,
             {
-              nicho: ws.nicho,
-              produto: ws.produto,
-              oferta: ws.oferta,
-              cta: ws.cta,
-              tom_voz: ws.tom_voz,
-              concorrentes: ws.concorrentes || [],
-              ig_username: ws.ig_username,
+              nicho: ctx.nicho,
+              produto: ctx.produto,
+              oferta: ctx.oferta,
+              cta: ctx.cta,
+              tom_voz: ctx.tom_voz,
+              concorrentes: ctx.concorrentes || [],
+              ig_username: ctx.ig_username,
             },
             brand,
             (post.cena_tipo as CreativeBrief["cena_tipo"]) || "hero_pessoa"
@@ -216,6 +237,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
                 researchCue,
               niche,
               hook: slides[i].texto || post.hook,
+              ...idOpts,
             });
             mediaUrls.push(url);
           }
@@ -229,6 +251,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             researchCue,
             niche,
             hook: post.hook,
+            ...idOpts,
           });
           mediaUrls = mediaUrl ? [mediaUrl] : [];
         }
@@ -240,12 +263,13 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
 
       const ins = await query(
         `INSERT INTO creatives (
-           workspace_id, strategy_id, day_index, format, hook, caption,
+           workspace_id, campaign_id, strategy_id, day_index, format, hook, caption,
            visual_prompt, media_url, media_urls, status, error
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)
          RETURNING ${CREATIVE_COLS}`,
         [
           ws.id,
+          scope.campaign.id,
           strategyId,
           post.day,
           formato,
@@ -265,14 +289,14 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post("/clear", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const scope = await resolveCampaignScope(getUserId(req), req);
+    if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
     const r = await query(
       `DELETE FROM creatives
-       WHERE workspace_id = $1
+       WHERE workspace_id = $1 AND campaign_id = $2
          AND status NOT IN ('published', 'scheduled')
        RETURNING id`,
-      [ws.id]
+      [scope.workspace.id, scope.campaign.id]
     );
     return { deleted: r.rows.length };
   });
@@ -300,8 +324,10 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post<{ Params: { id: string } }>("/:id/regenerate", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const scope = await resolveCampaignScope(getUserId(req), req);
+    if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
+    const ws = scope.workspace;
+    const idOpts = identityImageOpts(scope);
     const id = Number(req.params.id);
     const cur = await query<{
       id: number;
@@ -311,8 +337,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       media_urls: unknown;
     }>(
       `SELECT id, visual_prompt, format, hook, COALESCE(media_urls, '[]'::jsonb) AS media_urls
-       FROM creatives WHERE id = $1 AND workspace_id = $2`,
-      [id, ws.id]
+       FROM creatives WHERE id = $1 AND workspace_id = $2 AND campaign_id = $3`,
+      [id, ws.id, scope.campaign.id]
     );
     if (!cur.rows[0]) return reply.status(404).send({ error: "Criativo não encontrado." });
 
@@ -322,10 +348,15 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     );
 
     try {
-      const brand = (ws.brand_kit || {}) as BrandKit;
-      const niche = nicheFromWs(ws);
+      const brand = scope.brand;
+      const niche = nicheFromCampaign(scope);
       const row = cur.rows[0];
-      const researchCues = await latestResearchCues(ws.id, ws.nicho, ws.produto);
+      const researchCues = await latestResearchCues(
+        ws.id,
+        scope.campaign.id,
+        scope.campaign.nicho,
+        scope.campaign.produto
+      );
       let mediaUrl = "";
       let mediaUrls: string[] = [];
 
@@ -346,6 +377,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
               researchCue: researchCues[i % Math.max(researchCues.length, 1)],
               niche,
               hook: row.hook,
+              ...idOpts,
             })
           );
         }
@@ -362,6 +394,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             researchCue: researchCues[0],
             niche,
             hook: row.hook,
+            ...idOpts,
           }
         );
         mediaUrls = [mediaUrl];
@@ -387,8 +420,9 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { id: string }; Body: { slide_index?: number } }>(
     "/:id/regenerate-slide",
     async (req, reply) => {
-      const ws = await getWorkspaceForUser(getUserId(req));
-      if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+      const scope = await resolveCampaignScope(getUserId(req), req);
+      if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
+      const ws = scope.workspace;
       const id = Number(req.params.id);
       const slideIndex = Number(req.body?.slide_index ?? 0);
       const cur = await query<{
@@ -401,8 +435,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       }>(
         `SELECT id, visual_prompt, format, hook, media_url,
                 COALESCE(media_urls, '[]'::jsonb) AS media_urls
-         FROM creatives WHERE id = $1 AND workspace_id = $2`,
-        [id, ws.id]
+         FROM creatives WHERE id = $1 AND workspace_id = $2 AND campaign_id = $3`,
+        [id, ws.id, scope.campaign.id]
       );
       if (!cur.rows[0]) return reply.status(404).send({ error: "Criativo não encontrado." });
       const urls = asUrlList(cur.rows[0].media_urls);
@@ -411,9 +445,15 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       }
 
       try {
-        const brand = (ws.brand_kit || {}) as BrandKit;
-        const niche = nicheFromWs(ws);
-        const researchCues = await latestResearchCues(ws.id, ws.nicho, ws.produto);
+        const brand = scope.brand;
+        const niche = nicheFromCampaign(scope);
+        const researchCues = await latestResearchCues(
+          ws.id,
+          scope.campaign.id,
+          scope.campaign.nicho,
+          scope.campaign.produto
+        );
+        const idOpts = identityImageOpts(scope);
         const prompt = lockVisualToNiche(
           `${cur.rows[0].visual_prompt}. Carousel slide ${slideIndex + 1}, bold Portuguese hook "${cur.rows[0].hook}", unique composition`,
           niche,
@@ -427,6 +467,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
           researchCue: researchCues[slideIndex % Math.max(researchCues.length, 1)],
           niche,
           hook: cur.rows[0].hook,
+          ...idOpts,
         });
         const next = [...urls];
         if (next.length === 0) next.push(newUrl);
@@ -522,13 +563,13 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
   );
 
   app.post("/approve-all-ready", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const scope = await resolveCampaignScope(getUserId(req), req);
+    if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
     const r = await query(
       `UPDATE creatives SET status = 'approved', updated_at = NOW()
-       WHERE workspace_id = $1 AND status = 'ready'
+       WHERE workspace_id = $1 AND campaign_id = $2 AND status = 'ready'
        RETURNING id`,
-      [ws.id]
+      [scope.workspace.id, scope.campaign.id]
     );
     return { approved: r.rows.length };
   });

@@ -48,7 +48,6 @@ export function SettingsPage() {
   const [logoUrl, setLogoUrl] = useState("");
   const [brand, setBrand] = useState<BrandKit | null>(null);
   const [extracting, setExtracting] = useState(false);
-  const [applyingPreset, setApplyingPreset] = useState(false);
   const [generatingBrand, setGeneratingBrand] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -127,23 +126,6 @@ export function SettingsPage() {
     }
   }
 
-  async function applyPlannerPreset() {
-    setApplyingPreset(true);
-    setError("");
-    setMsg("");
-    try {
-      const r = await api.workspace.applyPreset("planner-mulher");
-      applyWorkspaceToForm(r.workspace, formSetters);
-      setMsg(
-        `Preset “${r.preset.label}” aplicado (briefing + identidade nova). Tokens IG mantidos. Rode Research → Estratégia → Criativos.`
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao aplicar preset");
-    } finally {
-      setApplyingPreset(false);
-    }
-  }
-
   async function generateBrand() {
     setGeneratingBrand(true);
     setError("");
@@ -169,10 +151,8 @@ export function SettingsPage() {
   const sourceLabel =
     brand?.source === "url"
       ? "extraída de site"
-      : brand?.source === "generated"
-        ? "gerada pelo motor"
-        : brand?.source === "preset"
-          ? "preset Planner"
+        : brand?.source === "generated"
+          ? "gerada pelo motor"
           : brand?.visual_summary
             ? "salva"
             : "ainda não definida";
@@ -180,8 +160,10 @@ export function SettingsPage() {
   return (
     <div className="animate-rise max-w-xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold">Config</h1>
-        <p className="text-white/55 mt-1">Nicho, identidade visual do produto e Instagram.</p>
+        <h1 className="font-display text-3xl font-bold">Conta</h1>
+        <p className="text-white/55 mt-1">
+          Instagram e chaves da conta. Briefing e identidade ficam na campanha (pipeline).
+        </p>
       </div>
 
       {ws?.brand_warning && (
@@ -189,22 +171,6 @@ export function SettingsPage() {
           {ws.brand_warning}
         </div>
       )}
-
-      <div className="card space-y-3">
-        <h2 className="font-display text-lg font-semibold">Produto atual</h2>
-        <p className="text-sm text-white/50">
-          Atalho: preenche nicho, oferta, concorrentes e identidade soft do{" "}
-          <strong className="text-white/70">Planner Mulher</strong> (apaga visual ProntEPI).
-        </p>
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={applyingPreset}
-          onClick={() => void applyPlannerPreset()}
-        >
-          {applyingPreset ? "Aplicando…" : "Aplicar Planner Mulher + identidade"}
-        </button>
-      </div>
 
       <div className="card space-y-4">
         <div>
@@ -304,6 +270,9 @@ export function SettingsPage() {
       </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
+        <p className="text-sm text-white/50">
+          Nicho/produto globais abaixo são legado da conta. Prefira editar o briefing na campanha.
+        </p>
         <label className="block">
           <span className="label">Nicho</span>
           <input className="field" value={nicho} onChange={(e) => setNicho(e.target.value)} />

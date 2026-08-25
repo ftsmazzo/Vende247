@@ -24,6 +24,8 @@ export type ImageGenOpts = {
   /** Contexto do workspace — trava nicho e bloqueia EPI residual */
   niche?: NicheCtx;
   hook?: string;
+  identityPositive?: string;
+  identityNegative?: string;
 };
 
 /**
@@ -206,6 +208,8 @@ export async function gerarImagemComModelo(
     researchCue: opts?.researchCue,
     niche: opts?.niche,
     hook: opts?.hook,
+    identityPositive: opts?.identityPositive,
+    identityNegative: opts?.identityNegative,
   });
   const resolution =
     opts?.purpose === "draft"
@@ -327,6 +331,8 @@ function buildPrompt(
     researchCue?: string;
     niche?: NicheCtx;
     hook?: string;
+    identityPositive?: string;
+    identityNegative?: string;
   }
 ): string {
   const shot = diversityShot(extras?.diversityIndex ?? 0);
@@ -335,6 +341,12 @@ function buildPrompt(
     : prompt;
   const cue = extras?.researchCue?.trim()
     ? `Visual inspiration (mood only, do not copy a brand): ${extras.researchCue.trim().slice(0, 180)}.`
+    : "";
+  const pos = extras?.identityPositive?.trim()
+    ? `IDENTITY LOCK (must follow): ${extras.identityPositive.trim().slice(0, 900)}.`
+    : "";
+  const neg = extras?.identityNegative?.trim()
+    ? `NEGATIVE / DO NOT: ${extras.identityNegative.trim().slice(0, 700)}.`
     : "";
 
   if (mode === "photo") {
@@ -346,8 +358,10 @@ function buildPrompt(
       "FORBIDDEN: smartphone mockups, fake dashboards, graphic overlays, stickers, banners.",
       "FORBIDDEN unless niche is industrial safety: hard hats, EPI/PPE, factories, warehouses, earmuffs.",
       brandPromptBits(brand),
+      pos,
+      neg,
       cue,
-      locked.slice(0, 2200),
+      locked.slice(0, 1800),
     ]
       .filter(Boolean)
       .join(" ");
@@ -366,8 +380,10 @@ function buildPrompt(
     "leave small clean space bottom-left for logo overlay only,",
     "no watermarks, no invented brand logos in the scene.",
     brandPromptBits(brand),
+    pos,
+    neg,
     cue,
-    locked.slice(0, 2200),
+    locked.slice(0, 1800),
   ]
     .filter(Boolean)
     .join(" ");
@@ -391,6 +407,8 @@ export async function gerarImagemViral(
     researchCue: opts?.researchCue,
     niche: opts?.niche,
     hook: opts?.hook,
+    identityPositive: opts?.identityPositive,
+    identityNegative: opts?.identityNegative,
   });
 
   let buffer: Buffer;

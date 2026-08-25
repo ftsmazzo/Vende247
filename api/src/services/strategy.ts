@@ -1,6 +1,7 @@
 import { chatJson } from "./llm.js";
 import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { BrandKit } from "./brandFromUrl.js";
+import { identityPromptBlock, type IdentityModel } from "./identityContract.js";
 import {
   filterResearchCues,
   lockVisualToNiche,
@@ -59,14 +60,18 @@ export async function generateStrategy(
   ctx: WorkspaceContext,
   report: ResearchReport,
   days = 7,
-  brand?: BrandKit | null
+  brand?: BrandKit | null,
+  identityModel?: IdentityModel | null
 ): Promise<StrategyPlan> {
   const n = Math.min(Math.max(days, 7), 14);
+  const identityLock = identityPromptBlock(identityModel);
 
   const plan = await chatJson<StrategyPlan>(
     `Você é diretor criativo de anúncios Instagram (Brasil, 2026).
+Skill: campaign-design-apply — aplique a identidade ativa; não invente outra paleta.
 Produto a vender: use SOMENTE ângulos do produto informado + research (oportunidades_unicas, direcao_visual, hooks).
 Nicho: ${ctx.nicho}. NÃO force software B2B / EPI / indústria se o produto for outro.
+${identityLock ? `IDENTIDADE (obrigatório respeitar): ${identityLock}` : ""}
 
 Plano de exatamente ${n} dias. Cada post DEVE ser visualmente e tematicamente diferente do anterior.
 

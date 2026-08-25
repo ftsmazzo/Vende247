@@ -1,5 +1,6 @@
 const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
 const TOKEN_KEY = "vende247_token";
+const CAMPAIGN_KEY = "vende247_campaign_id";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -10,11 +11,23 @@ export function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+export function getCampaignId(): number | null {
+  const n = Number(localStorage.getItem(CAMPAIGN_KEY));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function setCampaignId(id: number | null) {
+  if (id) localStorage.setItem(CAMPAIGN_KEY, String(id));
+  else localStorage.removeItem(CAMPAIGN_KEY);
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (!headers.has("Content-Type") && init.body) headers.set("Content-Type", "application/json");
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  const cid = getCampaignId();
+  if (cid) headers.set("X-Campaign-Id", String(cid));
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers });
   const data = await res.json().catch(() => ({}));
@@ -102,6 +115,27 @@ export const api = {
         body: JSON.stringify({ keep_logo }),
       }),
   },
+  campaigns: {
+    list: () => request<{ campaigns: Campaign[] }>("/api/campaigns"),
+    get: (id: number) => request<{ campaign: Campaign }>(`/api/campaigns/${id}`),
+    create: (body: Record<string, unknown>) =>
+      request<{ campaign: Campaign }>("/api/campaigns", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    update: (id: number, body: Record<string, unknown>) =>
+      request<{ campaign: Campaign }>(`/api/campaigns/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    identity: (id: number) =>
+      request<{ versions: unknown[]; active: IdentityActive | null }>(`/api/campaigns/${id}/identity`),
+    importIdentity: (id: number, body: { model?: unknown; css?: string; seed?: string }) =>
+      request<{ identity: unknown }>(`/api/campaigns/${id}/identity/import`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
   research: {
     latest: () => request<{ run: ResearchRun | null }>("/api/research/latest"),
     run: () => request<{ run: { id: number; status: string; report: ResearchReport } }>("/api/research/run", { method: "POST" }),
@@ -160,6 +194,46 @@ export const api = {
         body: JSON.stringify({ with_hero_image }),
       }),
   },
+};
+
+export type IdentityActive = {
+  id: number;
+  version: number;
+  source: string;
+  status: string;
+  confidence?: string;
+  model?: Record<string, unknown>;
+  css?: string;
+};
+
+export type Campaign = {
+  id: number;
+  type: string;
+  name: string;
+  nicho: string;
+  produto: string;
+  oferta: string;
+  cta: string;
+  tom_voz: string;
+  concorrentes: string[];
+  status: string;
+  has_active_identity?: boolean;
+  identity?: {
+    id: number;
+    version: number;
+    source: string;
+    status: string;
+    confidence: string;
+    summary: string;
+  } | null;
+  pipeline?: {
+    briefing: boolean;
+    identity: boolean;
+    research: boolean;
+    strategy: boolean;
+    landing: boolean;
+    creatives: boolean;
+  };
 };
 
 export type ResearchReport = {

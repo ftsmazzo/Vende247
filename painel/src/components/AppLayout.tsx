@@ -3,12 +3,12 @@ import { BRAND } from "../config/brand";
 import { setToken } from "../api/client";
 
 const links = [
-  { to: "/", label: "Início", end: true },
+  { to: "/", label: "Campanhas", end: true },
   { to: "/research", label: "Research" },
   { to: "/estrategia", label: "Estratégia" },
   { to: "/criativos", label: "Criativos" },
   { to: "/landing", label: "Landing" },
-  { to: "/config", label: "Config" },
+  { to: "/config", label: "Conta" },
 ];
 
 export function AppLayout() {

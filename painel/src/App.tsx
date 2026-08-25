@@ -9,6 +9,8 @@ import { StrategyPage } from "./pages/StrategyPage";
 import { CreativesPage } from "./pages/CreativesPage";
 import { LandingPage } from "./pages/LandingPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { CampaignPipelinePage } from "./pages/CampaignPipelinePage";
+import { IdentityPage } from "./pages/IdentityPage";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { StyleBits } from "./components/StyleBits";
 
@@ -39,6 +41,8 @@ export default function App() {
         }
       >
         <Route index element={<Safe label="Início"><HomePage /></Safe>} />
+        <Route path="campanha/:id" element={<Safe label="Campanha"><CampaignPipelinePage /></Safe>} />
+        <Route path="campanha/:id/identidade" element={<Safe label="Identidade"><IdentityPage /></Safe>} />
         <Route path="onboarding" element={<Safe label="Onboarding"><OnboardingPage /></Safe>} />
         <Route path="research" element={<Safe label="Research"><ResearchPage /></Safe>} />
         <Route path="estrategia" element={<Safe label="Estratégia"><StrategyPage /></Safe>} />

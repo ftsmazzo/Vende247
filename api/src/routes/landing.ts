@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { query } from "../db/index.js";
-import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHelpers.js";
-import type { BrandKit } from "../services/brandFromUrl.js";
+import { getUserId, requireAuth } from "../services/authHelpers.js";
+import { campaignCtx, resolveCampaignScope } from "../services/campaignHelpers.js";
 import { generateLanding } from "../services/landingGen.js";
 import type { ResearchReport } from "../services/research.js";
 import type { StrategyPlan } from "../services/strategy.js";
@@ -10,8 +10,8 @@ export const landingRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", requireAuth);
 
   app.get("/latest", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const scope = await resolveCampaignScope(getUserId(req), req);
+    if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
     const r = await query<{
       id: number;
       html: string;
@@ -19,44 +19,38 @@ export const landingRoutes: FastifyPluginAsync = async (app) => {
       created_at: string;
     }>(
       `SELECT id, html, meta, created_at FROM landings
-       WHERE workspace_id = $1 ORDER BY id DESC LIMIT 1`,
-      [ws.id]
+       WHERE workspace_id = $1 AND campaign_id = $2 ORDER BY id DESC LIMIT 1`,
+      [scope.workspace.id, scope.campaign.id]
     );
     return { landing: r.rows[0] ?? null };
   });
 
   app.post<{ Body: { with_hero_image?: boolean } }>("/generate", async (req, reply) => {
-    const ws = await getWorkspaceForUser(getUserId(req));
-    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
-    if (!ws.produto?.trim() && !ws.nicho?.trim()) {
-      return reply.status(400).send({ error: "Complete o onboarding (produto/nicho) antes." });
+    const scope = await resolveCampaignScope(getUserId(req), req);
+    if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
+    if (!scope.campaign.produto?.trim() && !scope.campaign.nicho?.trim() && !scope.campaign.name) {
+      return reply.status(400).send({ error: "Complete o briefing da campanha antes." });
     }
 
     const research = await query<{ report: ResearchReport }>(
       `SELECT report FROM research_runs
-       WHERE workspace_id = $1 AND status = 'done'
+       WHERE workspace_id = $1 AND campaign_id = $2 AND status = 'done'
        ORDER BY id DESC LIMIT 1`,
-      [ws.id]
+      [scope.workspace.id, scope.campaign.id]
     );
     const strategy = await query<{ plan: StrategyPlan }>(
-      `SELECT plan FROM strategies WHERE workspace_id = $1 ORDER BY id DESC LIMIT 1`,
-      [ws.id]
+      `SELECT plan FROM strategies WHERE workspace_id = $1 AND campaign_id = $2 ORDER BY id DESC LIMIT 1`,
+      [scope.workspace.id, scope.campaign.id]
     );
 
     try {
       const result = await generateLanding({
-        ctx: {
-          nicho: ws.nicho,
-          produto: ws.produto,
-          oferta: ws.oferta,
-          cta: ws.cta,
-          tom_voz: ws.tom_voz,
-          concorrentes: ws.concorrentes || [],
-          ig_username: ws.ig_username,
-        },
+        ctx: campaignCtx(scope.campaign, scope.workspace.ig_username),
         report: research.rows[0]?.report ?? null,
         strategy: strategy.rows[0]?.plan ?? null,
-        brand: (ws.brand_kit || {}) as BrandKit,
+        brand: scope.brand,
+        identityModel: scope.identity?.model,
+        identityCss: scope.identity?.css || "",
         withHeroImage: req.body?.with_hero_image !== false,
       });
 
@@ -66,10 +60,10 @@ export const landingRoutes: FastifyPluginAsync = async (app) => {
         meta: Record<string, unknown>;
         created_at: string;
       }>(
-        `INSERT INTO landings (workspace_id, html, meta)
-         VALUES ($1, $2, $3::jsonb)
+        `INSERT INTO landings (workspace_id, campaign_id, html, meta)
+         VALUES ($1, $2, $3, $4::jsonb)
          RETURNING id, html, meta, created_at`,
-        [ws.id, result.html, JSON.stringify(result.meta)]
+        [scope.workspace.id, scope.campaign.id, result.html, JSON.stringify(result.meta)]
       );
       return { landing: ins.rows[0] };
     } catch (err) {

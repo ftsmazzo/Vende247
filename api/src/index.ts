@@ -11,6 +11,7 @@ import { researchRoutes } from "./routes/research.js";
 import { strategyRoutes } from "./routes/strategy.js";
 import { creativesRoutes } from "./routes/creatives.js";
 import { landingRoutes } from "./routes/landing.js";
+import { campaignRoutes } from "./routes/campaigns.js";
 import { startCronJob } from "./services/cron.js";
 import { getLocalUploadsDir } from "./services/storage.js";
 
@@ -31,6 +32,7 @@ async function build() {
   await app.register(healthRoutes, { prefix: "/" });
   await app.register(authRoutes, { prefix: "/api/auth" });
   await app.register(workspaceRoutes, { prefix: "/api/workspace" });
+  await app.register(campaignRoutes, { prefix: "/api/campaigns" });
   await app.register(researchRoutes, { prefix: "/api/research" });
   await app.register(strategyRoutes, { prefix: "/api/strategy" });
   await app.register(creativesRoutes, { prefix: "/api/creatives" });

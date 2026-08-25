@@ -107,5 +107,76 @@ export async function ensureTables(): Promise<void> {
       WHERE status = 'scheduled';
 
     ALTER TABLE creatives ADD COLUMN IF NOT EXISTS media_urls JSONB DEFAULT '[]'::jsonb;
+
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id SERIAL PRIMARY KEY,
+      workspace_id INT REFERENCES workspaces(id) ON DELETE CASCADE,
+      type TEXT NOT NULL DEFAULT 'produto',
+      name TEXT NOT NULL,
+      nicho TEXT DEFAULT '',
+      produto TEXT DEFAULT '',
+      oferta TEXT DEFAULT '',
+      cta TEXT DEFAULT '',
+      tom_voz TEXT DEFAULT '',
+      concorrentes JSONB DEFAULT '[]'::jsonb,
+      status TEXT NOT NULL DEFAULT 'draft',
+      ig_user_id TEXT DEFAULT '',
+      ig_username TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS identity_versions (
+      id SERIAL PRIMARY KEY,
+      campaign_id INT REFERENCES campaigns(id) ON DELETE CASCADE,
+      version INT NOT NULL DEFAULT 1,
+      source TEXT NOT NULL DEFAULT 'import',
+      model JSONB DEFAULT '{}'::jsonb,
+      css TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft',
+      confidence TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (campaign_id, version)
+    );
+
+    ALTER TABLE research_runs ADD COLUMN IF NOT EXISTS campaign_id INT REFERENCES campaigns(id) ON DELETE CASCADE;
+    ALTER TABLE strategies ADD COLUMN IF NOT EXISTS campaign_id INT REFERENCES campaigns(id) ON DELETE CASCADE;
+    ALTER TABLE creatives ADD COLUMN IF NOT EXISTS campaign_id INT REFERENCES campaigns(id) ON DELETE CASCADE;
+    ALTER TABLE landings ADD COLUMN IF NOT EXISTS campaign_id INT REFERENCES campaigns(id) ON DELETE CASCADE;
+
+    CREATE INDEX IF NOT EXISTS idx_campaigns_workspace ON campaigns (workspace_id);
+    CREATE INDEX IF NOT EXISTS idx_identity_campaign ON identity_versions (campaign_id, status);
+  `);
+
+  await p.query(`
+    INSERT INTO campaigns (workspace_id, type, name, nicho, produto, oferta, cta, tom_voz, concorrentes, status)
+    SELECT w.id,
+           'produto',
+           COALESCE(NULLIF(TRIM(w.produto), ''), NULLIF(TRIM(w.name), ''), 'Campanha'),
+           COALESCE(w.nicho, ''),
+           COALESCE(w.produto, ''),
+           COALESCE(w.oferta, ''),
+           COALESCE(w.cta, ''),
+           COALESCE(w.tom_voz, ''),
+           COALESCE(w.concorrentes, '[]'::jsonb),
+           CASE WHEN w.onboarding_done THEN 'active' ELSE 'draft' END
+    FROM workspaces w
+    WHERE NOT EXISTS (SELECT 1 FROM campaigns c WHERE c.workspace_id = w.id)
+      AND (NULLIF(TRIM(w.produto), '') IS NOT NULL OR NULLIF(TRIM(w.nicho), '') IS NOT NULL);
+  `);
+
+  await p.query(`
+    UPDATE research_runs r SET campaign_id = (
+      SELECT c.id FROM campaigns c WHERE c.workspace_id = r.workspace_id ORDER BY c.id ASC LIMIT 1
+    ) WHERE campaign_id IS NULL;
+    UPDATE strategies s SET campaign_id = (
+      SELECT c.id FROM campaigns c WHERE c.workspace_id = s.workspace_id ORDER BY c.id ASC LIMIT 1
+    ) WHERE campaign_id IS NULL;
+    UPDATE creatives x SET campaign_id = (
+      SELECT c.id FROM campaigns c WHERE c.workspace_id = x.workspace_id ORDER BY c.id ASC LIMIT 1
+    ) WHERE campaign_id IS NULL;
+    UPDATE landings l SET campaign_id = (
+      SELECT c.id FROM campaigns c WHERE c.workspace_id = l.workspace_id ORDER BY c.id ASC LIMIT 1
+    ) WHERE campaign_id IS NULL;
   `);
 }
