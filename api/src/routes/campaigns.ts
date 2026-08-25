@@ -151,6 +151,16 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
     return { campaign: publicCampaign(fresh!, { identity }) };
   });
 
+  app.delete("/:id", async (req, reply) => {
+    const ws = await getWorkspaceForUser(getUserId(req));
+    if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+    const id = Number((req.params as { id: string }).id);
+    const campaign = await getCampaign(ws.id, id);
+    if (!campaign) return reply.status(404).send({ error: "Campanha não encontrada." });
+    await query(`DELETE FROM campaigns WHERE id = $1 AND workspace_id = $2`, [id, ws.id]);
+    return { ok: true };
+  });
+
   app.get("/:id/identity", async (req, reply) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });

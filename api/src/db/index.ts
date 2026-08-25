@@ -146,23 +146,25 @@ export async function ensureTables(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_campaigns_workspace ON campaigns (workspace_id);
     CREATE INDEX IF NOT EXISTS idx_identity_campaign ON identity_versions (campaign_id, status);
+
+    CREATE TABLE IF NOT EXISTS schema_patches (
+      name TEXT PRIMARY KEY,
+      applied_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
 
   await p.query(`
-    INSERT INTO campaigns (workspace_id, type, name, nicho, produto, oferta, cta, tom_voz, concorrentes, status)
-    SELECT w.id,
-           'produto',
-           COALESCE(NULLIF(TRIM(w.produto), ''), NULLIF(TRIM(w.name), ''), 'Campanha'),
-           COALESCE(w.nicho, ''),
-           COALESCE(w.produto, ''),
-           COALESCE(w.oferta, ''),
-           COALESCE(w.cta, ''),
-           COALESCE(w.tom_voz, ''),
-           COALESCE(w.concorrentes, '[]'::jsonb),
-           CASE WHEN w.onboarding_done THEN 'active' ELSE 'draft' END
-    FROM workspaces w
-    WHERE NOT EXISTS (SELECT 1 FROM campaigns c WHERE c.workspace_id = w.id)
-      AND (NULLIF(TRIM(w.produto), '') IS NOT NULL OR NULLIF(TRIM(w.nicho), '') IS NOT NULL);
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM schema_patches WHERE name = 'drop_planner_campaigns') THEN
+        DELETE FROM campaigns
+        WHERE name ~* 'planer|planner'
+           OR produto ~* 'planer|planner'
+           OR nicho ~* 'planner mulher'
+           OR oferta ~* 'planner';
+        INSERT INTO schema_patches (name) VALUES ('drop_planner_campaigns');
+      END IF;
+    END $$;
   `);
 
   await p.query(`

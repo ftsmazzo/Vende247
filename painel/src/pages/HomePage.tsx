@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, MouseEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, Campaign, setCampaignId } from "../api/client";
+import { api, Campaign, getCampaignId, setCampaignId } from "../api/client";
 import { BRAND } from "../config/brand";
 
 export function HomePage() {
@@ -12,6 +12,7 @@ export function HomePage() {
   const [type, setType] = useState("produto");
   const [nicho, setNicho] = useState("");
   const [creating, setCreating] = useState(false);
+  const [removingId, setRemovingId] = useState<number | null>(null);
 
   function load() {
     api.campaigns
@@ -28,6 +29,22 @@ export function HomePage() {
   function openCampaign(c: Campaign) {
     setCampaignId(c.id);
     navigate(`/campanha/${c.id}`);
+  }
+
+  async function removeCampaign(e: MouseEvent, c: Campaign) {
+    e.stopPropagation();
+    if (!window.confirm(`Excluir a campanha “${c.name}”?`)) return;
+    setRemovingId(c.id);
+    setError("");
+    try {
+      await api.campaigns.remove(c.id);
+      if (getCampaignId() === c.id) setCampaignId(null);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao excluir");
+    } finally {
+      setRemovingId(null);
+    }
   }
 
   async function onCreate(e: FormEvent) {
@@ -67,18 +84,23 @@ export function HomePage() {
 
       <div className="grid gap-3">
         {campaigns.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className="card text-left hover:border-signal/40 transition"
-            onClick={() => openCampaign(c)}
-          >
-            <p className="text-xs text-signal uppercase tracking-wide">{c.type}</p>
-            <h2 className="font-display text-xl font-semibold mt-1">{c.name}</h2>
-            <p className="text-sm text-white/50 mt-1">
-              {c.nicho || "sem nicho"} · identidade {c.has_active_identity ? "ativa" : "pendente"}
-            </p>
-          </button>
+          <div key={c.id} className="card flex items-start justify-between gap-3 hover:border-signal/40 transition">
+            <button type="button" className="text-left flex-1 min-w-0" onClick={() => openCampaign(c)}>
+              <p className="text-xs text-signal uppercase tracking-wide">{c.type}</p>
+              <h2 className="font-display text-xl font-semibold mt-1">{c.name}</h2>
+              <p className="text-sm text-white/50 mt-1">
+                {c.nicho || "sem nicho"} · identidade {c.has_active_identity ? "ativa" : "pendente"}
+              </p>
+            </button>
+            <button
+              type="button"
+              className="text-sm text-coral shrink-0"
+              disabled={removingId === c.id}
+              onClick={(e) => void removeCampaign(e, c)}
+            >
+              {removingId === c.id ? "…" : "Excluir"}
+            </button>
+          </div>
         ))}
         {!campaigns.length && (
           <p className="text-white/45 text-sm">Nenhuma campanha ainda. Crie uma e rode o pipeline.</p>

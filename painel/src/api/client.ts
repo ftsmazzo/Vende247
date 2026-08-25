@@ -128,6 +128,8 @@ export const api = {
         method: "PUT",
         body: JSON.stringify(body),
       }),
+    remove: (id: number) =>
+      request<{ ok: boolean }>(`/api/campaigns/${id}`, { method: "DELETE" }),
     identity: (id: number) =>
       request<{ versions: unknown[]; active: IdentityActive | null }>(`/api/campaigns/${id}/identity`),
     generateIdentity: (
