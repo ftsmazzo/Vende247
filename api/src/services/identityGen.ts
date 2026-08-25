@@ -81,11 +81,13 @@ PROIBIDO:
 - Copiar ProntEPI / teal hospitalar / dashboard SaaS se o produto não for isso.
 - Dizer que falta identidade e parar. Seu trabalho É criar o contrato.
 
-SAÍDA: um único JSON rico no shape abaixo (mesmo nível de detalhe de um brandbook operacional, não 3 cores soltas):
+SAÍDA: um único JSON compacto (sem quebras decorativas, sem markdown). Arrays com no máximo 8 itens. Strings com no máximo 350 caracteres.
+Shape:
 ${CONTRACT_SHAPE}
 
-generation_prompt = parágrafo para gerador de imagem DESTA marca.
-negative_prompt = o que essa marca não é.`,
+generation_prompt = um parágrafo para gerador de imagem DESTA marca.
+negative_prompt = o que essa marca não é.
+Feche todas as chaves. JSON válido é obrigatório.`
     JSON.stringify(
       {
         ponto_de_partida_cego: blind,
@@ -102,18 +104,20 @@ negative_prompt = o que essa marca não é.`,
         })),
         research: {
           resumo: report.resumo,
-          oportunidades_unicas: (report.oportunidades_unicas || []).slice(0, 10),
-          direcao_visual: (report.direcao_visual || []).slice(0, 12),
-          hooks_vencedores: (report.hooks_vencedores || []).slice(0, 10),
-          pilares_conteudo: report.pilares_conteudo,
-          o_que_concorrentes_fazem_bem: (report.o_que_concorrentes_fazem_bem || []).slice(0, 8),
+          oportunidades_unicas: (report.oportunidades_unicas || []).slice(0, 6),
+          direcao_visual: (report.direcao_visual || []).slice(0, 8),
+          hooks_vencedores: (report.hooks_vencedores || []).slice(0, 6),
+          pilares_conteudo: Array.isArray(report.pilares_conteudo)
+            ? report.pilares_conteudo.slice(0, 6)
+            : report.pilares_conteudo,
+          o_que_concorrentes_fazem_bem: (report.o_que_concorrentes_fazem_bem || []).slice(0, 5),
         },
         strategy: {
           resumo: strategy.resumo,
           pilares: strategy.pilares,
-          hooks: (strategy.posts || []).slice(0, 10).map((p) => p.hook),
-          formatos: (strategy.posts || []).slice(0, 10).map((p) => p.formato),
-          visual_prompts: (strategy.posts || []).slice(0, 6).map((p) => p.visual_prompt),
+          hooks: (strategy.posts || []).slice(0, 6).map((p) => p.hook),
+          formatos: (strategy.posts || []).slice(0, 6).map((p) => p.formato),
+          visual_prompts: (strategy.posts || []).slice(0, 4).map((p) => p.visual_prompt),
         },
       },
       null,
