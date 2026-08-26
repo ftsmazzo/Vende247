@@ -4,7 +4,17 @@ import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { StrategyPlan } from "./strategy.js";
 import { gerarImagemViral } from "./imageGen.js";
 import { isStorageConfigured } from "./storage.js";
-import { identityContextForLlm, identityLooksCampaignLayout, identityPickColors, identityLandingSystem, type IdentityModel, type LandingPalette, type LandingSystem } from "./identityContract.js";
+import {
+  composeLiveLandingSystem,
+  identityContextForLlm,
+  identityLandingSystem,
+  identityLogoUrl,
+  identityLooksCampaignLayout,
+  identityPickColors,
+  type IdentityModel,
+  type LandingPalette,
+  type LandingSystem,
+} from "./identityContract.js";
 
 export type LandingCopy = {
   brand_name: string;
@@ -383,30 +393,43 @@ export function renderLandingHtml(
   const displayFont = `"${displayName.replace(/"/g, "")}",${opts.identityLayout ? "Impact,sans-serif" : "Georgia,serif"}`;
   const bodyFont = `"${bodyName.replace(/"/g, "")}",system-ui,sans-serif`;
 
-  const radius =
-    effects.has("tight-radius") || ctaStyle === "square" || opts.identityLayout
-      ? "6px"
+  const softRadius = effects.has("soft-radius") || (!effects.has("tight-radius") && density !== "high");
+  const radius = effects.has("tight-radius")
+    ? "8px"
+    : softRadius
+      ? density === "airy"
+        ? "1.6rem"
+        : "1.25rem"
       : density === "high"
-        ? "0.75rem"
-        : "1.25rem";
-  const btnRadius = ctaStyle === "square" ? "6px" : ctaStyle === "underline" ? "0" : "999px";
-  const glass = effects.has("glass");
-  const softShadow = effects.has("soft-shadow");
+        ? "0.85rem"
+        : "1.1rem";
+  const btnRadius = ctaStyle === "square" ? "10px" : ctaStyle === "underline" ? "0" : "999px";
+  const glass = effects.has("glass") || true; // LP viva: glass por padrão
+  const softShadow = effects.has("soft-shadow") || true;
   const diagonal = effects.has("diagonal") || heroRecipe.includes("diagonal");
-  const sectionPad = density === "high" ? "1.85rem" : density === "airy" ? "3.4rem" : "2.75rem";
+  const motion = effects.has("motion") || true;
+  const hoverLift = effects.has("hover-lift") || true;
+  const blobs = effects.has("gradient-blobs") || true;
+  const curveDivider = effects.has("curve-divider") || softRadius;
+  const sectionPad = density === "high" ? "2.2rem" : density === "airy" ? "3.8rem" : "3rem";
   const cardBg = glass
     ? isLight
-      ? "rgba(255,255,255,.55)"
-      : "rgba(255,255,255,.06)"
+      ? "rgba(255,255,255,.62)"
+      : "rgba(255,255,255,.07)"
     : isLight
       ? "rgba(26,20,16,.04)"
       : "rgba(255,255,255,.035)";
-  const cardBlur = glass ? "backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" : "";
+  const cardBlur = glass ? "backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);" : "";
   const shadowCss = softShadow
     ? isLight
-      ? "0 12px 40px rgba(15,23,42,.08)"
-      : "0 16px 48px rgba(0,0,0,.35)"
+      ? "0 14px 44px rgba(15,23,42,.10)"
+      : "0 18px 52px rgba(0,0,0,.38)"
     : "none";
+  const shadowHover = softShadow
+    ? isLight
+      ? "0 22px 56px rgba(15,23,42,.14)"
+      : "0 26px 64px rgba(0,0,0,.48)"
+    : "0 12px 32px color-mix(in srgb,var(--accent) 28%,transparent)";
   const heroFullBleed = heroRecipe.includes("full");
   const heroStacked = heroRecipe.includes("stack") && !heroFullBleed;
   // full-bleed: imagem vira fundo do hero (nunca some). stacked: media abaixo. split: ao lado.
@@ -617,7 +640,13 @@ export function renderLandingHtml(
 </section>`,
   };
 
-  const bodySections = ordered.map((k) => sectionsHtml[k] || "").filter(Boolean).join("\n");
+  const curveHtml = curveDivider
+    ? `\n<div class="curve" aria-hidden="true"><svg viewBox="0 0 1440 48" preserveAspectRatio="none"><path d="M0,24 C360,48 1080,0 1440,24 L1440,48 L0,48 Z" fill="currentColor"/></svg></div>\n`
+    : "\n";
+  const bodySections = ordered.map((k) => sectionsHtml[k] || "").filter(Boolean).join(curveHtml);
+  const ambient = blobs
+    ? `<div class="ambient" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -645,6 +674,8 @@ export function renderLandingHtml(
   --card-border:${isLight ? "rgba(26,20,16,.10)" : "rgba(255,255,255,.10)"};
   --section-pad:${sectionPad};
   --shadow:${shadowCss};
+  --shadow-hover:${shadowHover};
+  --ease:cubic-bezier(.22,1,.36,1);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -805,9 +836,33 @@ footer{padding:1.5rem 0 2rem;border-top:1px solid var(--line);color:var(--muted)
   .section{padding:2.15rem 0}
   .offer{padding:1.35rem}
 }
+
+.ambient{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:${isLight ? ".22" : ".34"};animation:float 18s cubic-bezier(.22,1,.36,1) infinite alternate}
+.b1{width:42vw;height:42vw;left:-12vw;top:-10vw;background:color-mix(in srgb,var(--accent) 55%,transparent)}
+.b2{width:36vw;height:36vw;right:-10vw;top:28vh;background:color-mix(in srgb,var(--deep) 70%,transparent);animation-delay:-6s}
+.b3{width:30vw;height:30vw;left:20vw;bottom:-12vw;background:color-mix(in srgb,var(--accent) 35%,var(--deep));animation-delay:-11s}
+@keyframes float{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(4%,6%,0) scale(1.08)}}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.curve{color:var(--surface);line-height:0;margin:-1px 0;position:relative;z-index:1}
+.curve svg{display:block;width:100%;height:36px}
+.wrap,.section,.topbar,footer,.hero{position:relative;z-index:1}
+.section{animation:rise .65s cubic-bezier(.22,1,.36,1) both}
+.card,.pain-item,.step,.pillar,.angle-list li,.offer,.hero-media,.btn,.nav-cta{
+  transition:transform .3s cubic-bezier(.22,1,.36,1),box-shadow .3s cubic-bezier(.22,1,.36,1),border-color .3s ease,filter .25s ease;
+}
+.card:hover,.pain-item:hover,.step:hover,.pillar:hover{transform:translateY(-4px);box-shadow:var(--shadow-hover,0 22px 56px rgba(0,0,0,.4));border-color:color-mix(in srgb,var(--accent) 38%,var(--card-border))}
+.btn:hover,.nav-cta:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.btn{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 72%,var(--deep)))!important}
+.nav-cta{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 70%,var(--deep)))!important;box-shadow:0 8px 24px color-mix(in srgb,var(--accent) 28%,transparent)}
+.card{background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 10%,transparent),transparent 42%),var(--card-bg)!important}
+.logo{height:36px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25))}
+@media (prefers-reduced-motion:reduce){*,.blob,.section{animation:none!important;transition:none!important}}
+
 </style>
 </head>
 <body>
+${ambient}
 <div class="topbar"><div class="wrap brand">${logo}<a class="nav-cta" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a></div></div>
 ${bodySections}
 <footer><div class="wrap">${esc(copy.brand_name)}</div></footer>
@@ -1135,12 +1190,12 @@ JSON estrito.`,
 
   const html = renderLandingHtml(copy, {
     colors,
-    logoUrl: brand?.logo_url,
+    logoUrl: identityLogoUrl(identityModel, brand?.logo_url),
     heroUrl,
     ctaUrl: resolveCtaUrl(ctx, copy),
     concorrentes: [],
     identityLayout,
-    landingSystem: identityLandingSystem(identityModel || undefined),
+    landingSystem: composeLiveLandingSystem(identityLandingSystem(identityModel || undefined), Date.now()),
   });
 
   return {

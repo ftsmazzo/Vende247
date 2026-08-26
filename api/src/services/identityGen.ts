@@ -38,6 +38,10 @@ const CONTRACT_SHAPE = `{
     density: "high"|"medium"|"airy",
     cta_style: "pill"|"square"|"underline"
   },
+  assets: {
+    logo_url?: string;   // URL pública do logo da campanha (das image_urls do usuário)
+    image_urls?: string[];
+  },
   do: string[3..6],
   dont: string[3..6],
   generation_prompt: string<=280,
@@ -144,6 +148,15 @@ ${CONTRACT_SHAPE}`,
     }),
     4000
   );
+
+  // Logos/imagens coladas pelo usuário entram no contrato (não somem após o LLM).
+  if (imageUrls.length) {
+    const assets = (model.assets as { logo_url?: string; image_urls?: string[] } | undefined) || {};
+    model.assets = {
+      logo_url: assets.logo_url || imageUrls[0],
+      image_urls: [...new Set([...(assets.image_urls || []), ...imageUrls])].slice(0, 8),
+    };
+  }
 
   return { model, css: tokensCssFromModel(model), captures };
 }

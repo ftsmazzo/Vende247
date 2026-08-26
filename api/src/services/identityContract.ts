@@ -128,6 +128,84 @@ export function identityLandingSystem(model: IdentityModel | null | undefined): 
   return model.landing_system as LandingSystem;
 }
 
+/** Logo da campanha: assets da identidade → brand kit. */
+export function identityLogoUrl(
+  model: IdentityModel | null | undefined,
+  brandLogo?: string | null
+): string | undefined {
+  const assets = model?.assets as { logo_url?: string; image_urls?: string[] } | undefined;
+  const fromAssets =
+    (typeof assets?.logo_url === "string" && /^https?:\/\//i.test(assets.logo_url)
+      ? assets.logo_url
+      : null) ||
+    (Array.isArray(assets?.image_urls)
+      ? assets!.image_urls!.find((u) => /^https?:\/\//i.test(String(u)))
+      : null);
+  if (fromAssets) return String(fromAssets);
+  if (brandLogo && /^https?:\/\//i.test(brandLogo)) return brandLogo;
+  return undefined;
+}
+
+/**
+ * A cada geração de LP, compõe uma variante viva a partir do contrato base.
+ * Mesma identidade ≠ mesmo HTML: hero, ordem, efeitos e densidade mudam.
+ */
+export function composeLiveLandingSystem(
+  base: LandingSystem | null | undefined,
+  seed = Date.now()
+): LandingSystem {
+  const b = base || {};
+  const heroes = ["split-media", "diagonal-band", "stacked", "full-bleed"] as const;
+  const densities = ["high", "medium", "airy"] as const;
+  const ctas = ["pill", "square"] as const;
+  const mid = ["pain", "benefits", "steps", "pillars", "angles"] as const;
+
+  const pick = <T,>(arr: readonly T[], n: number) => arr[Math.abs(n) % arr.length];
+  const shuffle = <T,>(arr: T[], n: number): T[] => {
+    const a = [...arr];
+    let s = n;
+    for (let i = a.length - 1; i > 0; i--) {
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      const j = s % (i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const hero_recipe = pick(heroes, seed);
+  const density = pick(densities, Math.floor(seed / 7));
+  const cta_style = pick(ctas, Math.floor(seed / 13));
+  const section_order = ["hero", ...shuffle([...mid], seed), "offer"];
+
+  const baseEffects = (b.effects || []).map((e) => String(e).toLowerCase());
+  const polish = [
+    "glass",
+    "soft-shadow",
+    "gradient-hero",
+    "gradient-blobs",
+    "hover-lift",
+    "motion",
+    "curve-divider",
+  ];
+  // Alterna raio: umas gerações mais redondas, outras mais tight
+  if (seed % 2 === 0) polish.push("soft-radius");
+  else polish.push("tight-radius");
+  if (hero_recipe.includes("diagonal")) polish.push("diagonal");
+
+  const effects = [...new Set([...baseEffects.filter((e) => !/^tight-radius|soft-radius$/.test(e)), ...polish])];
+
+  return {
+    ...b,
+    hero_recipe: b.hero_recipe && seed % 5 === 0 ? b.hero_recipe : hero_recipe,
+    density: b.density && seed % 5 === 0 ? b.density : density,
+    cta_style: b.cta_style && seed % 5 === 0 ? b.cta_style : cta_style,
+    section_order: Array.isArray(b.section_order) && b.section_order.length >= 4 && seed % 5 === 0
+      ? b.section_order
+      : section_order,
+    effects,
+  };
+}
+
 export function identityPromptBlock(model: IdentityModel | null | undefined): string {
   const ctx = identityContextForLlm(model);
   return ctx ? JSON.stringify(ctx) : "";

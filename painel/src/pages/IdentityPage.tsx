@@ -143,13 +143,16 @@ export function IdentityPage() {
           )}
         </label>
         <label className="block">
-          <span className="label">URLs de imagens (mood, peça, print)</span>
+          <span className="label">URLs de imagens (logo, mood, peça)</span>
           <textarea
             className="field min-h-[72px]"
-            placeholder="https://…/mood.jpg"
+            placeholder={"https://…/logo.png\nhttps://…/variante-logo.svg"}
             value={imageUrls}
             onChange={(e) => setImageUrls(e.target.value)}
           />
+          <span className="mt-1 block text-xs text-white/35">
+            A 1ª URL vira o logo da LP (topbar). Re-rode o agente de identidade após colar.
+          </span>
         </label>
         <label className="block">
           <span className="label">Notas, trechos de PDF, o que o cliente falou</span>
