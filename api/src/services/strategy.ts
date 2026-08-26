@@ -309,15 +309,15 @@ function fallbackVisual(
   const h = (hook || ctx.produto.split(/[—\-–]/)[0] || "Oferta").slice(0, 40);
   const mood =
     brand?.visual_summary?.slice(0, 160) ||
-    "warm soft editorial lighting, authentic lifestyle, Instagram 4:5";
+    "authentic product photography matching the campaign niche, Instagram 4:5";
   const product = ctx.produto.slice(0, 100);
   const scenes: Record<CreativeBrief["cena_tipo"], string> = {
-    hero_pessoa: `Woman in a calm lifestyle moment connected to "${product}", bold Portuguese text "${h}", ${mood}, cinematic photo, no phone mockups`,
-    produto_detalhe: `Close-up of digital planner / journal pages and cozy props for "${product}", text "${h}", ${mood}, shallow depth of field`,
-    rotina: `Morning quiet-time ritual with coffee, open notebook and soft natural light for "${product}", text "${h}", ${mood}`,
+    hero_pessoa: `Person in a relevant lifestyle moment connected to "${product}", bold Portuguese text "${h}", ${mood}, cinematic photo, no phone mockups`,
+    produto_detalhe: `Close-up of the real product "${product}" in authentic use, text "${h}", ${mood}, shallow depth of field`,
+    rotina: `Everyday operational routine using "${product}", text "${h}", ${mood}`,
     emocao: `Emotional authentic portrait, hopeful soft expression, warm tones, text "${h}", product mood: ${product}, ${mood}`,
-    antes_depois: `Split concept: scattered notes and overwhelm vs calm organized faith routine with planner, text "${h}", ${mood}`,
-    prova_social: `Warm community / friendship moment of women sharing encouragement, authentic photo, text "${h}", ${mood}`,
+    antes_depois: `Split concept: chaotic manual process vs controlled digital workflow with "${product}", text "${h}", ${mood}`,
+    prova_social: `Authentic team or customer moment related to "${product}", text "${h}", ${mood}`,
     oferta: `Inviting product showcase of "${product}" with clear CTA text "${h}", bright commercial lifestyle photo, ${mood}`,
   };
   return scenes[cena];

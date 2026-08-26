@@ -7,34 +7,32 @@ export type NicheCtx = {
 };
 
 const INDUSTRIAL_RE =
-  /\b(epi|ppe|sst|ca\b|biometria|capacete|protetor auricular|earmuff|f[aá]brica|factory|warehouse|industrial|seguran[cç]a do trabalho|gest[aã]o de epi|hard\s*hat|plant floor|safety yellow|estoque de epi)\b/i;
+  /\b(epi|ppe|sst|nr\b|ca\b|biometria|capacete|protetor|f[aá]brica|factory|warehouse|industrial|seguran[cç]a do trabalho|gest[aã]o de epi|hard\s*hat|prontepi|pront\s*epi|sa[uú]de no trabalho|ordem de servi[cç]o|trabalhador|auditoria)\b/i;
 
+/** Fé explícita — NÃO incluir "mulher" ou "planner" sozinhos (contaminava SST). */
 const FAITH_RE =
-  /\b(crist[aã]|planner|b[ií]blia|f[eé]\b|devocional|ora[cç][aã]o|gratid[aã]o|igreja|mulher|quiet time|vers[ií]culo)\b/i;
+  /\b(crist[aã]|devocional|b[ií]blia|ora[cç][aã]o|igreja|vers[ií]culo|quiet time|mulher crist[aã]|planner crist[aã]|planner mulher)\b/i;
 
-/** Workspace é claramente industrial/EPI (aí EPI é permitido). */
-export function isIndustrialNiche(ctx: NicheCtx): boolean {
-  return INDUSTRIAL_RE.test(`${ctx.nicho} ${ctx.produto}`);
+export function isIndustrialNiche(ctx: NicheCtx | { nicho: string; produto: string; oferta?: string }): boolean {
+  return INDUSTRIAL_RE.test(`${ctx.nicho} ${ctx.produto} ${ctx.oferta || ""}`);
 }
 
-export function isFaithLifestyleNiche(ctx: NicheCtx): boolean {
-  return FAITH_RE.test(`${ctx.nicho} ${ctx.produto} ${ctx.oferta || ""}`);
+export function isFaithLifestyleNiche(ctx: NicheCtx | { nicho: string; produto: string; oferta?: string }): boolean {
+  return FAITH_RE.test(`${ctx.nicho} ${ctx.produto} ${ctx.oferta || ""}`) && !isIndustrialNiche(ctx);
 }
 
-/** Prompt/cena contaminada com EPI/indústria. */
 export function looksIndustrialVisual(text: string): boolean {
   return INDUSTRIAL_RE.test(text);
 }
 
-/** Remove cues de research antigos (EPI) quando o produto atual não é isso. */
 export function filterResearchCues(cues: string[], ctx: NicheCtx): string[] {
   if (isIndustrialNiche(ctx)) return cues.filter(Boolean);
   return cues.filter((c) => c && !looksIndustrialVisual(c));
 }
 
 /**
- * Trava o prompt visual no nicho atual.
- * Evita misturar capacete/EPI com legendas de planner.
+ * Trava o prompt no nicho da campanha.
+ * Industrial/SST → operação real. Faith só se briefing for fé. Sem misturar.
  */
 export function lockVisualToNiche(
   prompt: string,
@@ -43,53 +41,67 @@ export function lockVisualToNiche(
   hook?: string
 ): string {
   const base = (prompt || "").trim();
-  if (isIndustrialNiche(ctx)) {
-    return base.slice(0, 2200);
+  const blob = `${ctx.nicho} ${ctx.produto} ${ctx.oferta || ""} ${brand?.visual_summary || ""} ${brand?.product_ui_notes || ""}`;
+
+  if (isIndustrialNiche(ctx) || /prontepi|sst|\bepi\b/i.test(blob)) {
+    return [
+      `NICHE LOCK INDUSTRIAL/SST: product="${ctx.produto.slice(0, 140)}"; niche="${ctx.nicho.slice(0, 120)}".`,
+      "Show real workplace SST/EPI operations: warehouse, plant floor, safety technician, tablet with compliance UI, PPE delivery evidence.",
+      "Brand mood: dark navy, deep teal, authoritative, technical — NOT cozy lifestyle.",
+      "FORBIDDEN: Bible, planner journal, faith quiet-time, beige terracotta morning, purple SaaS gradient, smiling generic stock.",
+      brand?.visual_summary ? `Brand: ${brand.visual_summary.slice(0, 200)}.` : "",
+      brand?.product_ui_notes ? `Scenes: ${brand.product_ui_notes.slice(0, 220)}.` : "",
+      hook ? `Overlay: "${String(hook).slice(0, 48)}".` : "",
+      base,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .slice(0, 3500);
   }
 
-  const contaminated =
-    looksIndustrialVisual(base) ||
-    looksIndustrialVisual(hook || "") ||
-    /simplifique a gest[aã]o|comece com seguran[cç]a|controle!/i.test(base);
+  if (isFaithLifestyleNiche(ctx)) {
+    const scene =
+      brand?.product_ui_notes?.trim() ||
+      "Woman in calm morning quiet time: open planner or Bible, coffee, soft window light — cozy faith lifestyle";
+    return [
+      `NICHE LOCK FAITH: product="${ctx.produto.slice(0, 120)}".`,
+      scene,
+      "FORBIDDEN: industrial PPE, hard hats, factory, EPI management UI.",
+      base,
+    ]
+      .join(" ")
+      .slice(0, 3500);
+  }
 
-  const safeHook = (() => {
-    const h = (hook || "").trim();
-    if (!h || looksIndustrialVisual(h)) return "";
-    return h.slice(0, 48);
-  })();
+  const contaminatedFaith =
+    /\b(bible|b[ií]blia|quiet time|devotional|planner journal|terracotta cozy|faith lifestyle)\b/i.test(base);
+  const contaminatedIndustrial = looksIndustrialVisual(base) && !isIndustrialNiche(ctx);
 
   const scene =
     brand?.product_ui_notes?.trim() ||
-    (isFaithLifestyleNiche(ctx)
-      ? "Woman in calm morning quiet time: open planner or Bible, coffee, soft window light, beige terracotta tones, handwritten notes, flowers — cozy faith lifestyle, never industrial"
-      : `Authentic lifestyle scene for: ${ctx.produto}. Real people and product in use. No industrial props.`);
+    `Authentic product-in-use scene for "${ctx.produto}". Real people and context. No unrelated religious or industrial props.`;
 
-  const rebuilt = contaminated
-    ? [
-        `Instagram ad for "${ctx.produto}".`,
-        `Niche: ${ctx.nicho}.`,
-        scene,
-        safeHook ? `Bold Portuguese overlay text ONLY: "${safeHook}" (3–6 words max).` : "",
-        "Warm soft editorial photo, Instagram 4:5.",
-      ]
-        .filter(Boolean)
-        .join(" ")
-    : base;
+  const rebuilt =
+    contaminatedFaith || contaminatedIndustrial
+      ? [
+          `Instagram ad for "${ctx.produto}".`,
+          `Niche: ${ctx.nicho}.`,
+          scene,
+          hook ? `Overlay text: "${String(hook).slice(0, 48)}".` : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : base;
 
-  const lock = [
-    `NICHE LOCK (mandatory): product="${ctx.produto.slice(0, 120)}"; niche="${ctx.nicho.slice(0, 120)}".`,
-    "EVERY object, person, prop AND on-image text MUST match this niche only.",
-    "ABSOLUTELY FORBIDDEN in the photo AND in overlay typography: EPI, PPE, hard hats, earmuffs, factory, warehouse, industrial safety, SST, CA certificate, yellow safety gear, construction workers, biometria delivery.",
-    "FORBIDDEN overlay words: gestão de EPI, segurança industrial, Simplifique a Gestão, Comece com Segurança (industrial sense).",
-    brand?.visual_summary
-      ? `Brand mood: ${brand.visual_summary.slice(0, 200)}.`
-      : "",
-    brand?.product_ui_notes && !contaminated
-      ? `Preferred scenes: ${brand.product_ui_notes.slice(0, 220)}.`
-      : "",
+  return [
+    `NICHE LOCK: product="${ctx.produto.slice(0, 120)}"; niche="${ctx.nicho.slice(0, 120)}".`,
+    "EVERY object and on-image text MUST match this product only.",
+    "FORBIDDEN unless niche is faith: Bible, quiet time, planner journal faith aesthetic.",
+    "FORBIDDEN unless niche is industrial SST/EPI: hard hats, factory PPE overlays.",
+    brand?.visual_summary ? `Brand mood: ${brand.visual_summary.slice(0, 200)}.` : "",
+    rebuilt,
   ]
     .filter(Boolean)
-    .join(" ");
-
-  return `${lock} ${rebuilt}`.slice(0, 3500);
+    .join(" ")
+    .slice(0, 3500);
 }

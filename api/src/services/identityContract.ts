@@ -19,6 +19,21 @@ function tokenValue(tokens: unknown, key: string): string | undefined {
   return typeof node?.value === "string" ? node.value : undefined;
 }
 
+/** Aceita brand_primary / brand-primary / primary. */
+function tokenValueAny(tokens: unknown, keys: string[]): string | undefined {
+  if (!tokens || typeof tokens !== "object") return undefined;
+  const map = tokens as Record<string, { value?: string }>;
+  for (const k of keys) {
+    const direct = map[k]?.value;
+    if (typeof direct === "string") return direct;
+    const snake = map[k.replace(/-/g, "_")]?.value;
+    if (typeof snake === "string") return snake;
+    const kebab = map[k.replace(/_/g, "-")]?.value;
+    if (typeof kebab === "string") return kebab;
+  }
+  return undefined;
+}
+
 export function identityColors(model: IdentityModel | null | undefined): string[] {
   const colors = (model?.design_tokens as { colors?: Record<string, { value?: string }> } | undefined)
     ?.colors;
@@ -52,41 +67,47 @@ export function identityGenerationHints(model: IdentityModel | null | undefined)
   palette: string;
 } {
   const colors = identityColors(model).slice(0, 5).join(", ");
-  return {
-    positive: String(model?.generation_prompt || "").slice(0, 1800),
-    negative: String(model?.negative_prompt || "").slice(0, 1200),
-    palette: colors,
-  };
+  const pos =
+    String(model?.generation_prompt || model?.positive_prompt || "").slice(0, 1800) ||
+    String((model?.identity_signature as { summary?: string } | undefined)?.summary || "").slice(0, 1800);
+  const neg =
+    String(model?.negative_prompt || "").slice(0, 1200) ||
+    (Array.isArray(model?.dont) ? model.dont.map(String).join(", ") : "").slice(0, 1200);
+  return { positive: pos, negative: neg, palette: colors };
 }
 
 export function identityContextForLlm(model: IdentityModel | null | undefined): Record<string, unknown> | null {
   if (!model || !Object.keys(model).length) return null;
-  const sig = model.identity_signature as Record<string, unknown> | undefined;
-  const tokens = model.design_tokens as { colors?: Record<string, { value?: string }> } | undefined;
+  const sig = (model.identity_signature || model.brand_signature) as Record<string, unknown> | undefined;
+  const tokens = (model.design_tokens || model.tokens) as
+    | { colors?: Record<string, { value?: string }> }
+    | undefined;
   const colorMap: Record<string, string> = {};
   if (tokens?.colors) {
     for (const [k, v] of Object.entries(tokens.colors)) {
       if (v?.value) colorMap[k] = v.value;
     }
   }
+  const doList = Array.isArray(model.do) ? model.do : Array.isArray(model.dos) ? model.dos : [];
+  const dontList = Array.isArray(model.dont) ? model.dont : Array.isArray(model.donts) ? model.donts : [];
   return {
     skill: "campaign-design-apply",
-    candidate: model.candidate ?? null,
-    campaign_label: (model.campaign as { label?: string } | undefined)?.label ?? null,
-    identity_summary: sig?.summary || "",
-    recognition_cues: Array.isArray(sig?.recognition_cues) ? sig.recognition_cues.slice(0, 8) : [],
+    identity_summary:
+      (sig?.summary as string) ||
+      String((model.brand_signature as { summary?: string } | undefined)?.summary || ""),
+    recognition_cues: Array.isArray(sig?.recognition_cues)
+      ? sig.recognition_cues.slice(0, 8)
+      : Array.isArray(sig?.recognition_signals)
+        ? (sig.recognition_signals as unknown[]).slice(0, 8)
+        : [],
     colors: colorMap,
     color_list: identityColors(model).slice(0, 10),
-    hierarchy_rules: model.hierarchy_rules ?? null,
     image_treatment: model.image_treatment ?? null,
-    iconography_and_graphics: model.iconography_and_graphics ?? null,
     landing_page_style_spec: model.landing_page_style_spec ?? null,
-    responsive_strategy: model.responsive_strategy ?? null,
-    do: Array.isArray(model.do) ? model.do.slice(0, 16) : [],
-    dont: Array.isArray(model.dont) ? model.dont.slice(0, 16) : [],
-    generation_prompt: String(model.generation_prompt || "").slice(0, 2200),
+    do: doList.slice(0, 16),
+    dont: dontList.slice(0, 16),
+    generation_prompt: String(model.generation_prompt || model.positive_prompt || "").slice(0, 2200),
     negative_prompt: String(model.negative_prompt || "").slice(0, 1400),
-    acceptance_criteria: model.acceptance_criteria ?? null,
   };
 }
 
@@ -114,6 +135,7 @@ function normHex(c: string | undefined): string | null {
 export type LandingPalette = {
   accent: string;
   deep: string;
+  /** Fundo da página (sempre escuro o bastante OU claro o bastante — nunca ink-de-texto). */
   ink: string;
   surface: string;
   theme: "light" | "dark";
@@ -122,69 +144,99 @@ export type LandingPalette = {
   ctaInk: string;
 };
 
+/**
+ * Tokens de design (Figma/CSS):
+ * - surface = fundo de superfície/página
+ * - ink = cor de texto
+ * - brand_primary / brand_secondary / brand_accent = marca
+ *
+ * NUNCA use ink claro como background (bug clássico: texto some).
+ */
 export function identityPickColors(model: IdentityModel | null | undefined): LandingPalette | null {
-  const tokens = (model?.design_tokens as { colors?: Record<string, { value?: string }> } | undefined)?.colors;
-  const list = identityColors(model).map((c) => normHex(c)).filter(Boolean) as string[];
+  const tokens = (model?.design_tokens as { colors?: Record<string, { value?: string }> } | undefined)
+    ?.colors;
+  const list = identityColors(model)
+    .map((c) => normHex(c))
+    .filter(Boolean) as string[];
   if (!list.length && !tokens) return null;
 
-  const tokenInk = normHex(tokenValue(tokens, "ink"));
-  const tokenSurface = normHex(tokenValue(tokens, "surface"));
-  const tokenPrimary = normHex(tokenValue(tokens, "brand_primary"));
-  const tokenAccent =
-    normHex(tokenValue(tokens, "brand_accent")) ||
-    normHex(tokenValue(tokens, "brand_yellow"));
-  const tokenSecondary = normHex(tokenValue(tokens, "brand_secondary"));
+  const primary = normHex(
+    tokenValueAny(tokens, ["brand_primary", "brand-primary", "primary", "brand_blue"])
+  );
+  const secondary = normHex(
+    tokenValueAny(tokens, ["brand_secondary", "brand-secondary", "secondary", "brand_green"])
+  );
+  const accentTok = normHex(
+    tokenValueAny(tokens, ["brand_accent", "brand-accent", "accent", "brand_yellow"])
+  );
+  const tokenInk = normHex(tokenValueAny(tokens, ["ink", "text", "foreground"]));
+  const tokenSurface = normHex(tokenValueAny(tokens, ["surface", "background", "bg", "canvas"]));
 
-  const vivid = [...list].sort((a, b) => luminanceGuess(b) - luminanceGuess(a));
   const accent =
-    tokenAccent ||
-    vivid.find((c) => luminanceGuess(c) > 0.35) ||
-    tokenPrimary ||
+    accentTok ||
+    [...list].sort((a, b) => luminanceGuess(b) - luminanceGuess(a)).find((c) => luminanceGuess(c) > 0.4) ||
+    primary ||
     list[0] ||
-    "#C4A484";
-  const deep =
-    tokenSecondary ||
-    tokenPrimary ||
-    [...list].sort((a, b) => luminanceGuess(a) - luminanceGuess(b)).find((c) => luminanceGuess(c) < 0.45) ||
-    "#3D5A50";
+    "#14B8A6";
 
-  // Tokens de design: surface = fundo da página, ink = cor do texto (escuro)
-  const surfaceIsPage = tokenSurface && luminanceGuess(tokenSurface) > 0.55;
-  const inkIsText = tokenInk && luminanceGuess(tokenInk) < 0.45;
+  const deep = primary || secondary || "#0F766E";
 
-  if (surfaceIsPage || (inkIsText && tokenSurface)) {
-    const pageBg = surfaceIsPage ? tokenSurface! : "#FAFAF8";
+  const inkLum = tokenInk ? luminanceGuess(tokenInk) : -1;
+  const surfaceLum = tokenSurface ? luminanceGuess(tokenSurface) : -1;
+
+  // Tema dark: surface escuro OU ink claro (texto sobre fundo escuro)
+  const darkTheme =
+    (surfaceLum >= 0 && surfaceLum < 0.4) ||
+    (inkLum >= 0 && inkLum > 0.55 && surfaceLum >= 0 && surfaceLum < 0.55) ||
+    (inkLum >= 0 && inkLum > 0.55 && !tokenSurface);
+
+  if (darkTheme) {
+    const pageBg =
+      (tokenSurface && surfaceLum < 0.45 ? tokenSurface : null) ||
+      (secondary && luminanceGuess(secondary) < 0.35 ? secondary : null) ||
+      (primary && luminanceGuess(primary) < 0.25 ? primary : null) ||
+      [...list].sort((a, b) => luminanceGuess(a) - luminanceGuess(b)).find((c) => luminanceGuess(c) < 0.3) ||
+      "#0F172A";
     const pageAlt =
-      list.find((c) => luminanceGuess(c) > 0.72 && luminanceGuess(c) < 0.96 && c !== pageBg) ||
-      "#F0EDE8";
-    const text = inkIsText ? tokenInk! : "#1A1410";
+      list.find((c) => c !== pageBg && luminanceGuess(c) < 0.35 && luminanceGuess(c) > 0.08) ||
+      secondary ||
+      "#1E293B";
+    const text =
+      (tokenInk && inkLum > 0.55 ? tokenInk : null) ||
+      list.find((c) => luminanceGuess(c) > 0.7) ||
+      "#F8FAFC";
     return {
-      theme: "light",
+      theme: "dark",
       accent,
       deep,
       ink: pageBg,
       surface: pageAlt,
       text,
-      textMuted: "rgba(26,20,16,.62)",
-      ctaInk: luminanceGuess(accent) > 0.55 ? deep : "#FFFFFF",
+      textMuted: "rgba(248,250,252,.68)",
+      ctaInk: luminanceGuess(accent) > 0.55 ? pageBg : "#FFFFFF",
     };
   }
 
-  const darkCandidates = [tokenPrimary, tokenSecondary, tokenInk, tokenSurface, ...list].filter(
-    (c): c is string => Boolean(c && luminanceGuess(c) < 0.22)
-  );
-  const ink = darkCandidates[0] || "#1A1410";
-  const surface =
-    darkCandidates.find((c) => c !== ink && luminanceGuess(c) < 0.28) || "#120E0C";
-
+  // Tema light: surface claro, ink escuro
+  const pageBg =
+    (tokenSurface && surfaceLum > 0.55 ? tokenSurface : null) ||
+    list.find((c) => luminanceGuess(c) > 0.85) ||
+    "#FAFAF8";
+  const pageAlt =
+    list.find((c) => luminanceGuess(c) > 0.72 && luminanceGuess(c) < 0.95 && c !== pageBg) || "#F1F5F9";
+  const text =
+    (tokenInk && inkLum < 0.45 ? tokenInk : null) ||
+    list.find((c) => luminanceGuess(c) < 0.35) ||
+    secondary ||
+    "#0F172A";
   return {
-    theme: "dark",
+    theme: "light",
     accent,
     deep,
-    ink,
-    surface,
-    text: "#F4F6F5",
-    textMuted: "rgba(244,246,245,.68)",
-    ctaInk: luminanceGuess(accent) > 0.55 ? deep : ink,
+    ink: pageBg,
+    surface: pageAlt,
+    text,
+    textMuted: "rgba(15,23,42,.62)",
+    ctaInk: luminanceGuess(accent) > 0.55 ? text : "#FFFFFF",
   };
 }

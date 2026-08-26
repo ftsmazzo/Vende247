@@ -797,14 +797,14 @@ JSON estrito.`,
       body: cleanPublicText(ctx.oferta)?.slice(0, 120) || "Organização e constância no dia a dia.",
     },
     {
-      title: "Suporte no Direct",
-      body: "Dúvidas? Fale direto — atendimento humano e rápido.",
+      title: "Fale com o time",
+      body: "Tire dúvidas com o time — próximo passo claro.",
     },
   ];
   const defaultSteps = [
-    { title: "Escolha", body: `Peça o ${shortProduct} pelo Direct.` },
-    { title: "Receba", body: "Acesso ao material digital após a confirmação." },
-    { title: "Use no dia a dia", body: "Aplique no ritmo da sua rotina e mantenha a constância." },
+    { title: "Escolha", body: `Agende uma demo de ${shortProduct}.` },
+    { title: "Receba", body: "Veja o fluxo real do sistema em operação." },
+    { title: "Use no dia a dia", body: "Comece pelo processo crítico e escale com evidência." },
   ];
   const defaultFaq = [
     {
@@ -844,10 +844,10 @@ JSON estrito.`,
   copy.faq = normalizeFaq(copy.faq).filter((f) => !isIgOrInternalNoise(`${f.q} ${f.a}`));
 
   const defaultPains = [
-    "Quer crescer na fé, mas a rotina engole o tempo",
-    "Começa o mês animada e abandona na segunda semana",
-    "Planner genérico que não fala a linguagem do seu coração",
-    "Falta um ritual simples de oração, gratidão e organização",
+    `Processos de ${(ctx.nicho || "este mercado").split(/[—\-–|/]/)[0]?.trim() || "este mercado"} ainda dependem de planilha e papel`,
+    "Falta evidência rastreável quando a auditoria chega",
+    "Cadastros repetidos geram erro e retrabalho",
+    "O time perde tempo em tarefa operacional que deveria ser sistema",
   ];
 
   if (copy.pains.length < 3) {
@@ -865,16 +865,16 @@ JSON estrito.`,
   if (!copy.pillars.length) {
     copy.pillars = [
       {
-        title: "Fé no centro",
-        body: "Páginas de oração, gratidão e Palavra — não só checklist de tarefas.",
+        title: "Evidência",
+        body: "Histórico e comprovação no processo — não só promessa.",
       },
       {
-        title: "Rotina leve",
-        body: "Estrutura mensal simples para manter constância sem sobrecarregar.",
+        title: "Operação",
+        body: "Fluxo pensado para quem executa no campo e no escritório.",
       },
       {
-        title: "Acesso imediato",
-        body: "PDF digital — use no celular ou imprima no conforto de casa.",
+        title: "Escala",
+        body: "Padronize multi-unidade ou multi-cliente sem copiar planilha.",
       },
     ];
   }
@@ -883,25 +883,25 @@ JSON estrito.`,
     copy.angles = filterProductLines([
       ...copy.angles,
       ...normalizeStrings(report?.hooks_vencedores),
-      "Constância começa com um ritual simples",
-      "Organize o mês sem perder a fé de vista",
-      "Um planner que fala a língua do seu coração",
-      "Do Direct ao PDF — acesso imediato",
+      "Menos papel, mais evidência rastreável",
+      "Feito para consultoria, indústria e agro",
+      "Do cadastro à evidência — em um fluxo",
+      "Auditoria não espera planilha desatualizada",
     ]).slice(0, 6);
   }
 
   if (!copy.proof_items.length) {
     copy.proof_items = [
-      "Páginas de oração, gratidão e estudo bíblico",
-      "Formato digital com acesso imediato",
-      "Feito para a mulher cristã na correria do dia a dia",
+      "Ficha SST, OS e integração no mesmo cadastro",
+      "Entrega de EPI com evidência e histórico",
+      "Feito para operações de SST com multi-cliente",
     ];
   }
   if (!copy.metrics.length) {
     copy.metrics = [
-      { value: "PDF", label: "acesso imediato" },
-      { value: "Mensal", label: "ritual renovado" },
-      { value: "Direct", label: "compra simples" },
+      { value: "SST", label: "operação rastreável" },
+      { value: "EPI", label: "entrega com evidência" },
+      { value: "1x", label: "cadastro, vários fluxos" },
     ];
   }
 
@@ -913,9 +913,9 @@ JSON estrito.`,
     cleanPublicText(copy.headline).split(/\s+/).length < 2;
 
   const head = splitHeadline(
-    weakHeadline ? "Rotina sem propósito?" : copy.headline,
+    weakHeadline ? "Operação sem evidência?" : copy.headline,
     weakHeadline || !copy.headline_accent
-      ? "Organize com fé."
+      ? "Evidência, não promessa."
       : copy.headline_accent
   );
   copy.headline = head.main;
@@ -928,7 +928,7 @@ JSON estrito.`,
   if (!copy.subheadline || isIgOrInternalNoise(copy.subheadline) || copy.subheadline.length < 40) {
     copy.subheadline =
       cleanPublicText(ctx.oferta)?.slice(0, 180) ||
-      "Planner digital com oração, gratidão e organização — para a mulher que quer constância na fé e no dia a dia.";
+      "Plataforma de gestão operacional de SST: admissão, treinamentos e entrega de EPI com evidência.";
   }
   copy.audience = cleanPublicText(copy.audience);
   if (isIgOrInternalNoise(copy.audience)) copy.audience = "";
@@ -938,9 +938,9 @@ JSON estrito.`,
   copy.differentiator = cleanPublicText(copy.differentiator);
   if (isIgOrInternalNoise(copy.differentiator)) copy.differentiator = "";
   if (!copy.differentiator) {
-    copy.differentiator = "Fé + organização no mesmo ritual";
+    copy.differentiator = "Proteção comprovável — processo e histórico.";
   }
-  copy.hero_cta = shortCta(copy.hero_cta || ctx.cta || "Quero o planner");
+  copy.hero_cta = shortCta(copy.hero_cta || ctx.cta || `Falar com ${shortProduct}`);
   copy.hero_cta_secondary = cleanPublicText(copy.hero_cta_secondary) || "Ver como funciona";
   copy.final_cta = shortCta(copy.final_cta || copy.hero_cta);
   copy.pain_title = cleanPublicText(copy.pain_title) || "Isso ainda te trava?";
@@ -949,47 +949,55 @@ JSON estrito.`,
   }
   copy.solution_title = cleanPublicText(copy.solution_title) || "O que muda na prática";
   copy.how_title = cleanPublicText(copy.how_title) || "Como funciona";
-  copy.pillars_title = cleanPublicText(copy.pillars_title) || "Por que este planner";
+  copy.pillars_title = cleanPublicText(copy.pillars_title) || `Por que ${shortProduct}`;
   copy.angles_title = cleanPublicText(copy.angles_title) || "O que ressoa com você";
   copy.proof_title = cleanPublicText(copy.proof_title) || "O que você recebe";
   copy.faq_title = cleanPublicText(copy.faq_title) || "Perguntas frequentes";
-  copy.offer_title = shortTitle(copy.offer_title || "Quero o planner", 48);
+  copy.offer_title = shortTitle(copy.offer_title || ctx.cta || `Falar com ${shortProduct}`, 48);
   copy.offer_body =
     cleanPublicText(copy.offer_body) ||
     cleanPublicText(ctx.oferta) ||
-    "Peça no Direct e receba o PDF com acesso imediato.";
+    "Fale com o time e veja o fluxo real do sistema.";
   if (isIgOrInternalNoise(copy.offer_body)) {
     copy.offer_body =
       cleanPublicText(ctx.oferta) ||
-      "Peça no Direct e receba o PDF com acesso imediato.";
+      "Fale com o time e veja o fluxo real do sistema.";
   }
   if (copy.offer_title.length > 60 || isIgOrInternalNoise(copy.offer_title)) {
-    copy.offer_title = "Quero o planner";
+    copy.offer_title = shortTitle(ctx.cta || `Falar com ${shortProduct}`, 48);
   }
-  copy.final_sub = cleanPublicText(copy.final_sub) || "Resposta rápida no Direct.";
-  copy.whatsapp_hint = cleanPublicText(copy.whatsapp_hint || ctx.cta) || "Chama no Direct e peça o planner";
+  copy.final_sub = cleanPublicText(copy.final_sub) || "Fale com o time e veja o fluxo real.";
+  copy.whatsapp_hint = cleanPublicText(copy.whatsapp_hint || ctx.cta) || "Fale com o time comercial";
   if (isIgOrInternalNoise(copy.whatsapp_hint)) {
-    copy.whatsapp_hint = "Peça o planner no Direct";
+    copy.whatsapp_hint = "Agende uma demonstração";
   }
   copy.whatsapp_url = copy.whatsapp_url && !isFakePhone(String(copy.whatsapp_url).replace(/\D/g, ""))
     ? copy.whatsapp_url
     : undefined;
   copy.seo_title =
     cleanPublicText(copy.seo_title) ||
-    `${brandName} — planner digital com fé e organização`;
+    `${brandName} — gestão operacional de SST`;
   copy.seo_description =
     cleanPublicText(copy.seo_description) || copy.subheadline.slice(0, 155);
 
   let heroUrl: string | undefined;
   if (opts.withHeroImage !== false && isStorageConfigured()) {
+    const industrial = /\b(epi|sst|prontepi|seguran|industrial)\b/i.test(
+      `${ctx.nicho} ${ctx.produto}`
+    );
     try {
       heroUrl = await gerarImagemViral(
         [
           brand?.product_ui_notes ||
-            "Woman in a calm morning quiet time with open planner, coffee and soft window light.",
-          "Warm beige and terracotta tones, editorial lifestyle photo, shallow depth of field.",
+            (industrial
+              ? "Safety technician in industrial workplace using tablet with SST / EPI dashboard, navy and deep teal lighting, authoritative technical photo"
+              : `Premium product hero for "${shortProduct}" in authentic use, modern brand photography`),
+          industrial
+            ? "Dark navy and teal industrial brand mood, high contrast. FORBIDDEN: Bible, planner journal, faith lifestyle, beige terracotta cozy morning"
+            : "Modern brand photography matching the product niche. FORBIDDEN: Bible, faith props, random industrial PPE unless product is SST/EPI",
           "Empty visual space on the left third for website text overlay.",
-          `Mood for product: ${ctx.produto.slice(0, 120)}`,
+          `Product: ${ctx.produto.slice(0, 140)}`,
+          `Niche: ${ctx.nicho.slice(0, 100)}`,
           brand?.visual_summary ? `Brand mood: ${brand.visual_summary.slice(0, 180)}` : "",
         ]
           .filter(Boolean)

@@ -44,7 +44,7 @@ export function brandMismatchReason(
     /paleta de cores que remete [àa] seguran/i.test(blob);
 
   if (hasProntColors || strongOldBrand) {
-    return "A identidade salva ainda parece do produto anterior (EPI/SaaS verde-azul). Gere uma nova ou aplique o preset do Planner.";
+    return "A identidade salva ainda parece de outro produto (EPI/SaaS). Gere uma nova identidade para ESTA campanha — não use preset de planner.";
   }
   return null;
 }
@@ -62,7 +62,7 @@ export async function generateBrandIdentity(opts: {
 }): Promise<BrandKit> {
   const { ctx, report, strategy, keepLogoUrl } = opts;
 
-  // Atalho sólido para o produto atual (evita alucinação verde/teal)
+  // Só atalho faith se o briefing for EXPLICITAMENTE fé — nunca forçar planner em SST/EPI.
   if (isFaithLifestyleNiche(ctx) && !isIndustrialNiche(ctx)) {
     const base = PLANNER_MULHER_PRESET.brand_kit;
     try {
@@ -107,7 +107,7 @@ Use research/estratégia só como clima de campanha (pilares/hooks), não como c
         )
       );
 
-      const colors = sanitizeColors(ai.colors?.length ? ai.colors : base.colors || []);
+      const colors = sanitizeColors(ai.colors?.length ? ai.colors : base.colors || [], ctx);
       return {
         colors,
         visual_summary: ai.visual_summary || base.visual_summary,
@@ -163,7 +163,7 @@ JSON: {
   );
 
   return {
-    colors: sanitizeColors(ai.colors || []),
+    colors: sanitizeColors(ai.colors || [], ctx),
     visual_summary: ai.visual_summary || "",
     product_ui_notes: ai.product_ui_notes || "",
     logo_url: keepLogoUrl || undefined,
@@ -172,8 +172,12 @@ JSON: {
   };
 }
 
-function sanitizeColors(colors: string[]): string[] {
-  const banned = new Set(["#0f766e", "#115e59", "#99f6e4", "#0f172a", "#14b8a6", "#0d9488"]);
+function sanitizeColors(colors: string[], ctx?: WorkspaceBrandCtx): string[] {
+  // Só bloqueia teal EPI quando o produto NÃO é industrial/SST.
+  const banTeal = ctx ? !isIndustrialNiche(ctx) : false;
+  const banned = banTeal
+    ? new Set(["#0f766e", "#115e59", "#99f6e4", "#0f172a", "#14b8a6", "#0d9488"])
+    : new Set<string>();
   return [...new Set(colors)]
     .map((c) => (c.startsWith("#") ? c.toLowerCase() : `#${c}`.toLowerCase()))
     .filter((c) => /^#[0-9a-f]{3,8}$/i.test(c) && !banned.has(c))

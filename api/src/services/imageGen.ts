@@ -349,14 +349,22 @@ function buildPrompt(
     ? `NEGATIVE / DO NOT: ${extras.identityNegative.trim().slice(0, 700)}.`
     : "";
 
+  const industrial = extras?.niche
+    ? /\b(epi|sst|prontepi|seguran|industrial|f[aá]brica)\b/i.test(
+        `${extras.niche.nicho} ${extras.niche.produto}`
+      )
+    : false;
+
   if (mode === "photo") {
     return [
       "Premium photorealistic photograph, full bleed, no letterboxing, no frames,",
-      "ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO TYPOGRAPHY, NO CAPTIONS, NO LOGOS, NO WATERMARKS, NO UI,",
+      "ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO TYPOGRAPHY, NO CAPTIONS, NO LOGOS, NO WATERMARKS, NO UI overlays as graphic stickers,",
       "cinematic lighting, editorial quality, clean composition with negative space on the left,",
       `Camera: ${shot}.`,
-      "FORBIDDEN: smartphone mockups, fake dashboards, graphic overlays, stickers, banners.",
-      "FORBIDDEN unless niche is industrial safety: hard hats, EPI/PPE, factories, warehouses, earmuffs.",
+      "FORBIDDEN: smartphone mockups as empty frames, graphic stickers, banners, watermarks.",
+      industrial
+        ? "REQUIRED mood: industrial SST/EPI workplace. FORBIDDEN: Bible, planner journal, faith quiet-time, beige terracotta cozy morning."
+        : "FORBIDDEN unless niche is industrial safety: hard hats, EPI/PPE factories as default filler. FORBIDDEN: Bible/faith props unless niche is faith.",
       brandPromptBits(brand),
       pos,
       neg,
@@ -371,11 +379,12 @@ function buildPrompt(
     "scroll-stopping, vivid colors, emotional impact,",
     "SAFE ZONE: keep ALL text and faces inside a 12% margin from every edge — nothing important near the border,",
     "bold short Portuguese hook (3–6 words) in the UPPER-CENTER, fully readable, large clean sans typography,",
-    "photorealistic lifestyle scene matching the product niche (people, rituals, product in use) — follow brand mood if given,",
+    "photorealistic scene matching the product niche (people + product in use) — follow brand mood if given,",
     `UNIQUE SHOT THIS IMAGE: ${shot} — must look different from other ads in the same campaign.`,
     "FORBIDDEN: smartphone mockups, fake app dashboards, invented UI, dark mats, widescreen bars,",
-    "FORBIDDEN: industrial PPE, hard hats, earmuffs, factory floors, warehouse safety gear, yellow construction helmets — unless niche lock explicitly is industrial EPI/SST,",
-    "FORBIDDEN: overlay text about gestão de EPI / segurança industrial when niche is faith/planner/lifestyle,",
+    industrial
+      ? "REQUIRED: industrial SST/EPI workplace authenticity. FORBIDDEN: Bible, planner journal, faith lifestyle, beige cozy morning."
+      : "FORBIDDEN: industrial PPE/hard hats/factory as default filler unless niche lock is industrial EPI/SST. FORBIDDEN: Bible/faith props unless niche is faith.",
     "FORBIDDEN: text cut off, text overflowing edges, tiny unreadable type, watermark stamps,",
     "leave small clean space bottom-left for logo overlay only,",
     "no watermarks, no invented brand logos in the scene.",
