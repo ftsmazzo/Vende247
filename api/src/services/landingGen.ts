@@ -315,6 +315,21 @@ function shortTitle(s: string, max = 52): string {
   return t.slice(0, max - 1).trimEnd() + "…";
 }
 
+/** Briefing/nicho costuma vir como parágrafo — nunca jogar isso cru na LP. */
+function clipBrief(s: unknown, max = 96): string {
+  let t = cleanPublicText(s);
+  if (!t) return "";
+  const cut = t.split(/[—\-–|/.;]/)[0]?.trim() || t;
+  t = cut.length >= 12 && cut.length <= max ? cut : t;
+  if (t.length <= max) return t;
+  const space = t.lastIndexOf(" ", max - 1);
+  return (space > 40 ? t.slice(0, space) : t.slice(0, max - 1)).trimEnd() + "…";
+}
+
+function isDumpText(s: string, max = 140): boolean {
+  return cleanPublicText(s).length > max;
+}
+
 function splitHeadline(headline: string, accent: string): { main: string; accent: string } {
   let main = cleanPublicText(headline);
   let acc = cleanPublicText(accent);
@@ -392,11 +407,13 @@ export function renderLandingHtml(
       ? "0 12px 40px rgba(15,23,42,.08)"
       : "0 16px 48px rgba(0,0,0,.35)"
     : "none";
-  const heroStacked = heroRecipe.includes("stack") || heroRecipe.includes("full");
-  const heroBg = heroRecipe.includes("full")
+  const heroFullBleed = heroRecipe.includes("full");
+  const heroStacked = heroRecipe.includes("stack") && !heroFullBleed;
+  // full-bleed: imagem vira fundo do hero (nunca some). stacked: media abaixo. split: ao lado.
+  const heroBgBase = heroFullBleed
     ? isLight
       ? `linear-gradient(180deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),var(--ink))`
-      : `linear-gradient(165deg,var(--deep),var(--ink) 50%,var(--surface))`
+      : `linear-gradient(165deg,color-mix(in srgb,var(--deep) 75%,transparent),var(--ink) 55%,var(--surface))`
     : heroStacked
       ? `linear-gradient(180deg,var(--ink),var(--surface))`
       : opts.identityLayout || diagonal
@@ -404,9 +421,15 @@ export function renderLandingHtml(
         : isLight
           ? `radial-gradient(70% 80% at 90% 10%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 55%),linear-gradient(180deg,var(--surface),var(--ink))`
           : `radial-gradient(55% 70% at 85% 15%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 60%),linear-gradient(180deg,var(--ink),var(--surface))`;
-  const heroGrid = heroStacked
-    ? "grid-template-columns:1fr"
-    : "grid-template-columns:minmax(0,1.05fr) minmax(280px,.9fr)";
+  const heroBg =
+    heroFullBleed && opts.heroUrl
+      ? `linear-gradient(105deg,color-mix(in srgb,var(--ink) 88%,transparent) 0%,color-mix(in srgb,var(--ink) 55%,transparent) 48%,transparent 72%),url('${esc(opts.heroUrl)}') center/cover no-repeat`
+      : heroBgBase;
+  const heroGrid =
+    heroFullBleed || heroStacked
+      ? "grid-template-columns:1fr"
+      : "grid-template-columns:minmax(0,1.05fr) minmax(280px,.9fr)";
+  const showHeroMediaColumn = !heroFullBleed || !opts.heroUrl;
 
   const orderRaw = Array.isArray(ls.section_order)
     ? ls.section_order.map((x) => String(x).toLowerCase())
@@ -524,7 +547,7 @@ export function renderLandingHtml(
       </div>
       ${metrics ? `<div class="metrics">${metrics}</div>` : ""}
     </div>
-    ${heroStacked ? "" : heroMedia}
+    ${showHeroMediaColumn ? heroMedia : ""}
   </div>
 </header>`,
     pain: `<section class="section pain" id="dor">
@@ -870,78 +893,80 @@ JSON estrito.`,
     )
   );
 
-  const brandName = cleanPublicText(copy.brand_name) || ctx.produto.split(/[—\-–]/)[0]?.trim() || "Produto";
+  const brandName = cleanPublicText(copy.brand_name) || clipBrief(ctx.produto, 40) || "Produto";
   const shortProduct = brandName;
+  const nicheShort = clipBrief(ctx.nicho, 72) || "operações de SST";
+  const offerShort =
+    clipBrief(ctx.oferta, 160) ||
+    `${shortProduct}: gestão operacional com evidência rastreável.`;
 
   const defaultBenefits = [
     {
-      title: "Comece hoje",
-      body: `${shortProduct} — acesso simples e imediato após a compra.`,
+      title: "Um cadastro, vários fluxos",
+      body: "Admissão, integração, treinamentos e EPI no mesmo registro — sem retrabalho.",
     },
     {
-      title: "Feito para você",
-      body: `Pensado para o público de ${ctx.nicho.split(/[—\-–]/)[0]?.trim() || "este nicho"}.`,
+      title: "Evidência na entrega",
+      body: "Confirmação rastreável de quem recebeu o EPI, quando e qual equipamento.",
     },
     {
-      title: "Resultado prático",
-      body: cleanPublicText(ctx.oferta)?.slice(0, 120) || "Organização e constância no dia a dia.",
+      title: "Pronto para auditoria",
+      body: "Fichas, certificados e histórico organizados quando a fiscalização chega.",
     },
     {
-      title: "Fale com o time",
-      body: "Tire dúvidas com o time — próximo passo claro.",
+      title: "Escala multi-cliente",
+      body: `Feito para ${nicheShort} — várias empresas sem planilha paralela.`,
     },
   ];
   const defaultSteps = [
-    { title: "Escolha", body: `Agende uma demo de ${shortProduct}.` },
-    { title: "Receba", body: "Veja o fluxo real do sistema em operação." },
-    { title: "Use no dia a dia", body: "Comece pelo processo crítico e escale com evidência." },
+    { title: "Cadastre a operação", body: `Empresas, unidades e trabalhadores entram uma vez no ${shortProduct}.` },
+    { title: "Automatize documentos", body: "Ficha SST, OS e integração saem do mesmo fluxo." },
+    { title: "Entregue com prova", body: "EPI com histórico e evidência — pronto para auditoria." },
   ];
   const defaultFaq = [
+    { q: "O que o sistema cobre?", a: offerShort },
     {
-      q: "Como funciona?",
-      a: cleanPublicText(ctx.oferta) || `Você recebe ${shortProduct} conforme a oferta da campanha.`,
+      q: "Serve para consultoria multi-cliente?",
+      a: "Sim — uma plataforma para gerir várias empresas e seus trabalhadores.",
     },
     {
-      q: "Quando recebo?",
-      a: "Assim que a ação for confirmada — o próximo passo está no CTA.",
+      q: "Como comprovo a entrega de EPI?",
+      a: "A entrega gera evidência rastreável (quem, o quê e quando).",
     },
     {
-      q: "Serve para iniciantes?",
-      a: "Sim, se o briefing descreve um público que está começando.",
-    },
-    {
-      q: "Como sigo?",
-      a: cleanPublicText(ctx.cta) || "Use o botão principal desta página.",
+      q: "Como começo?",
+      a: clipBrief(ctx.cta, 80) || "Agende uma demonstração pelo botão desta página.",
     },
   ];
 
   copy.brand_name = brandName;
-  copy.pains = filterProductLines(normalizeStrings(copy.pains));
-  copy.benefits = normalizePairs(copy.benefits).filter(
-    (b) => !isIgOrInternalNoise(`${b.title} ${b.body}`)
-  );
-  copy.how_steps = normalizePairs(copy.how_steps).filter(
-    (b) => !isIgOrInternalNoise(`${b.title} ${b.body}`)
-  );
-  copy.pillars = normalizePairs(copy.pillars).filter(
-    (b) => !isIgOrInternalNoise(`${b.title} ${b.body}`)
-  );
-  copy.angles = filterProductLines(normalizeStrings(copy.angles));
-  copy.proof_items = filterProductLines(normalizeStrings(copy.proof_items));
+  copy.pains = filterProductLines(normalizeStrings(copy.pains)).filter((p) => !isDumpText(p, 130));
+  copy.benefits = normalizePairs(copy.benefits)
+    .filter((b) => !isIgOrInternalNoise(`${b.title} ${b.body}`) && !isDumpText(b.body, 180))
+    .map((b) => ({ title: shortTitle(b.title, 40), body: clipBrief(b.body, 140) || b.body.slice(0, 140) }));
+  copy.how_steps = normalizePairs(copy.how_steps)
+    .filter((b) => !isIgOrInternalNoise(`${b.title} ${b.body}`) && !isDumpText(b.body, 160))
+    .map((b) => ({ title: shortTitle(b.title, 36), body: clipBrief(b.body, 120) || b.body.slice(0, 120) }));
+  copy.pillars = normalizePairs(copy.pillars)
+    .filter((b) => !isIgOrInternalNoise(`${b.title} ${b.body}`) && !isDumpText(b.body, 160))
+    .map((b) => ({ title: shortTitle(b.title, 36), body: clipBrief(b.body, 120) || b.body.slice(0, 120) }));
+  copy.angles = filterProductLines(normalizeStrings(copy.angles)).filter((a) => !isDumpText(a, 120));
+  copy.proof_items = filterProductLines(normalizeStrings(copy.proof_items)).filter((a) => !isDumpText(a, 120));
   copy.metrics = normalizePairs(copy.metrics)
-    .filter((p) => !isIgOrInternalNoise(`${p.title} ${p.body}`))
-    .map((p) => ({ value: p.title, label: p.body }));
-  copy.faq = normalizeFaq(copy.faq).filter((f) => !isIgOrInternalNoise(`${f.q} ${f.a}`));
+    .filter((p) => !isIgOrInternalNoise(`${p.title} ${p.body}`) && !isDumpText(p.body, 80))
+    .map((p) => ({ value: shortTitle(p.title, 12), label: clipBrief(p.body, 48) || p.body.slice(0, 48) }));
+  copy.faq = normalizeFaq(copy.faq)
+    .filter((f) => !isIgOrInternalNoise(`${f.q} ${f.a}`) && !isDumpText(f.a, 280))
+    .map((f) => ({ q: shortTitle(f.q, 72), a: clipBrief(f.a, 220) || f.a.slice(0, 220) }));
 
   const defaultPains = [
-    `Processos de ${(ctx.nicho || "este mercado").split(/[—\-–|/]/)[0]?.trim() || "este mercado"} ainda dependem de planilha e papel`,
+    "Processos de SST ainda dependem de planilha e papel",
     "Falta evidência rastreável quando a auditoria chega",
     "Cadastros repetidos geram erro e retrabalho",
-    "O time perde tempo em tarefa operacional que deveria ser sistema",
+    "O time perde tempo em tarefa que deveria ser sistema",
   ];
 
   if (copy.pains.length < 3) {
-    // NUNCA usar oportunidades_unicas da research (vem em tom de estrategia)
     copy.pains = [...copy.pains, ...defaultPains]
       .filter((v, i, a) => a.indexOf(v) === i)
       .slice(0, 4);
@@ -954,25 +979,16 @@ JSON estrito.`,
 
   if (!copy.pillars.length) {
     copy.pillars = [
-      {
-        title: "Evidência",
-        body: "Histórico e comprovação no processo — não só promessa.",
-      },
-      {
-        title: "Operação",
-        body: "Fluxo pensado para quem executa no campo e no escritório.",
-      },
-      {
-        title: "Escala",
-        body: "Padronize multi-unidade ou multi-cliente sem copiar planilha.",
-      },
+      { title: "Evidência", body: "Histórico e comprovação no processo — não só promessa." },
+      { title: "Operação", body: "Fluxo pensado para quem executa no campo e no escritório." },
+      { title: "Escala", body: "Padronize multi-unidade ou multi-cliente sem copiar planilha." },
     ];
   }
 
   if (copy.angles.length < 3) {
     copy.angles = filterProductLines([
       ...copy.angles,
-      ...normalizeStrings(report?.hooks_vencedores),
+      ...normalizeStrings(report?.hooks_vencedores).filter((h) => !isDumpText(h, 110)),
       "Menos papel, mais evidência rastreável",
       "Feito para consultoria, indústria e agro",
       "Do cadastro à evidência — em um fluxo",
@@ -995,7 +1011,6 @@ JSON estrito.`,
     ];
   }
 
-  // Headline fraca / genérica → força tensão de produto
   const weakHeadline =
     !copy.headline ||
     /menos papel/i.test(copy.headline) ||
@@ -1011,30 +1026,41 @@ JSON estrito.`,
   copy.headline = head.main;
   copy.headline_accent = head.accent;
   copy.eyebrow = cleanPublicText(copy.eyebrow);
-  if (!copy.eyebrow || isIgOrInternalNoise(copy.eyebrow)) {
+  if (!copy.eyebrow || isIgOrInternalNoise(copy.eyebrow) || isDumpText(copy.eyebrow, 40)) {
     copy.eyebrow = shortProduct;
   }
   copy.subheadline = cleanPublicText(copy.subheadline);
-  if (!copy.subheadline || isIgOrInternalNoise(copy.subheadline) || copy.subheadline.length < 40) {
-    copy.subheadline =
-      cleanPublicText(ctx.oferta)?.slice(0, 180) ||
-      "Plataforma de gestão operacional de SST: admissão, treinamentos e entrega de EPI com evidência.";
+  if (
+    !copy.subheadline ||
+    isIgOrInternalNoise(copy.subheadline) ||
+    copy.subheadline.length < 40 ||
+    isDumpText(copy.subheadline, 220)
+  ) {
+    copy.subheadline = offerShort;
+  } else {
+    copy.subheadline = clipBrief(copy.subheadline, 200) || offerShort;
   }
   copy.audience = cleanPublicText(copy.audience);
-  if (isIgOrInternalNoise(copy.audience)) copy.audience = "";
+  if (isIgOrInternalNoise(copy.audience) || isDumpText(copy.audience, 110)) copy.audience = "";
   if (!copy.audience) {
-    copy.audience = `Para quem se identifica com: ${ctx.nicho.split(/[—\-–]/)[0]?.trim() || "este nicho"}`;
+    copy.audience = `Para ${nicheShort}`;
+  } else {
+    copy.audience = clipBrief(copy.audience, 100);
   }
   copy.differentiator = cleanPublicText(copy.differentiator);
-  if (isIgOrInternalNoise(copy.differentiator)) copy.differentiator = "";
+  if (isIgOrInternalNoise(copy.differentiator) || isDumpText(copy.differentiator, 90)) {
+    copy.differentiator = "";
+  }
   if (!copy.differentiator) {
     copy.differentiator = "Proteção comprovável — processo e histórico.";
+  } else {
+    copy.differentiator = clipBrief(copy.differentiator, 80);
   }
   copy.hero_cta = shortCta(copy.hero_cta || ctx.cta || `Falar com ${shortProduct}`);
   copy.hero_cta_secondary = cleanPublicText(copy.hero_cta_secondary) || "Ver como funciona";
   copy.final_cta = shortCta(copy.final_cta || copy.hero_cta);
   copy.pain_title = cleanPublicText(copy.pain_title) || "Isso ainda te trava?";
-  if (isIgOrInternalNoise(copy.pain_title)) {
+  if (isIgOrInternalNoise(copy.pain_title) || isDumpText(copy.pain_title, 48)) {
     copy.pain_title = "Isso ainda te trava?";
   }
   copy.solution_title = cleanPublicText(copy.solution_title) || "O que muda na prática";
@@ -1043,23 +1069,22 @@ JSON estrito.`,
   copy.angles_title = cleanPublicText(copy.angles_title) || "O que ressoa com você";
   copy.proof_title = cleanPublicText(copy.proof_title) || "O que você recebe";
   copy.faq_title = cleanPublicText(copy.faq_title) || "Perguntas frequentes";
-  copy.offer_title = shortTitle(copy.offer_title || ctx.cta || `Falar com ${shortProduct}`, 48);
-  copy.offer_body =
-    cleanPublicText(copy.offer_body) ||
-    cleanPublicText(ctx.oferta) ||
-    "Fale com o time e veja o fluxo real do sistema.";
-  if (isIgOrInternalNoise(copy.offer_body)) {
-    copy.offer_body =
-      cleanPublicText(ctx.oferta) ||
-      "Fale com o time e veja o fluxo real do sistema.";
+  copy.offer_title = shortTitle(copy.offer_title || `Agende uma demo do ${shortProduct}`, 48);
+  copy.offer_body = cleanPublicText(copy.offer_body);
+  if (!copy.offer_body || isIgOrInternalNoise(copy.offer_body) || isDumpText(copy.offer_body, 220)) {
+    copy.offer_body = offerShort;
+  } else {
+    copy.offer_body = clipBrief(copy.offer_body, 200) || offerShort;
   }
   if (copy.offer_title.length > 60 || isIgOrInternalNoise(copy.offer_title)) {
-    copy.offer_title = shortTitle(ctx.cta || `Falar com ${shortProduct}`, 48);
+    copy.offer_title = shortTitle(`Agende uma demo do ${shortProduct}`, 48);
   }
   copy.final_sub = cleanPublicText(copy.final_sub) || "Fale com o time e veja o fluxo real.";
   copy.whatsapp_hint = cleanPublicText(copy.whatsapp_hint || ctx.cta) || "Fale com o time comercial";
-  if (isIgOrInternalNoise(copy.whatsapp_hint)) {
+  if (isIgOrInternalNoise(copy.whatsapp_hint) || isDumpText(copy.whatsapp_hint, 80)) {
     copy.whatsapp_hint = "Agende uma demonstração";
+  } else {
+    copy.whatsapp_hint = clipBrief(copy.whatsapp_hint, 72);
   }
   copy.whatsapp_url = copy.whatsapp_url && !isFakePhone(String(copy.whatsapp_url).replace(/\D/g, ""))
     ? copy.whatsapp_url

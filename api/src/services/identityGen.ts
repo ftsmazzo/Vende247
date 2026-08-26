@@ -31,7 +31,7 @@ const CONTRACT_SHAPE = `{
   landing_system: {
     theme: "dark"|"light",
     tokens: { accent, deep, ink, surface, text: "#hex" },
-    hero_recipe: "split-media"|"full-bleed"|"stacked"|"diagonal-band",
+    hero_recipe: "split-media"|"full-bleed"|"stacked"|"diagonal-band" (prefira split-media se houver foto de produto),
     section_order: string[] (subset of hero,pain,benefits,steps,pillars,angles,offer),
     effects: string[] (subset: glass, soft-shadow, diagonal, gradient-hero, tight-radius, pill-cta, square-cta),
     typography: { display: string, body: string },
