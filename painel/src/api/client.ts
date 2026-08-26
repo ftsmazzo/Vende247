@@ -136,7 +136,10 @@ export const api = {
       id: number,
       body?: { notes?: string; reference_urls?: string[]; image_urls?: string[] }
     ) =>
-      request<{ identity: unknown }>(`/api/campaigns/${id}/identity/generate`, {
+      request<{
+        identity: unknown;
+        captures?: Array<{ url: string; ok: boolean; error?: string | null; mood?: string; colors?: string[] }>;
+      }>(`/api/campaigns/${id}/identity/generate`, {
         method: "POST",
         body: JSON.stringify(body || {}),
       }),
@@ -144,6 +147,13 @@ export const api = {
       request<{ identity: unknown }>(`/api/campaigns/${id}/identity/import`, {
         method: "POST",
         body: JSON.stringify(body),
+      }),
+  },
+  tools: {
+    captureSite: (url: string) =>
+      request<{ capture: unknown }>("/api/tools/capture-site", {
+        method: "POST",
+        body: JSON.stringify({ url }),
       }),
   },
   research: {

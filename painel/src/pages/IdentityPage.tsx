@@ -16,6 +16,8 @@ export function IdentityPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [captureStats, setCaptureStats] = useState<{ ok: number; fail: number } | null>(null);
+
   const pipe = campaign?.pipeline;
   const canGenerate = Boolean(pipe?.research && pipe?.strategy);
 
@@ -45,12 +47,22 @@ export function IdentityPage() {
     setError("");
     setMsg("");
     try {
-      await api.campaigns.generateIdentity(campaignId, {
+      const gen = await api.campaigns.generateIdentity(campaignId, {
         notes: notes || undefined,
         reference_urls: splitUrls(urls),
         image_urls: splitUrls(imageUrls),
       });
-      setMsg("Agente gerou o contrato desta campanha.");
+      const caps = gen.captures || [];
+      if (caps.length) {
+        const ok = caps.filter((c) => c.ok).length;
+        setCaptureStats({ ok, fail: caps.length - ok });
+        setMsg(
+          `Agente gerou o contrato. Capturas: ${ok} ok${caps.length - ok ? `, ${caps.length - ok} falhou` : ""}.`
+        );
+      } else {
+        setCaptureStats(null);
+        setMsg("Agente gerou o contrato desta campanha.");
+      }
       const r = await api.campaigns.identity(campaignId);
       setActive(r.active);
       if (r.active?.model) setJsonText(JSON.stringify(r.active.model, null, 2));
@@ -107,8 +119,9 @@ export function IdentityPage() {
       <div className="card space-y-3">
         <h2 className="font-display text-lg font-semibold">Referências (opcional)</h2>
         <p className="text-sm text-white/50">
-          Quanto mais material, mais o contrato se parece com um brandbook. Sem nada, o agente inventa
-          um sistema alinhado ao mercado que a pesquisa viu.
+          Cole sites que você acha bons: o sistema captura o design system (cores, fontes, densidade,
+          hero/CTA) e o agente escolhe o que serve à campanha — sem copiar marca alheia. Sem nada, parte
+          do zero alinhado à research.
         </p>
         <label className="block">
           <span className="label">Sites / páginas públicas</span>
@@ -118,6 +131,16 @@ export function IdentityPage() {
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
           />
+          <span className="mt-1 block text-xs text-white/35">
+            Até 3 URLs são capturadas a fundo (HTML/CSS). Útil para dark industrial, glass, tipografia,
+            etc.
+          </span>
+          {captureStats && (
+            <p className="mt-2 text-xs text-white/45">
+              Última geração: {captureStats.ok} captura(s) ok
+              {captureStats.fail ? ` · ${captureStats.fail} falhou` : ""}.
+            </p>
+          )}
         </label>
         <label className="block">
           <span className="label">URLs de imagens (mood, peça, print)</span>

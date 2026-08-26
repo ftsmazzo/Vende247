@@ -4,7 +4,7 @@ import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { StrategyPlan } from "./strategy.js";
 import { gerarImagemViral } from "./imageGen.js";
 import { isStorageConfigured } from "./storage.js";
-import { identityContextForLlm, identityLooksCampaignLayout, identityPickColors, type IdentityModel, type LandingPalette } from "./identityContract.js";
+import { identityContextForLlm, identityLooksCampaignLayout, identityPickColors, identityLandingSystem, type IdentityModel, type LandingPalette, type LandingSystem } from "./identityContract.js";
 
 export type LandingCopy = {
   brand_name: string;
@@ -92,7 +92,32 @@ function saturation(hex: string): number {
 /** Paleta da LP: respeita tokens da identidade com contraste legível. */
 function pickColors(brand?: BrandKit | null, identity?: IdentityModel | null): LandingPalette {
   const fromIdentity = identityPickColors(identity || undefined);
-  if (fromIdentity) return fromIdentity;
+  if (fromIdentity) {
+    const ls = identityLandingSystem(identity || undefined);
+    const t = ls?.tokens || {};
+    let palette: LandingPalette = { ...fromIdentity };
+    if (ls?.theme === "dark" || ls?.theme === "light") {
+      palette = { ...palette, theme: ls.theme };
+    }
+    const hex = (v?: string) => (v && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null);
+    if (hex(t.accent)) palette.accent = hex(t.accent)!;
+    if (hex(t.deep)) palette.deep = hex(t.deep)!;
+    if (hex(t.ink)) palette.ink = hex(t.ink)!;
+    if (hex(t.surface)) palette.surface = hex(t.surface)!;
+    if (hex(t.text)) palette.text = hex(t.text)!;
+    if (palette.theme === "dark" && luminance(palette.ink) > 0.55) {
+      palette.ink = hex(t.ink) && luminance(hex(t.ink)!) < 0.4 ? hex(t.ink)! : "#0F172A";
+      if (luminance(palette.text) < 0.45) palette.text = "#F8FAFC";
+    }
+    if (palette.theme === "light" && luminance(palette.ink) < 0.4) {
+      palette.ink = hex(t.ink) && luminance(hex(t.ink)!) > 0.7 ? hex(t.ink)! : "#FAFAF8";
+      if (luminance(palette.text) > 0.6) palette.text = "#0F172A";
+    }
+    palette.ctaInk = luminance(palette.accent) > 0.55 ? palette.ink : "#FFFFFF";
+    palette.textMuted =
+      palette.theme === "dark" ? "rgba(248,250,252,.68)" : "rgba(15,23,42,.62)";
+    return palette;
+  }
   const raw = (brand?.colors ?? [])
     .map((c) => (c.startsWith("#") ? c.toLowerCase() : `#${c}`.toLowerCase()))
     .filter((c) => parseHex(c));
@@ -312,15 +337,90 @@ export function renderLandingHtml(
     ctaUrl: string;
     concorrentes: string[];
     identityLayout?: boolean;
+    landingSystem?: LandingSystem | null;
   }
 ): string {
   const { accent, deep, ink, surface, theme, text, textMuted, ctaInk } = opts.colors;
   const isLight = theme === "light";
-  const fonts = opts.identityLayout
-    ? "family=Barlow+Condensed:wght@600;700;800;900&family=Barlow:wght@400;500;600;700"
-    : "family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@400;500;600;700;800";
-  const displayFont = opts.identityLayout ? '"Barlow Condensed",Impact,sans-serif' : '"Fraunces",Georgia,serif';
-  const bodyFont = opts.identityLayout ? '"Barlow",system-ui,sans-serif' : '"Outfit",system-ui,sans-serif';
+  const ls = opts.landingSystem || {};
+  const effects = new Set((ls.effects || []).map((e) => String(e).toLowerCase()));
+  const density = String(ls.density || "medium").toLowerCase();
+  const heroRecipe = String(
+    ls.hero_recipe || (opts.identityLayout ? "diagonal-band" : "split-media")
+  ).toLowerCase();
+  const ctaStyle = String(
+    ls.cta_style ||
+      (effects.has("pill-cta") || effects.has("pill")
+        ? "pill"
+        : effects.has("square-cta") || effects.has("square")
+          ? "square"
+          : opts.identityLayout
+            ? "square"
+            : "pill")
+  ).toLowerCase();
+
+  const displayName =
+    ls.typography?.display?.trim() || (opts.identityLayout ? "Barlow Condensed" : "Fraunces");
+  const bodyName = ls.typography?.body?.trim() || (opts.identityLayout ? "Barlow" : "Outfit");
+  const gf = (name: string, weights: string) =>
+    `family=${encodeURIComponent(name).replace(/%20/g, "+")}:wght@${weights}`;
+  const fonts = `${gf(displayName, opts.identityLayout || density === "high" ? "600;700;800;900" : "500;600;700")}&${gf(bodyName, "400;500;600;700;800")}`;
+  const displayFont = `"${displayName.replace(/"/g, "")}",${opts.identityLayout ? "Impact,sans-serif" : "Georgia,serif"}`;
+  const bodyFont = `"${bodyName.replace(/"/g, "")}",system-ui,sans-serif`;
+
+  const radius =
+    effects.has("tight-radius") || ctaStyle === "square" || opts.identityLayout
+      ? "6px"
+      : density === "high"
+        ? "0.75rem"
+        : "1.25rem";
+  const btnRadius = ctaStyle === "square" ? "6px" : ctaStyle === "underline" ? "0" : "999px";
+  const glass = effects.has("glass");
+  const softShadow = effects.has("soft-shadow");
+  const diagonal = effects.has("diagonal") || heroRecipe.includes("diagonal");
+  const sectionPad = density === "high" ? "1.85rem" : density === "airy" ? "3.4rem" : "2.75rem";
+  const cardBg = glass
+    ? isLight
+      ? "rgba(255,255,255,.55)"
+      : "rgba(255,255,255,.06)"
+    : isLight
+      ? "rgba(26,20,16,.04)"
+      : "rgba(255,255,255,.035)";
+  const cardBlur = glass ? "backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" : "";
+  const shadowCss = softShadow
+    ? isLight
+      ? "0 12px 40px rgba(15,23,42,.08)"
+      : "0 16px 48px rgba(0,0,0,.35)"
+    : "none";
+  const heroStacked = heroRecipe.includes("stack") || heroRecipe.includes("full");
+  const heroBg = heroRecipe.includes("full")
+    ? isLight
+      ? `linear-gradient(180deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),var(--ink))`
+      : `linear-gradient(165deg,var(--deep),var(--ink) 50%,var(--surface))`
+    : heroStacked
+      ? `linear-gradient(180deg,var(--ink),var(--surface))`
+      : opts.identityLayout || diagonal
+        ? `linear-gradient(165deg,var(--deep) 0%,var(--ink) 55%,var(--surface) 100%)`
+        : isLight
+          ? `radial-gradient(70% 80% at 90% 10%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 55%),linear-gradient(180deg,var(--surface),var(--ink))`
+          : `radial-gradient(55% 70% at 85% 15%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 60%),linear-gradient(180deg,var(--ink),var(--surface))`;
+  const heroGrid = heroStacked
+    ? "grid-template-columns:1fr"
+    : "grid-template-columns:minmax(0,1.05fr) minmax(280px,.9fr)";
+
+  const orderRaw = Array.isArray(ls.section_order)
+    ? ls.section_order.map((x) => String(x).toLowerCase())
+    : [];
+  const defaultOrder = ["hero", "pain", "benefits", "steps", "pillars", "angles", "offer"];
+  const sectionOrder = (orderRaw.length ? orderRaw : defaultOrder).filter((x) =>
+    ["hero", "pain", "benefits", "steps", "pillars", "angles", "offer"].includes(x)
+  );
+  const ordered = [
+    "hero",
+    ...sectionOrder.filter((x) => x !== "hero" && x !== "offer"),
+    "offer",
+  ].filter((x, i, a) => a.indexOf(x) === i);
+
   const ctaHref = opts.ctaUrl;
   const ctaPrimary = shortCta(copy.hero_cta);
   const ctaFinal = shortCta(copy.final_cta || copy.hero_cta);
@@ -400,8 +500,101 @@ export function renderLandingHtml(
     ? `<div class="hero-media" style="background-image:url('${esc(opts.heroUrl)}')" role="img" aria-label=""></div>`
     : `<div class="hero-media hero-media--fallback"></div>`;
 
-  // proof section removida do HTML se pillars cobrem o mesmo — evita pagina alongada/vazia
   void copy.proof_items;
+
+  const sectionsHtml: Record<string, string> = {
+    hero: `<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-inner">
+      ${copy.eyebrow ? `<div class="eyebrow">${esc(cleanPublicText(copy.eyebrow))}</div>` : ""}
+      <h1>${esc(head.main).replace(/\n/g, "<br/>")}<span class="accent-line">${esc(head.accent)}</span></h1>
+      <p class="lead">${esc(cleanPublicText(copy.subheadline))}</p>
+      ${
+        copy.audience || copy.differentiator
+          ? `<p class="meta-line">${esc(
+              [cleanPublicText(copy.audience), cleanPublicText(copy.differentiator)]
+                .filter(Boolean)
+                .join(" · ")
+            )}</p>`
+          : ""
+      }
+      <div class="cta-row">
+        <a class="btn" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a>
+        <a class="btn btn-ghost" href="#dor">${esc(cleanPublicText(copy.hero_cta_secondary) || "Ver o problema")}</a>
+      </div>
+      ${metrics ? `<div class="metrics">${metrics}</div>` : ""}
+    </div>
+    ${heroStacked ? "" : heroMedia}
+  </div>
+</header>`,
+    pain: `<section class="section pain" id="dor">
+  <div class="wrap pain-split">
+    <div>
+      <p class="section-kicker">O problema</p>
+      <h2 class="display">${esc(cleanPublicText(copy.pain_title) || "Isso ainda trava a sua operacao?")}</h2>
+    </div>
+    <ul class="pain-list">${pains}</ul>
+  </div>
+</section>`,
+    benefits: benefits
+      ? `<section class="section" id="solucao">
+  <div class="wrap">
+    <p class="section-kicker">A solução</p>
+    <h2 class="display">${esc(cleanPublicText(copy.solution_title) || "O que muda na prática")}</h2>
+    <div class="grid-4">${benefits}</div>
+  </div>
+</section>`
+      : "",
+    steps: steps
+      ? `<section class="section" id="como">
+  <div class="wrap">
+    <p class="section-kicker">Como funciona</p>
+    <h2 class="display">${esc(cleanPublicText(copy.how_title) || "Do caos ao controle")}</h2>
+    <ol class="steps">${steps}</ol>
+  </div>
+</section>`
+      : "",
+    pillars: pillars
+      ? `<section class="section" id="pilares">
+  <div class="wrap">
+    <p class="section-kicker">Por que escolhem</p>
+    <h2 class="display">${esc(cleanPublicText(copy.pillars_title) || "Pilares do produto")}</h2>
+    <div class="pillars">${pillars}</div>
+  </div>
+</section>`
+      : "",
+    angles: angles
+      ? `<section class="section" id="angulos">
+  <div class="wrap">
+    <p class="section-kicker">Mensagens que convertem</p>
+    <h2 class="display">${esc(cleanPublicText(copy.angles_title) || "O que o mercado responde")}</h2>
+    <ul class="angle-list">${angles}</ul>
+  </div>
+</section>`
+      : "",
+    offer: `<section class="section" id="oferta">
+  <div class="wrap bottom-grid">
+    ${
+      faq
+        ? `<div id="faq">
+    <p class="section-kicker">Duvidas</p>
+    <h2 class="display">${esc(cleanPublicText(copy.faq_title) || "Perguntas frequentes")}</h2>
+    ${faq}
+  </div>`
+        : "<div></div>"
+    }
+    <div class="offer" id="contato">
+      <p class="section-kicker">Proximo passo</p>
+      <h2 class="display">${esc(shortTitle(copy.offer_title, 48) || "Peca uma demonstracao")}</h2>
+      <p>${esc(cleanPublicText(copy.offer_body))}</p>
+      <a class="btn" href="${esc(ctaHref)}">${esc(ctaFinal)}</a>
+      <span class="hint">${esc(cleanPublicText(copy.whatsapp_hint))}</span>
+    </div>
+  </div>
+</section>`,
+  };
+
+  const bodySections = ordered.map((k) => sectionsHtml[k] || "").filter(Boolean).join("\n");
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -422,10 +615,13 @@ export function renderLandingHtml(
   --paper:${text};
   --muted:${textMuted};
   --line:${isLight ? "rgba(26,20,16,.10)" : "rgba(255,255,255,.10)"};
-  --radius:${opts.identityLayout ? "6px" : "1.25rem"};
+  --radius:${radius};
+  --btn-radius:${btnRadius};
   --cta-ink:${ctaInk};
-  --card-bg:${isLight ? "rgba(26,20,16,.04)" : "rgba(255,255,255,.035)"};
+  --card-bg:${cardBg};
   --card-border:${isLight ? "rgba(26,20,16,.10)" : "rgba(255,255,255,.10)"};
+  --section-pad:${sectionPad};
+  --shadow:${shadowCss};
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -433,61 +629,56 @@ body{
   font-family:${bodyFont};
   background:var(--ink);
   color:var(--paper);
-  line-height:1.55;
+  line-height:${density === "high" ? "1.45" : "1.55"};
   -webkit-font-smoothing:antialiased;
 }
 a{color:inherit;text-decoration:none}
-.wrap{width:min(${opts.identityLayout ? "1200px" : "1080px"},92vw);margin:0 auto}
-.display{font-family:${displayFont};font-weight:${opts.identityLayout ? "800" : "600"};letter-spacing:${opts.identityLayout ? "-.02em" : "-.03em"};line-height:1.05}
+.wrap{width:min(${density === "high" ? "1180px" : "1080px"},92vw);margin:0 auto}
+.display{font-family:${displayFont};font-weight:${opts.identityLayout || density === "high" ? "800" : "600"};letter-spacing:-.03em;line-height:1.05}
 .ico{width:1.15rem;height:1.15rem;flex-shrink:0;display:block}
 .ico-wrap{
-  width:2.35rem;height:2.35rem;border-radius:.75rem;display:grid;place-items:center;
+  width:2.35rem;height:2.35rem;border-radius:calc(var(--radius) * .6);display:grid;place-items:center;
   color:var(--accent);margin-bottom:.75rem;
   background:color-mix(in srgb,var(--accent) 14%,transparent);
   border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);
 }
 .topbar{
   position:sticky;top:0;z-index:50;padding:.65rem 0;
-  background:${isLight ? "rgba(255,255,255,.92)" : "rgba(6,9,8,.82)"};
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  background:${glass ? (isLight ? "rgba(255,255,255,.72)" : "rgba(6,9,8,.55)") : isLight ? "rgba(255,255,255,.92)" : "rgba(6,9,8,.82)"};
+  backdrop-filter:blur(${glass ? "18" : "12"}px);-webkit-backdrop-filter:blur(${glass ? "18" : "12"}px);
   border-bottom:1px solid var(--line);
 }
 .brand{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .logo{height:32px;width:auto;object-fit:contain}
 .logo-text{font-family:${displayFont};font-size:1.25rem;color:var(--accent)}
 .nav-cta{
-  font-size:.78rem;font-weight:800;padding:.55rem .95rem;border-radius:${opts.identityLayout ? "6px" : "999px"};
+  font-size:.78rem;font-weight:800;padding:.55rem .95rem;border-radius:var(--btn-radius);
   background:var(--accent);color:var(--cta-ink);
+  ${ctaStyle === "underline" ? "background:transparent;color:var(--accent);border-bottom:2px solid var(--accent);border-radius:0;padding:.35rem 0;" : ""}
 }
 .hero{
   position:relative;isolation:isolate;
   padding:2.25rem 0 1.75rem;
-  background:${
-    opts.identityLayout
-      ? `linear-gradient(165deg,var(--deep) 0%,var(--ink) 55%,var(--surface) 100%)`
-      : isLight
-        ? `radial-gradient(70% 80% at 90% 10%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 55%),
-    linear-gradient(180deg,var(--surface),var(--ink))`
-        : `radial-gradient(55% 70% at 85% 15%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 60%),
-    linear-gradient(180deg,var(--ink),var(--surface))`
-  };
+  background:${heroBg};
 }
 .hero::after{
-  content:${opts.identityLayout ? '""' : "none"};
+  content:${diagonal || opts.identityLayout ? '""' : "none"};
   position:absolute;left:0;right:0;bottom:-2px;height:72px;
-  background:linear-gradient(104deg, #12B24B 0 38%, var(--accent) 38% 72%, var(--deep) 72% 100%);
+  background:linear-gradient(104deg, color-mix(in srgb,var(--accent) 70%,#12B24B) 0 38%, var(--accent) 38% 72%, var(--deep) 72% 100%);
   clip-path:polygon(0 42%,100% 0,100% 100%,0 100%);
   pointer-events:none;
 }
 .hero-grid{
   display:grid;gap:1.75rem;align-items:stretch;
-  grid-template-columns:minmax(0,1.05fr) minmax(280px,.9fr);
+  ${heroGrid};
 }
 .hero-media{
   position:relative;min-height:100%;aspect-ratio:4/5;max-height:420px;
-  border-radius:1.15rem;overflow:hidden;
+  border-radius:var(--radius);overflow:hidden;
   background-size:cover;background-position:center;
   border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  ${cardBlur}
 }
 .hero-media--fallback{background:radial-gradient(70% 50% at 80% 10%,color-mix(in srgb,var(--accent) 30%,transparent),transparent 55%),linear-gradient(165deg,var(--ink),var(--deep))}
 .hero-media::after{
@@ -497,32 +688,32 @@ a{color:inherit;text-decoration:none}
 .hero-inner{display:flex;flex-direction:column;justify-content:center;max-width:36rem}
 .eyebrow{
   display:inline-flex;align-self:flex-start;font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--accent);margin-bottom:.7rem;padding:.3rem .65rem;border-radius:999px;
+  color:var(--accent);margin-bottom:.7rem;padding:.3rem .65rem;border-radius:${ctaStyle === "pill" ? "999px" : "6px"};
   border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
   background:color-mix(in srgb,var(--accent) 10%,transparent);
 }
-.hero h1{font-family:${displayFont};font-weight:${opts.identityLayout ? "800" : "600"};font-size:clamp(1.95rem,4.2vw,2.85rem);letter-spacing:-.035em;line-height:1.06;margin:0 0 .7rem}
-.accent-line{display:block;color:var(--accent);font-style:${opts.identityLayout ? "normal" : "italic"};font-weight:${opts.identityLayout ? "800" : "500"};margin-top:.08em}
+.hero h1{font-family:${displayFont};font-weight:${opts.identityLayout || density === "high" ? "800" : "600"};font-size:clamp(1.95rem,4.2vw,2.85rem);letter-spacing:-.035em;line-height:1.06;margin:0 0 .7rem}
+.accent-line{display:block;color:var(--accent);font-style:${opts.identityLayout || density === "high" ? "normal" : "italic"};font-weight:${opts.identityLayout ? "800" : "500"};margin-top:.08em}
 .lead{font-size:1.02rem;color:var(--muted);margin-bottom:.85rem;font-weight:450;max-width:34rem;line-height:1.5}
 .meta-line{font-size:.84rem;color:var(--muted);margin-bottom:1rem;opacity:.85}
 .cta-row{display:flex;flex-wrap:wrap;gap:.65rem}
 .btn{
   display:inline-flex;align-items:center;justify-content:center;
   background:var(--accent);color:var(--cta-ink);font-weight:800;font-size:.92rem;
-  padding:.82rem 1.15rem;border-radius:${opts.identityLayout ? "6px" : "999px"};border:0;
-  box-shadow:0 8px 28px color-mix(in srgb,var(--accent) 22%,transparent);
-  transition:transform .18s ease;
+  padding:.82rem 1.15rem;border-radius:var(--btn-radius);border:0;
+  box-shadow:${softShadow ? "0 8px 28px color-mix(in srgb,var(--accent) 22%,transparent)" : "none"};
+  transition:transform .18s ease,box-shadow .18s ease;
 }
 .btn:hover{transform:translateY(-1px)}
 .btn-ghost{background:transparent;color:var(--paper);border:1px solid var(--line);box-shadow:none}
-.section{padding:2.75rem 0}
+.section{padding:var(--section-pad) 0}
 .section + .section{border-top:1px solid var(--line)}
 .section-kicker{font-size:.68rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.55rem}
 .section h2.display{font-size:clamp(1.55rem,3vw,2.15rem);max-width:20ch;margin-bottom:1.15rem;color:var(--paper)}
 .metrics{
   display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;
-  margin-top:1.15rem;border:1px solid var(--line);border-radius:1rem;overflow:hidden;
-  background:var(--card-bg);
+  margin-top:1.15rem;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+  background:var(--card-bg);${cardBlur}
 }
 .metric{padding:.85rem .9rem;border-right:1px solid var(--line)}
 .metric:last-child{border-right:0}
@@ -533,46 +724,47 @@ a{color:inherit;text-decoration:none}
 .pain-list{list-style:none;display:grid;gap:.65rem;grid-template-columns:1fr 1fr}
 .pain-item{
   display:grid;grid-template-columns:auto 1fr;gap:.65rem;align-items:start;
-  padding:.95rem 1rem;border-radius:1rem;border:1px solid var(--card-border);
-  background:var(--card-bg);
+  padding:.95rem 1rem;border-radius:var(--radius);border:1px solid var(--card-border);
+  background:var(--card-bg);${cardBlur}box-shadow:var(--shadow);
 }
 .pain-item .num{font-family:${displayFont};color:var(--accent);font-size:.95rem;line-height:1.2}
-.pain-item p{font-weight:550;font-size:.95rem;line-height:1.4}
+.pain-item p{font-weight:550;font-size:.95rem;line-height:1.4;color:var(--paper)}
 .grid-4{display:grid;gap:.85rem;grid-template-columns:repeat(4,minmax(0,1fr))}
 .card{
-  padding:1.15rem 1.05rem;border-radius:1rem;border:1px solid var(--card-border);
-  background:var(--card-bg);
+  padding:1.15rem 1.05rem;border-radius:var(--radius);border:1px solid var(--card-border);
+  background:var(--card-bg);${cardBlur}box-shadow:var(--shadow);
 }
 .card h3,.pillar h3,.step h3{font-size:1.02rem;font-weight:700;margin-bottom:.35rem;letter-spacing:-.02em;color:var(--paper)}
 .card p,.pillar p,.step p,.faq-item p{color:var(--muted);font-size:.88rem;font-weight:450;line-height:1.45}
-.pain-item p{font-weight:550;font-size:.95rem;line-height:1.4;color:var(--paper)}
 .steps{list-style:none;display:grid;gap:.75rem;grid-template-columns:repeat(3,minmax(0,1fr))}
 .step{
   display:grid;gap:.65rem;align-content:start;
-  padding:1.1rem 1rem;border-radius:1rem;border:1px solid var(--card-border);
-  background:var(--card-bg);
+  padding:1.1rem 1rem;border-radius:var(--radius);border:1px solid var(--card-border);
+  background:var(--card-bg);${cardBlur}
 }
 .step-n{
-  width:2.2rem;height:2.2rem;border-radius:999px;display:grid;place-items:center;
+  width:2.2rem;height:2.2rem;border-radius:${ctaStyle === "pill" ? "999px" : "6px"};display:grid;place-items:center;
   font-family:${displayFont};font-weight:600;font-size:.95rem;background:var(--accent);color:var(--cta-ink);
 }
 .pillars{display:grid;gap:.85rem;grid-template-columns:repeat(3,minmax(0,1fr))}
-.pillar{padding:1.15rem 1.05rem;border-radius:1rem;background:var(--card-bg);border:1px solid color-mix(in srgb,var(--accent) 16%,transparent)}
+.pillar{padding:1.15rem 1.05rem;border-radius:var(--radius);background:var(--card-bg);border:1px solid color-mix(in srgb,var(--accent) 16%,transparent);${cardBlur}}
 .angle-list{list-style:none;display:grid;gap:.65rem;grid-template-columns:1fr 1fr}
-.angle-list li{display:flex;gap:.65rem;align-items:flex-start;padding:.9rem 1rem;border-radius:.9rem;border:1px solid var(--card-border);background:var(--card-bg);font-weight:550;font-size:.92rem;line-height:1.4;color:var(--paper)}
+.angle-list li{display:flex;gap:.65rem;align-items:flex-start;padding:.9rem 1rem;border-radius:var(--radius);border:1px solid var(--card-border);background:var(--card-bg);font-weight:550;font-size:.92rem;line-height:1.4;color:var(--paper);${cardBlur}}
 .angle-list .ico{color:var(--accent);margin-top:.12rem}
 .bottom-grid{display:grid;gap:1.25rem;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);align-items:stretch}
 .offer{
-  padding:1.75rem;border-radius:1.25rem;height:100%;
+  padding:1.75rem;border-radius:var(--radius);height:100%;
   display:flex;flex-direction:column;justify-content:center;
   background:
     radial-gradient(90% 120% at 100% 0%,color-mix(in srgb,var(--accent) 20%,transparent),transparent 55%),
     linear-gradient(135deg,var(--deep),var(--ink));
   border:1px solid color-mix(in srgb,var(--accent) 20%,transparent);
+  ${glass ? "backdrop-filter:blur(12px);" : ""}
+  box-shadow:var(--shadow);
 }
 .offer h2{margin-bottom:.75rem}
 .offer p{color:var(--muted);margin:0 0 1.15rem;max-width:36rem;font-size:.95rem}
-.faq-item{border:1px solid var(--card-border);border-radius:.85rem;padding:.85rem 1rem;background:var(--card-bg);margin-bottom:.5rem}
+.faq-item{border:1px solid var(--card-border);border-radius:var(--radius);padding:.85rem 1rem;background:var(--card-bg);margin-bottom:.5rem;${cardBlur}}
 .faq-item summary{cursor:pointer;font-weight:650;list-style:none;font-size:.95rem;color:var(--paper)}
 .faq-item summary::-webkit-details-marker{display:none}
 .faq-item p{margin-top:.55rem}
@@ -594,109 +786,7 @@ footer{padding:1.5rem 0 2rem;border-top:1px solid var(--line);color:var(--muted)
 </head>
 <body>
 <div class="topbar"><div class="wrap brand">${logo}<a class="nav-cta" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a></div></div>
-<header class="hero">
-  <div class="wrap hero-grid">
-    <div class="hero-inner">
-      ${copy.eyebrow ? `<div class="eyebrow">${esc(cleanPublicText(copy.eyebrow))}</div>` : ""}
-      <h1>${esc(head.main).replace(/\n/g, "<br/>")}<span class="accent-line">${esc(head.accent)}</span></h1>
-      <p class="lead">${esc(cleanPublicText(copy.subheadline))}</p>
-      ${
-        copy.audience || copy.differentiator
-          ? `<p class="meta-line">${esc(
-              [cleanPublicText(copy.audience), cleanPublicText(copy.differentiator)]
-                .filter(Boolean)
-                .join(" · ")
-            )}</p>`
-          : ""
-      }
-      <div class="cta-row">
-        <a class="btn" href="${esc(ctaHref)}">${esc(ctaPrimary)}</a>
-        <a class="btn btn-ghost" href="#dor">${esc(cleanPublicText(copy.hero_cta_secondary) || "Ver o problema")}</a>
-      </div>
-      ${metrics ? `<div class="metrics">${metrics}</div>` : ""}
-    </div>
-    ${heroMedia}
-  </div>
-</header>
-
-<section class="section pain" id="dor">
-  <div class="wrap pain-split">
-    <div>
-      <p class="section-kicker">O problema</p>
-      <h2 class="display">${esc(cleanPublicText(copy.pain_title) || "Isso ainda trava a sua operacao?")}</h2>
-    </div>
-    <ul class="pain-list">${pains}</ul>
-  </div>
-</section>
-
-${
-  benefits
-    ? `<section class="section" id="solucao">
-  <div class="wrap">
-    <p class="section-kicker">A solução</p>
-    <h2 class="display">${esc(cleanPublicText(copy.solution_title) || "O que muda na prática")}</h2>
-    <div class="grid-4">${benefits}</div>
-  </div>
-</section>`
-    : ""
-}
-
-${
-  steps
-    ? `<section class="section" id="como">
-  <div class="wrap">
-    <p class="section-kicker">Como funciona</p>
-    <h2 class="display">${esc(cleanPublicText(copy.how_title) || "Do caos ao controle")}</h2>
-    <ol class="steps">${steps}</ol>
-  </div>
-</section>`
-    : ""
-}
-
-${
-  pillars
-    ? `<section class="section" id="pilares">
-  <div class="wrap">
-    <p class="section-kicker">Por que escolhem</p>
-    <h2 class="display">${esc(cleanPublicText(copy.pillars_title) || "Pilares do produto")}</h2>
-    <div class="pillars">${pillars}</div>
-  </div>
-</section>`
-    : ""
-}
-
-${
-  angles
-    ? `<section class="section" id="angulos">
-  <div class="wrap">
-    <p class="section-kicker">Mensagens que convertem</p>
-    <h2 class="display">${esc(cleanPublicText(copy.angles_title) || "O que o mercado responde")}</h2>
-    <ul class="angle-list">${angles}</ul>
-  </div>
-</section>`
-    : ""
-}
-
-<section class="section" id="oferta">
-  <div class="wrap bottom-grid">
-    ${
-      faq
-        ? `<div id="faq">
-    <p class="section-kicker">Duvidas</p>
-    <h2 class="display">${esc(cleanPublicText(copy.faq_title) || "Perguntas frequentes")}</h2>
-    ${faq}
-  </div>`
-        : "<div></div>"
-    }
-    <div class="offer" id="contato">
-      <p class="section-kicker">Proximo passo</p>
-      <h2 class="display">${esc(shortTitle(copy.offer_title, 48) || "Peca uma demonstracao")}</h2>
-      <p>${esc(cleanPublicText(copy.offer_body))}</p>
-      <a class="btn" href="${esc(ctaHref)}">${esc(ctaFinal)}</a>
-      <span class="hint">${esc(cleanPublicText(copy.whatsapp_hint))}</span>
-    </div>
-  </div>
-</section>
+${bodySections}
 <footer><div class="wrap">${esc(copy.brand_name)}</div></footer>
 </body>
 </html>`;
@@ -1025,6 +1115,7 @@ JSON estrito.`,
     ctaUrl: resolveCtaUrl(ctx, copy),
     concorrentes: [],
     identityLayout,
+    landingSystem: identityLandingSystem(identityModel || undefined),
   });
 
   return {

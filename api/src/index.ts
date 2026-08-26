@@ -16,6 +16,7 @@ import { startCronJob } from "./services/cron.js";
 import { getLocalUploadsDir } from "./services/storage.js";
 
 import { extractBrandFromUrl } from "./services/brandFromUrl.js";
+import { captureDesignSystem } from "./services/siteCapture.js";
 import { getUserId, getWorkspaceForUser, publicWorkspace } from "./services/authHelpers.js";
 import { query } from "./db/index.js";
 
@@ -64,6 +65,31 @@ async function build() {
         ]);
         const fresh = await getWorkspaceForUser(getUserId(req));
         return { workspace: publicWorkspace(fresh), brand_kit: merged };
+      } catch (err) {
+        return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  );
+
+  app.post<{ Body: { url?: string } }>(
+    "/api/tools/capture-site",
+    {
+      preHandler: async (req, reply) => {
+        try {
+          await req.jwtVerify();
+        } catch {
+          return reply.status(401).send({ error: "Não autenticado." });
+        }
+      },
+    },
+    async (req, reply) => {
+      const ws = await getWorkspaceForUser(getUserId(req));
+      if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
+      const url = req.body?.url?.trim();
+      if (!url) return reply.status(400).send({ error: "Informe a URL pública." });
+      try {
+        const capture = await captureDesignSystem(url);
+        return { capture };
       } catch (err) {
         return reply.status(400).send({ error: err instanceof Error ? err.message : String(err) });
       }

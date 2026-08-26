@@ -232,7 +232,7 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
-      const { model, css } = await generateCampaignIdentity({
+      const { model, css, captures } = await generateCampaignIdentity({
         ctx: campaignCtx(campaign, ws.ig_username),
         report: research.rows[0].report,
         strategy: strategy.rows[0].plan,
@@ -242,7 +242,16 @@ export const campaignRoutes: FastifyPluginAsync = async (app) => {
       });
       const identity = await saveActiveIdentity(id, model, css, "generated");
       await query(`UPDATE campaigns SET status = 'active', updated_at = NOW() WHERE id = $1`, [id]);
-      return { identity };
+      return {
+        identity,
+        captures: captures.map((c) => ({
+          url: c.source_url,
+          ok: c.ok,
+          error: c.error || null,
+          mood: c.mood,
+          colors: c.tokens.colors.slice(0, 6),
+        })),
+      };
     } catch (err) {
       return reply.status(500).send({ error: err instanceof Error ? err.message : String(err) });
     }

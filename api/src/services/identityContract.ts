@@ -104,11 +104,28 @@ export function identityContextForLlm(model: IdentityModel | null | undefined): 
     color_list: identityColors(model).slice(0, 10),
     image_treatment: model.image_treatment ?? null,
     landing_page_style_spec: model.landing_page_style_spec ?? null,
+    landing_system: model.landing_system ?? null,
     do: doList.slice(0, 16),
     dont: dontList.slice(0, 16),
     generation_prompt: String(model.generation_prompt || model.positive_prompt || "").slice(0, 2200),
     negative_prompt: String(model.negative_prompt || "").slice(0, 1400),
   };
+}
+
+export type LandingSystem = {
+  theme?: "dark" | "light";
+  tokens?: Partial<Record<"accent" | "deep" | "ink" | "surface" | "text", string>>;
+  hero_recipe?: string;
+  section_order?: string[];
+  effects?: string[];
+  typography?: { display?: string; body?: string };
+  density?: string;
+  cta_style?: string;
+};
+
+export function identityLandingSystem(model: IdentityModel | null | undefined): LandingSystem | null {
+  if (!model?.landing_system || typeof model.landing_system !== "object") return null;
+  return model.landing_system as LandingSystem;
 }
 
 export function identityPromptBlock(model: IdentityModel | null | undefined): string {
