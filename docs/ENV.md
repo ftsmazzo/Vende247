@@ -42,7 +42,7 @@ APIFY_TOKEN=
 | `OR_COMPARE_MODELS` | não | (4 modelos acima) | A/B em Criativos → “Testar modelos” |
 | `GEMINI_IMAGE_MODEL` | não | `gemini-3.1-flash-image` | Nano Banana 2; ou `imagen-4.0-generate-001` |
 | `KAIROGEN_ACCESS_TOKEN` | alt | — | Bearer OAuth se `IMAGE_PROVIDER=kairogen` (ou `KAIROGEN_API_KEY`) |
-| `KAIROGEN_REFRESH_TOKEN` | alt | — | Renova o access (~8h); client `kairogen-mcp` |
+| `KAIROGEN_REFRESH_TOKEN` | alt | — | Renova o access (~8h). A API grava tokens renovados em `app_secrets` (Postgres) — não precisa colar de novo a cada expiração |
 | `KAIROGEN_IMAGE_MODEL` | não | `nano-banana-pro` | Default; alt: `nano-banana`, `flux-2-pro`, `seedream-v4-5` |
 | `KAIROGEN_MODEL_PHOTO` | não | (IMAGE_MODEL) | Hero LP |
 | `KAIROGEN_MODEL_COVER` | não | (IMAGE_MODEL) | Criativo feed |

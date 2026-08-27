@@ -1,11 +1,15 @@
 /**
  * Cliente HTTP Kairogen (api.kairogen.ai).
  * Auth: Bearer OAuth (access + refresh via client_id kairogen-mcp).
+ * Tokens renovados são persistidos em app_secrets (Postgres) para sobreviver a restart.
  * Geração: POST /generations { model, params: { prompt, aspect_ratio, images? } }
  */
 
+import { getPool, query } from "../db/index.js";
+
 const DEFAULT_BASE = "https://api.kairogen.ai";
 const CLIENT_ID = "kairogen-mcp";
+const SECRET_KEY = "kairogen_oauth";
 
 type TokenBundle = {
   access_token: string;
@@ -14,9 +18,26 @@ type TokenBundle = {
 };
 
 let memoryTokens: TokenBundle | null = null;
+let loadPromise: Promise<void> | null = null;
+let refreshLock: Promise<TokenBundle> | null = null;
 
 function apiBase() {
   return (process.env.KAIROGEN_API_BASE?.trim() || DEFAULT_BASE).replace(/\/$/, "");
+}
+
+function jwtExpiresAt(accessToken: string): number | undefined {
+  try {
+    const part = accessToken.split(".")[1];
+    if (!part) return undefined;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const payload = JSON.parse(Buffer.from(pad, "base64").toString("utf8")) as {
+      exp?: number;
+    };
+    return typeof payload.exp === "number" ? payload.exp * 1000 : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function loadEnvTokens(): TokenBundle | null {
@@ -26,70 +47,151 @@ function loadEnvTokens(): TokenBundle | null {
     "";
   if (!access) return null;
   const refresh = process.env.KAIROGEN_REFRESH_TOKEN?.trim() || undefined;
-  return { access_token: access, refresh_token: refresh };
+  return {
+    access_token: access,
+    refresh_token: refresh,
+    expires_at: jwtExpiresAt(access),
+  };
 }
 
-function currentTokens(): TokenBundle {
-  if (memoryTokens?.access_token) return memoryTokens;
-  const fromEnv = loadEnvTokens();
-  if (!fromEnv) {
-    throw new Error(
-      "KAIROGEN_ACCESS_TOKEN (ou KAIROGEN_API_KEY) não configurada. Conecte via OAuth device flow."
+async function loadDbTokens(): Promise<TokenBundle | null> {
+  if (!getPool()) return null;
+  try {
+    const r = await query<{ value: TokenBundle }>(
+      `SELECT value FROM app_secrets WHERE key = $1`,
+      [SECRET_KEY]
     );
+    const v = r.rows[0]?.value;
+    if (!v?.access_token) return null;
+    return {
+      access_token: String(v.access_token),
+      refresh_token: v.refresh_token ? String(v.refresh_token) : undefined,
+      expires_at:
+        typeof v.expires_at === "number" ? v.expires_at : jwtExpiresAt(String(v.access_token)),
+    };
+  } catch (err) {
+    console.warn("[kairogen] falha ao ler app_secrets:", err);
+    return null;
   }
-  memoryTokens = fromEnv;
-  return memoryTokens;
+}
+
+async function saveTokens(tok: TokenBundle): Promise<void> {
+  memoryTokens = tok;
+  process.env.KAIROGEN_ACCESS_TOKEN = tok.access_token;
+  if (tok.refresh_token) process.env.KAIROGEN_REFRESH_TOKEN = tok.refresh_token;
+
+  if (!getPool()) return;
+  try {
+    await query(
+      `INSERT INTO app_secrets (key, value, updated_at)
+       VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (key) DO UPDATE
+         SET value = EXCLUDED.value, updated_at = NOW()`,
+      [
+        SECRET_KEY,
+        JSON.stringify({
+          access_token: tok.access_token,
+          refresh_token: tok.refresh_token || null,
+          expires_at: tok.expires_at || null,
+        }),
+      ]
+    );
+  } catch (err) {
+    console.warn("[kairogen] falha ao gravar app_secrets:", err);
+  }
+}
+
+async function ensureTokensLoaded(): Promise<void> {
+  if (memoryTokens?.access_token) return;
+  if (!loadPromise) {
+    loadPromise = (async () => {
+      const fromDb = await loadDbTokens();
+      const fromEnv = loadEnvTokens();
+      // Prefere DB (refresh mais novo) se existir; senão seed a partir do env.
+      if (fromDb?.access_token) {
+        memoryTokens = fromDb;
+        // Se env tem refresh e DB não, completa
+        if (!memoryTokens.refresh_token && fromEnv?.refresh_token) {
+          memoryTokens.refresh_token = fromEnv.refresh_token;
+          await saveTokens(memoryTokens);
+        }
+      } else if (fromEnv?.access_token) {
+        await saveTokens(fromEnv);
+      }
+    })().finally(() => {
+      loadPromise = null;
+    });
+  }
+  await loadPromise;
+}
+
+async function currentTokens(): Promise<TokenBundle> {
+  await ensureTokensLoaded();
+  if (memoryTokens?.access_token) return memoryTokens;
+  throw new Error(
+    "KAIROGEN_ACCESS_TOKEN (ou KAIROGEN_API_KEY) não configurada. Conecte via OAuth device flow."
+  );
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<TokenBundle> {
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-    client_id: CLIENT_ID,
-  });
-  const res = await fetch(`${apiBase()}/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  const json = (await res.json()) as {
-    access_token?: string;
-    refresh_token?: string;
-    expires_in?: number;
-    error?: string;
-    error_description?: string;
-    message?: string;
-  };
-  if (!res.ok || !json.access_token) {
-    throw new Error(
-      json.error_description ||
-        json.message ||
-        json.error ||
-        `Kairogen refresh HTTP ${res.status}`
+  if (refreshLock) return refreshLock;
+  refreshLock = (async () => {
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: CLIENT_ID,
+    });
+    const res = await fetch(`${apiBase()}/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    const json = (await res.json()) as {
+      access_token?: string;
+      refresh_token?: string;
+      expires_in?: number;
+      error?: string;
+      error_description?: string;
+      message?: string;
+    };
+    if (!res.ok || !json.access_token) {
+      throw new Error(
+        json.error_description ||
+          json.message ||
+          json.error ||
+          `Kairogen refresh HTTP ${res.status}`
+      );
+    }
+    const next: TokenBundle = {
+      access_token: json.access_token,
+      refresh_token: json.refresh_token || refreshToken,
+      expires_at:
+        jwtExpiresAt(json.access_token) ||
+        Date.now() + (json.expires_in ?? 28800) * 1000,
+    };
+    await saveTokens(next);
+    console.log(
+      "[kairogen] token renovado; expira em",
+      next.expires_at ? new Date(next.expires_at).toISOString() : "?"
     );
-  }
-  const next: TokenBundle = {
-    access_token: json.access_token,
-    refresh_token: json.refresh_token || refreshToken,
-    expires_at: Date.now() + (json.expires_in ?? 28800) * 1000,
-  };
-  memoryTokens = next;
-  // Mantém process.env atualizado nesta instância (EasyPanel precisa reiniciar p/ persistir)
-  process.env.KAIROGEN_ACCESS_TOKEN = next.access_token;
-  if (next.refresh_token) process.env.KAIROGEN_REFRESH_TOKEN = next.refresh_token;
-  return next;
+    return next;
+  })().finally(() => {
+    refreshLock = null;
+  });
+  return refreshLock;
 }
 
-async function authHeaders(forceRefresh = false): Promise<Record<string, string>> {
-  let tok = currentTokens();
-  if (forceRefresh && tok.refresh_token) {
-    tok = await refreshAccessToken(tok.refresh_token);
-  } else if (
-    tok.refresh_token &&
-    tok.expires_at &&
-    tok.expires_at < Date.now() + 60_000
-  ) {
-    tok = await refreshAccessToken(tok.refresh_token);
+async function authHeaders(): Promise<Record<string, string>> {
+  let tok = await currentTokens();
+  const skew = 5 * 60_000; // renova 5 min antes
+  if (tok.refresh_token && (!tok.expires_at || tok.expires_at < Date.now() + skew)) {
+    try {
+      tok = await refreshAccessToken(tok.refresh_token);
+    } catch (err) {
+      // Se ainda parece válido, tenta seguir; senão propaga
+      if (!tok.expires_at || tok.expires_at < Date.now()) throw err;
+      console.warn("[kairogen] refresh antecipado falhou, usando access atual:", err);
+    }
   }
   return {
     Authorization: `Bearer ${tok.access_token}`,
@@ -105,7 +207,7 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   };
   const res = await fetch(`${apiBase()}${path}`, { ...init, headers });
   if (res.status === 401) {
-    const tok = currentTokens();
+    const tok = await currentTokens();
     if (tok.refresh_token) {
       await refreshAccessToken(tok.refresh_token);
       const headers2 = {
@@ -117,18 +219,6 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   }
   return res;
 }
-
-export type KairogenGenerateOpts = {
-  model?: string;
-  prompt: string;
-  aspectRatio?: string;
-  /** URLs públicas — ativa modo Editar (img2img) nos modelos com support */
-  referenceImageUrls?: string[];
-  numImages?: number;
-  resolution?: string;
-  negativePrompt?: string;
-  timeoutMs?: number;
-};
 
 type GenerationStatus = {
   generationId: string;
