@@ -230,13 +230,27 @@ type GenerationStatus = {
 
 function kairogenModelForPurpose(purpose?: string): string {
   const p = (purpose || "cover").toLowerCase();
+  // gpt-image-2: melhor tipografia PT no criativo IG (texto na arte).
+  // flux/seedream: foto/hero. nano-banana: volume barato / edit.
   if (p === "photo") {
-    return process.env.KAIROGEN_MODEL_PHOTO?.trim() || process.env.KAIROGEN_IMAGE_MODEL?.trim() || "nano-banana-pro";
+    return (
+      process.env.KAIROGEN_MODEL_PHOTO?.trim() ||
+      process.env.KAIROGEN_IMAGE_MODEL?.trim() ||
+      "flux-2-pro"
+    );
   }
   if (p === "draft" || p === "volume") {
-    return process.env.KAIROGEN_MODEL_VOLUME?.trim() || process.env.KAIROGEN_IMAGE_MODEL?.trim() || "nano-banana";
+    return (
+      process.env.KAIROGEN_MODEL_VOLUME?.trim() ||
+      process.env.KAIROGEN_IMAGE_MODEL?.trim() ||
+      "gpt-image-2"
+    );
   }
-  return process.env.KAIROGEN_MODEL_COVER?.trim() || process.env.KAIROGEN_IMAGE_MODEL?.trim() || "nano-banana-pro";
+  return (
+    process.env.KAIROGEN_MODEL_COVER?.trim() ||
+    process.env.KAIROGEN_IMAGE_MODEL?.trim() ||
+    "gpt-image-2"
+  );
 }
 
 async function pollGeneration(
@@ -287,6 +301,11 @@ export async function bufferFromKairogen(
     numImages: 1,
   };
   if (refs.length) params.images = refs;
+  // Tipografia legível em criativos IG (modelos GPT Image no Kairogen)
+  const purpose = (opts?.purpose || "cover").toLowerCase();
+  if (/gpt-image/i.test(model)) {
+    params.quality = purpose === "draft" || purpose === "volume" ? "medium" : "high";
+  }
 
   const body = { model, params };
   const res = await apiFetch("/generations", {

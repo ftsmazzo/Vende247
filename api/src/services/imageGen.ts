@@ -110,14 +110,14 @@ async function bufferFromOpenAIGenerate(
 
 /** Sufixos de diversidade (ângulo / luz / locação) — evita lote “tudo igual”. */
 const DIVERSITY_SHOTS = [
-  "wide establishing shot, soft morning window light",
-  "medium shot, eye-level, gentle natural daylight",
-  "close-up on hands and product details, shallow depth of field",
-  "slight low angle, warm side light, high contrast",
-  "documentary candid, over-the-shoulder quiet moment",
-  "two-shot conversation, natural colors, authentic lifestyle",
-  "top-down / flat lay of journal pages, coffee and soft props",
-  "golden hour outdoor portrait, calm and warm tones",
+  "tight medium portrait, shallow depth, rim light from warehouse LED",
+  "over-the-shoulder looking at tablet, face half-lit, documentary grit",
+  "low angle hero of worker mid-action, dramatic industrial contrast",
+  "close-up gloved hands + device screen glow, bokeh factory background",
+  "two-shot conversation on shop floor, natural hard-hat authenticity",
+  "wide aisle establishing shot, subject walking with purpose, cool teal grade",
+  "eye-level candid pause, soft side light, real PPE textures sharp",
+  "slight dutch energy, motion blur background, subject locked sharp",
 ];
 
 export function diversityShot(index = 0): string {
@@ -339,6 +339,7 @@ function buildPrompt(
     hook?: string;
     identityPositive?: string;
     identityNegative?: string;
+    hasReferenceImages?: boolean;
   }
 ): string {
   const shot = diversityShot(extras?.diversityIndex ?? 0);
@@ -380,25 +381,38 @@ function buildPrompt(
       .filter(Boolean)
       .join(" ");
   }
+
+  const hookLine = (extras?.hook || "").trim().slice(0, 72);
+  const hasRefs = Boolean(extras?.hasReferenceImages);
+
+  // Criativo IG: texto NA imagem (padrão feed), mas layout limpo — sem “Canva inventado”.
   return [
-    "Instagram ad creative 4:5 portrait FULL BLEED edge-to-edge, no letterboxing, no black bars, no outer frame,",
-    "scroll-stopping, vivid colors, emotional impact,",
-    "SAFE ZONE: keep ALL text and faces inside a 12% margin from every edge — nothing important near the border,",
-    "bold short Portuguese hook (3–6 words) in the UPPER-CENTER, fully readable, large clean sans typography,",
-    "photorealistic scene matching the product niche (people + product in use) — follow brand mood if given,",
-    `UNIQUE SHOT THIS IMAGE: ${shot} — must look different from other ads in the same campaign.`,
-    "FORBIDDEN: smartphone mockups, fake app dashboards, invented UI, dark mats, widescreen bars,",
+    hasRefs
+      ? "EDIT the reference photo(s) into a premium Instagram feed ad creative 4:5."
+      : "Create a premium Instagram feed ad creative 4:5 portrait, FULL BLEED edge-to-edge.",
+    "This is a finished social ad people post AS-IS — hook text MUST be painted into the image (not a raw photo).",
+    "LAYOUT RULES (strict):",
+    "- ONE short Portuguese hook only (3–7 words), huge bold sans, high contrast, upper third.",
+    hookLine ? `- Exact hook text to render: \"${hookLine}\"` : "- Use the Portuguese hook implied by the brief.",
+    "- Optional one tiny subline under the hook (max 8 words) OR none — never paragraphs.",
+    "- Photoreal cinematic scene is 70% of the frame; typography is 30% graphic design, not a document.",
+    "- Dark navy / deep teal industrial grade when SST/EPI; crisp edges, magazine ad finish.",
+    `Camera / mood: ${shot}.`,
+    "FORBIDDEN (causes cheap AI ads):",
+    "- multi-card grids, numbered feature boxes (01/02/03), list layouts, FAQ blocks,",
+    "- fake mobile UI chrome, invented dashboards as stickers, big CTA banners with arrows,",
+    "- watermark stamps, logo walls, barcode, QR, collages of 3+ panels,",
+    "- tiny unreadable text, text cut at edges, comic speech bubbles.",
+    "ALLOWED on device screens: a subtle real product UI glow — never a full fake app redesign filling the frame.",
+    "Leave a clean corner bottom-left for a small logo overlay later.",
     industrial
-      ? "REQUIRED: industrial SST/EPI workplace authenticity. FORBIDDEN: Bible, planner journal, faith lifestyle, beige cozy morning."
-      : "FORBIDDEN: industrial PPE/hard hats/factory as default filler unless niche lock is industrial EPI/SST. FORBIDDEN: Bible/faith props unless niche is faith.",
-    "FORBIDDEN: text cut off, text overflowing edges, tiny unreadable type, watermark stamps,",
-    "leave small clean space bottom-left for logo overlay only,",
-    "no watermarks, no invented brand logos in the scene.",
+      ? "REQUIRED authenticity: real SST/EPI workplace people + gear. FORBIDDEN: Bible, planner, faith lifestyle, beige cozy."
+      : "Match the product niche; do not default to hard hats unless niche is industrial safety.",
     brandPromptBits(brand),
     pos,
     neg,
     cue,
-    locked.slice(0, 1800),
+    locked.slice(0, 1600),
   ]
     .filter(Boolean)
     .join(" ");
@@ -424,6 +438,7 @@ export async function gerarImagemViral(
     hook: opts?.hook,
     identityPositive: opts?.identityPositive,
     identityNegative: opts?.identityNegative,
+    hasReferenceImages: Boolean(opts?.referenceImageUrls?.length),
   });
 
   let buffer: Buffer;
