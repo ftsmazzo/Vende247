@@ -219,8 +219,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       const visualRaw =
         post.visual_prompt ||
         `Viral Instagram creative about ${ctx.produto}. Hook text: "${post.hook}". Niche: ${ctx.nicho}.`;
-      const visual = lockVisualToNiche(visualRaw, niche, brand, post.hook, dayIdx);
       const dayIdx = Math.max(0, (post.day || 1) - 1);
+      const visual = lockVisualToNiche(visualRaw, niche, brand, post.hook, dayIdx);
       const researchCue =
         researchCues[dayIdx % Math.max(researchCues.length, 1)] || undefined;
 
