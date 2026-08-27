@@ -344,7 +344,13 @@ function buildPrompt(
 ): string {
   const shot = diversityShot(extras?.diversityIndex ?? 0);
   const locked = extras?.niche
-    ? lockVisualToNiche(prompt, extras.niche, brand, extras.hook)
+    ? lockVisualToNiche(
+        prompt,
+        extras.niche,
+        brand,
+        extras.hook,
+        extras.diversityIndex ?? 0
+      )
     : prompt;
   const cue = extras?.researchCue?.trim()
     ? `Visual inspiration (mood only, do not copy a brand): ${extras.researchCue.trim().slice(0, 180)}.`

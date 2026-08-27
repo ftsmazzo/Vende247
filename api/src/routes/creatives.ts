@@ -38,12 +38,24 @@ function nicheFromCampaign(scope: CampaignScope) {
   };
 }
 
-function identityImageOpts(scope: CampaignScope) {
+function identityImageOpts(
+  scope: CampaignScope,
+  opts?: { diversityIndex?: number; allowRefs?: boolean }
+) {
   const h = identityGenerationHints(scope.identity?.model);
-  const refs =
-    (process.env.IMAGE_PROVIDER ?? "").toLowerCase() === "kairogen"
+  // Refs iguais em todo post → banana-edit clona a mesma foto (lote “tudo igual”).
+  // Só usa banco se KAIROGEN_USE_IMAGE_REFS=true; senão gpt-image-2 gera cena nova.
+  const useRefs =
+    opts?.allowRefs === true ||
+    (process.env.KAIROGEN_USE_IMAGE_REFS || "").toLowerCase() === "true";
+  const allRefs =
+    useRefs && (process.env.IMAGE_PROVIDER ?? "").toLowerCase() === "kairogen"
       ? identityReferenceImageUrls(scope.identity?.model)
       : [];
+  const refs =
+    allRefs.length > 1 && opts?.diversityIndex != null
+      ? [allRefs[Math.abs(opts.diversityIndex) % allRefs.length]]
+      : allRefs.slice(0, 1);
   return {
     identityPositive: h.positive || undefined,
     identityNegative: h.negative || undefined,
@@ -207,7 +219,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       const visualRaw =
         post.visual_prompt ||
         `Viral Instagram creative about ${ctx.produto}. Hook text: "${post.hook}". Niche: ${ctx.nicho}.`;
-      const visual = lockVisualToNiche(visualRaw, niche, brand, post.hook);
+      const visual = lockVisualToNiche(visualRaw, niche, brand, post.hook, dayIdx);
       const dayIdx = Math.max(0, (post.day || 1) - 1);
       const researchCue =
         researchCues[dayIdx % Math.max(researchCues.length, 1)] || undefined;
@@ -240,7 +252,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
               slides[i].visual_prompt,
               niche,
               brand,
-              slides[i].texto || post.hook
+              slides[i].texto || post.hook,
+              dayIdx * 5 + i
             );
             const url = await gerarImagemViral(slidePrompt, brand, {
               purpose: i === 0 ? "cover" : "volume",
@@ -251,7 +264,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
                 researchCue,
               niche,
               hook: slides[i].texto || post.hook,
-              ...idOpts,
+              ...identityImageOpts(scope, { diversityIndex: dayIdx * 5 + i }),
             });
             mediaUrls.push(url);
           }
@@ -265,7 +278,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             researchCue,
             niche,
             hook: post.hook,
-            ...idOpts,
+            ...identityImageOpts(scope, { diversityIndex: dayIdx }),
           });
           mediaUrls = mediaUrl ? [mediaUrl] : [];
         }
@@ -378,37 +391,39 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
         const existing = asUrlList(row.media_urls);
         const count = Math.max(existing.length, 4);
         for (let i = 0; i < count; i++) {
+          const div = id * 3 + i + (Date.now() % 7);
           const promptRaw =
             i === 0
               ? row.visual_prompt
-              : `${row.visual_prompt}. Carousel slide ${i + 1} of ${count}, different angle, bold Portuguese text related to "${row.hook}"`;
-          const prompt = lockVisualToNiche(promptRaw, niche, brand, row.hook);
+              : `${row.visual_prompt}. Carousel slide ${i + 1} of ${count}, different scene and angle, bold Portuguese text related to "${row.hook}"`;
+          const prompt = lockVisualToNiche(promptRaw, niche, brand, row.hook, div);
           mediaUrls.push(
             await gerarImagemViral(prompt, brand, {
               purpose: i === 0 ? "cover" : "volume",
               mode: "ad",
-              diversityIndex: id * 3 + i + Date.now() % 7,
+              diversityIndex: div,
               researchCue: researchCues[i % Math.max(researchCues.length, 1)],
               niche,
               hook: row.hook,
-              ...idOpts,
+              ...identityImageOpts(scope, { diversityIndex: div }),
             })
           );
         }
         mediaUrl = mediaUrls[0] || "";
       } else {
+        const div = id + (Date.now() % 8);
         mediaUrl = await gerarImagemViral(
-          lockVisualToNiche(row.visual_prompt, niche, brand, row.hook),
+          lockVisualToNiche(row.visual_prompt, niche, brand, row.hook, div),
           brand,
           {
             purpose: "cover",
             mode: "ad",
             aspectRatio: row.format === "reels" ? "9:16" : "4:5",
-            diversityIndex: id + (Date.now() % 8),
+            diversityIndex: div,
             researchCue: researchCues[0],
             niche,
             hook: row.hook,
-            ...idOpts,
+            ...identityImageOpts(scope, { diversityIndex: div }),
           }
         );
         mediaUrls = [mediaUrl];
@@ -467,21 +482,22 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
           scope.campaign.nicho,
           scope.campaign.produto
         );
-        const idOpts = identityImageOpts(scope);
+        const div = id + slideIndex * 2 + (Date.now() % 8);
         const prompt = lockVisualToNiche(
-          `${cur.rows[0].visual_prompt}. Carousel slide ${slideIndex + 1}, bold Portuguese hook "${cur.rows[0].hook}", unique composition`,
+          `${cur.rows[0].visual_prompt}. Carousel slide ${slideIndex + 1}, bold Portuguese hook "${cur.rows[0].hook}", unique composition and scene`,
           niche,
           brand,
-          cur.rows[0].hook
+          cur.rows[0].hook,
+          div
         );
         const newUrl = await gerarImagemViral(prompt, brand, {
           purpose: "volume",
           mode: "ad",
-          diversityIndex: id + slideIndex * 2 + (Date.now() % 8),
+          diversityIndex: div,
           researchCue: researchCues[slideIndex % Math.max(researchCues.length, 1)],
           niche,
           hook: cur.rows[0].hook,
-          ...idOpts,
+          ...identityImageOpts(scope, { diversityIndex: div }),
         });
         const next = [...urls];
         if (next.length === 0) next.push(newUrl);

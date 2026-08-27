@@ -13,11 +13,27 @@ const INDUSTRIAL_RE =
 const FAITH_RE =
   /\b(crist[aã]|devocional|b[ií]blia|ora[cç][aã]o|igreja|vers[ií]culo|quiet time|mulher crist[aã]|planner crist[aã]|planner mulher)\b/i;
 
-export function isIndustrialNiche(ctx: NicheCtx | { nicho: string; produto: string; oferta?: string }): boolean {
+/** Cenas industriais distintas — evita “sempre o mesmo técnico + tablet”. */
+const INDUSTRIAL_SCENES = [
+  "PPE delivery desk: gloved hands scanning tags, crates of safety gear, documentary close-up",
+  "morning admission desk: clerk at computer station, badge printer, queue soft-focus behind",
+  "auditor walkthrough: safety lead with checklist board, plant aisle blurred",
+  "toolbox talk: 3–4 workers listening under shed light, tablet only briefly visible",
+  "evidence moment: worker taking timestamped PPE photo on phone, racking behind",
+  "control room: dual monitors with charts, cool teal ambient — no fake UI stickers",
+  "loading dock: supervisor with radio, trucks/doors, cinematic wide shot",
+  "hands-only macro: EPI gloves packing labeled kit, no faces",
+];
+
+export function isIndustrialNiche(
+  ctx: NicheCtx | { nicho: string; produto: string; oferta?: string }
+): boolean {
   return INDUSTRIAL_RE.test(`${ctx.nicho} ${ctx.produto} ${ctx.oferta || ""}`);
 }
 
-export function isFaithLifestyleNiche(ctx: NicheCtx | { nicho: string; produto: string; oferta?: string }): boolean {
+export function isFaithLifestyleNiche(
+  ctx: NicheCtx | { nicho: string; produto: string; oferta?: string }
+): boolean {
   return FAITH_RE.test(`${ctx.nicho} ${ctx.produto} ${ctx.oferta || ""}`) && !isIndustrialNiche(ctx);
 }
 
@@ -32,26 +48,32 @@ export function filterResearchCues(cues: string[], ctx: NicheCtx): string[] {
 
 /**
  * Trava o prompt no nicho da campanha.
- * Industrial/SST → operação real. Faith só se briefing for fé. Sem misturar.
+ * Industrial: operação real + cena rotativa (diversityIndex).
  */
 export function lockVisualToNiche(
   prompt: string,
   ctx: NicheCtx,
   brand?: BrandKit | null,
-  hook?: string
+  hook?: string,
+  diversityIndex = 0
 ): string {
   const base = (prompt || "").trim();
   const blob = `${ctx.nicho} ${ctx.produto} ${ctx.oferta || ""} ${brand?.visual_summary || ""} ${brand?.product_ui_notes || ""}`;
+  const scene =
+    INDUSTRIAL_SCENES[Math.abs(diversityIndex) % INDUSTRIAL_SCENES.length];
 
   if (isIndustrialNiche(ctx) || /prontepi|sst|\bepi\b/i.test(blob)) {
     return [
       `NICHE LOCK INDUSTRIAL/SST: product="${ctx.produto.slice(0, 140)}"; niche="${ctx.nicho.slice(0, 120)}".`,
-      "Show real workplace SST/EPI operations: warehouse, plant floor, safety technician, tablet with compliance UI, PPE delivery evidence.",
+      `UNIQUE SCENE THIS IMAGE (must differ from sibling posts): ${scene}.`,
       "Brand mood: dark navy, deep teal, authoritative, technical — NOT cozy lifestyle.",
-      "FORBIDDEN: Bible, planner journal, faith quiet-time, beige terracotta morning, purple SaaS gradient, smiling generic stock.",
-      brand?.visual_summary ? `Brand: ${brand.visual_summary.slice(0, 200)}.` : "",
-      brand?.product_ui_notes ? `Scenes: ${brand.product_ui_notes.slice(0, 220)}.` : "",
-      hook ? `Overlay: "${String(hook).slice(0, 48)}".` : "",
+      "Do NOT repeat the same hard-hat portrait + glowing tablet hero every time.",
+      "FORBIDDEN artwork layout: numbered feature cards 01/02/03, multi-box grids, fake Canva templates, huge CTA banners.",
+      "FORBIDDEN props: Bible, planner journal, faith quiet-time, beige terracotta morning, purple SaaS gradient.",
+      brand?.visual_summary
+        ? `Brand colors/mood only (ignore LP layout recipes): ${brand.visual_summary.slice(0, 160)}.`
+        : "",
+      hook ? `On-image hook idea: "${String(hook).slice(0, 56)}".` : "",
       base,
     ]
       .filter(Boolean)
@@ -60,12 +82,12 @@ export function lockVisualToNiche(
   }
 
   if (isFaithLifestyleNiche(ctx)) {
-    const scene =
+    const faithScene =
       brand?.product_ui_notes?.trim() ||
       "Woman in calm morning quiet time: open planner or Bible, coffee, soft window light — cozy faith lifestyle";
     return [
       `NICHE LOCK FAITH: product="${ctx.produto.slice(0, 120)}".`,
-      scene,
+      faithScene,
       "FORBIDDEN: industrial PPE, hard hats, factory, EPI management UI.",
       base,
     ]
@@ -74,10 +96,12 @@ export function lockVisualToNiche(
   }
 
   const contaminatedFaith =
-    /\b(bible|b[ií]blia|quiet time|devotional|planner journal|terracotta cozy|faith lifestyle)\b/i.test(base);
+    /\b(bible|b[ií]blia|quiet time|devotional|planner journal|terracotta cozy|faith lifestyle)\b/i.test(
+      base
+    );
   const contaminatedIndustrial = looksIndustrialVisual(base) && !isIndustrialNiche(ctx);
 
-  const scene =
+  const genericScene =
     brand?.product_ui_notes?.trim() ||
     `Authentic product-in-use scene for "${ctx.produto}". Real people and context. No unrelated religious or industrial props.`;
 
@@ -86,7 +110,7 @@ export function lockVisualToNiche(
       ? [
           `Instagram ad for "${ctx.produto}".`,
           `Niche: ${ctx.nicho}.`,
-          scene,
+          genericScene,
           hook ? `Overlay text: "${String(hook).slice(0, 48)}".` : "",
         ]
           .filter(Boolean)

@@ -67,12 +67,29 @@ export function identityGenerationHints(model: IdentityModel | null | undefined)
   palette: string;
 } {
   const colors = identityColors(model).slice(0, 5).join(", ");
-  const pos =
+  // Criativos IG: cor/mood só — corta receitas de LP (cards 01/02/03, split-hero, etc.).
+  const raw =
     String(model?.generation_prompt || model?.positive_prompt || "").slice(0, 1800) ||
-    String((model?.identity_signature as { summary?: string } | undefined)?.summary || "").slice(0, 1800);
+    String((model?.identity_signature as { summary?: string } | undefined)?.summary || "").slice(
+      0,
+      1800
+    );
+  const cleaned = raw
+    .replace(
+      /\b(01|02|03|numbered cards?|feature boxes?|split-?media|pill CTA|glass-?blur|sequential numbered)\b/gi,
+      " "
+    )
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 420);
+  const pos = [colors ? `Brand palette: ${colors}.` : "", cleaned ? `Brand mood: ${cleaned}.` : ""]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 700);
   const neg =
     String(model?.negative_prompt || "").slice(0, 1200) ||
-    (Array.isArray(model?.dont) ? model.dont.map(String).join(", ") : "").slice(0, 1200);
+    (Array.isArray(model?.dont) ? model.dont.map(String).join(", ") : "").slice(0, 1200) ||
+    "cheap stock smile, purple gradient, beige cozy morning, Bible, planner journal, multi-card Canva layout";
   return { positive: pos, negative: neg, palette: colors };
 }
 
