@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { uploadMedia, isStorageConfigured } from "./storage.js";
 import type { BrandKit } from "./brandFromUrl.js";
 import { lockVisualToNiche, type NicheCtx } from "./nicheVisual.js";
+import { bufferFromKairogen } from "./kairogen.js";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GEMINI_API_KEY;
@@ -26,6 +27,11 @@ export type ImageGenOpts = {
   hook?: string;
   identityPositive?: string;
   identityNegative?: string;
+  /**
+   * URLs públicas de banco/referência.
+   * No provider kairogen ativa modo Editar (img2img) em vez de criar do zero.
+   */
+  referenceImageUrls?: string[];
 };
 
 /**
@@ -435,7 +441,13 @@ export async function gerarImagemViral(
     });
   };
 
-  if (provider === "openrouter") {
+  if (provider === "kairogen") {
+    buffer = await bufferFromKairogen(enriched.slice(0, 4000), {
+      purpose,
+      aspectRatio,
+      referenceImageUrls: opts?.referenceImageUrls,
+    });
+  } else if (provider === "openrouter") {
     try {
       buffer = await tryOpenRouter();
     } catch (err) {

@@ -32,7 +32,7 @@ APIFY_TOKEN=
 | `GEMINI_API_KEY` | alt | — | Se `LLM_PROVIDER=gemini` ou `IMAGE_PROVIDER=gemini` |
 | `LLM_PROVIDER` | não | `openai` | `openai`, `gemini` ou `anthropic` |
 | `LLM_MODEL` | não | depende | Ex.: `gpt-4o-mini`, `claude-sonnet-4-6` |
-| `IMAGE_PROVIDER` | não | `openai` | `openai`, `gemini` ou `openrouter` |
+| `IMAGE_PROVIDER` | não | `openai` | `openai`, `gemini`, `openrouter` ou `kairogen` |
 | `OPENAI_IMAGE_MODEL` | não | `gpt-image-2` | Preferir `gpt-image-2` (size 4:5 nativo). Alt: `gpt-image-1.5` |
 | `OPENROUTER_API_KEY` | alt | — | Obrigatória se `IMAGE_PROVIDER=openrouter` |
 | `OR_MODEL_VOLUME` | não | `qwen/qwen-image-3` | Slides / volume (~$0,03) — texto PT |
@@ -41,6 +41,13 @@ APIFY_TOKEN=
 | `OR_MODEL_DRAFT` | não | `krea/krea-2-medium-turbo` | Rascunhos (~$0,015) |
 | `OR_COMPARE_MODELS` | não | (4 modelos acima) | A/B em Criativos → “Testar modelos” |
 | `GEMINI_IMAGE_MODEL` | não | `gemini-3.1-flash-image` | Nano Banana 2; ou `imagen-4.0-generate-001` |
+| `KAIROGEN_ACCESS_TOKEN` | alt | — | Bearer OAuth se `IMAGE_PROVIDER=kairogen` (ou `KAIROGEN_API_KEY`) |
+| `KAIROGEN_REFRESH_TOKEN` | alt | — | Renova o access (~8h); client `kairogen-mcp` |
+| `KAIROGEN_IMAGE_MODEL` | não | `nano-banana-pro` | Default; alt: `nano-banana`, `flux-2-pro`, `seedream-v4-5` |
+| `KAIROGEN_MODEL_PHOTO` | não | (IMAGE_MODEL) | Hero LP |
+| `KAIROGEN_MODEL_COVER` | não | (IMAGE_MODEL) | Criativo feed |
+| `KAIROGEN_MODEL_VOLUME` | não | `nano-banana` | Lote/slides (mais barato) |
+| `KAIROGEN_API_BASE` | não | `https://api.kairogen.ai` | Override |
 | `APIFY_TOKEN` | recomendado | — | Scrape de perfis IG + Ad Library comercial |
 | `APIFY_IG_ACTOR` | não | `apify/instagram-profile-scraper` | Actor Instagram |
 | `APIFY_AD_LIBRARY_ACTOR` | não | `viralanalyzer/facebook-ads-library` | Ads comerciais BR (substitui Graph Meta) |

@@ -3,7 +3,7 @@ import { query } from "../db/index.js";
 import { getUserId, getWorkspaceForUser, requireAuth } from "../services/authHelpers.js";
 import { campaignCtx, resolveCampaignScope, type CampaignScope } from "../services/campaignHelpers.js";
 import { gerarImagemViral, gerarImagemComModelo, openRouterCompareModels } from "../services/imageGen.js";
-import { identityGenerationHints } from "../services/identityContract.js";
+import { identityGenerationHints, identityReferenceImageUrls } from "../services/identityContract.js";
 import { publishCarousel, publishImage } from "../services/instagram.js";
 import { filterResearchCues, lockVisualToNiche } from "../services/nicheVisual.js";
 import type { ResearchReport } from "../services/research.js";
@@ -40,7 +40,15 @@ function nicheFromCampaign(scope: CampaignScope) {
 
 function identityImageOpts(scope: CampaignScope) {
   const h = identityGenerationHints(scope.identity?.model);
-  return { identityPositive: h.positive || undefined, identityNegative: h.negative || undefined };
+  const refs =
+    (process.env.IMAGE_PROVIDER ?? "").toLowerCase() === "kairogen"
+      ? identityReferenceImageUrls(scope.identity?.model)
+      : [];
+  return {
+    identityPositive: h.positive || undefined,
+    identityNegative: h.negative || undefined,
+    ...(refs.length ? { referenceImageUrls: refs } : {}),
+  };
 }
 
 const CREATIVE_COLS = `id, strategy_id, day_index, format, hook, caption, visual_prompt,

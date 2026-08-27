@@ -9,6 +9,7 @@ import {
   identityContextForLlm,
   identityLandingSystem,
   identityLogoUrl,
+  identityReferenceImageUrls,
   identityLooksCampaignLayout,
   identityPickColors,
   type IdentityModel,
@@ -1155,6 +1156,10 @@ JSON estrito.`,
     const industrial = /\b(epi|sst|prontepi|seguran|industrial)\b/i.test(
       `${ctx.nicho} ${ctx.produto}`
     );
+    const kairogenRefs =
+      (process.env.IMAGE_PROVIDER ?? "").toLowerCase() === "kairogen"
+        ? identityReferenceImageUrls(identityModel)
+        : [];
     try {
       heroUrl = await gerarImagemViral(
         [
@@ -1166,6 +1171,9 @@ JSON estrito.`,
             ? "Dark navy and teal industrial brand mood, high contrast. FORBIDDEN: Bible, planner journal, faith lifestyle, beige terracotta cozy morning"
             : "Modern brand photography matching the product niche. FORBIDDEN: Bible, faith props, random industrial PPE unless product is SST/EPI",
           "Empty visual space on the left third for website text overlay.",
+          kairogenRefs.length
+            ? "EDIT the provided reference photo(s): keep product/brand recognizability, improve lighting and composition for a landing hero, no text overlays."
+            : "",
           `Product: ${ctx.produto.slice(0, 140)}`,
           `Niche: ${ctx.nicho.slice(0, 100)}`,
           brand?.visual_summary ? `Brand mood: ${brand.visual_summary.slice(0, 180)}` : "",
@@ -1179,6 +1187,7 @@ JSON estrito.`,
           overlayLogo: false,
           aspectRatio: "4:5",
           niche: { nicho: ctx.nicho, produto: ctx.produto, oferta: ctx.oferta },
+          ...(kairogenRefs.length ? { referenceImageUrls: kairogenRefs } : {}),
         }
       );
     } catch {

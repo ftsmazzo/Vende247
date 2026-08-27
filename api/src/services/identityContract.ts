@@ -147,6 +147,28 @@ export function identityLogoUrl(
 }
 
 /**
+ * Banco de imagens da identidade (URLs públicas).
+ * No Kairogen, viram `params.images` → modo Editar (não gera do zero).
+ * Exclui o logo para não “editar” o símbolo da marca como cena.
+ */
+export function identityReferenceImageUrls(
+  model: IdentityModel | null | undefined,
+  opts?: { excludeLogo?: boolean; limit?: number }
+): string[] {
+  const assets = model?.assets as { logo_url?: string; image_urls?: string[] } | undefined;
+  const logo = typeof assets?.logo_url === "string" ? assets.logo_url.trim() : "";
+  const urls = Array.isArray(assets?.image_urls) ? assets!.image_urls! : [];
+  const out: string[] = [];
+  for (const u of urls) {
+    const s = String(u || "").trim();
+    if (!/^https?:\/\//i.test(s)) continue;
+    if (opts?.excludeLogo !== false && logo && s === logo) continue;
+    if (!out.includes(s)) out.push(s);
+  }
+  return out.slice(0, opts?.limit ?? 4);
+}
+
+/**
  * A cada geração de LP, compõe uma variante viva a partir do contrato base.
  * Mesma identidade ≠ mesmo HTML: hero, ordem, efeitos e densidade mudam.
  */
