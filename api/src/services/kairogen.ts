@@ -264,19 +264,31 @@ async function pollGeneration(
     const json = (await res.json()) as GenerationStatus & {
       message?: string;
       statusCode?: number;
+      errorCode?: string | null;
     };
     if (!res.ok) {
       throw new Error(json.message || `Kairogen poll HTTP ${res.status}`);
     }
     const st = (json.status || "").toUpperCase();
     if (st === "COMPLETED" || st === "SUCCESS") return json;
-    if (st === "FAILED" || st === "ERROR" || st === "CANCELLED") {
-      throw new Error(json.error || `Kairogen geração ${st}`);
+    if (
+      st === "FAILED" ||
+      st === "ERROR" ||
+      st === "CANCELLED" ||
+      st === "REFUNDED"
+    ) {
+      const detail = [json.error, json.errorCode].filter(Boolean).join(" · ");
+      throw new Error(
+        detail ||
+          `Kairogen geração ${st}${st === "REFUNDED" ? " (créditos estornados)" : ""}`
+      );
     }
     await new Promise((r) => setTimeout(r, delay));
-    delay = Math.min(delay + 500, 5000);
+    delay = Math.min(delay + 500, 4000);
   }
-  throw new Error(`Kairogen timeout após ${Math.round(timeoutMs / 1000)}s`);
+  throw new Error(
+    `Kairogen timeout após ${Math.round(timeoutMs / 1000)}s (id ${generationId}). A geração pode ter falhado ou ainda estar na fila — confira em app.kairogen.ai.`
+  );
 }
 
 /**
@@ -292,19 +304,36 @@ export async function bufferFromKairogen(
     timeoutMs?: number;
   }
 ): Promise<Buffer> {
-  const model = opts?.model || kairogenModelForPurpose(opts?.purpose);
+  let model = opts?.model || kairogenModelForPurpose(opts?.purpose);
   const aspectRatio = opts?.aspectRatio || "4:5";
-  const refs = (opts?.referenceImageUrls || []).filter(Boolean).slice(0, 10);
+  let refs = (opts?.referenceImageUrls || []).filter(Boolean).slice(0, 10);
+  const purpose = (opts?.purpose || "cover").toLowerCase();
+
+  // gpt-image-* no Kairogen não aceita `images` (erro IMG-INPUT → REFUNDED após minutos).
+  // Com referência: usa nano-banana-pro (modo Editar). Sem ref: gpt-image-2 (texto PT).
+  if (refs.length && /gpt-image/i.test(model)) {
+    console.warn(
+      "[kairogen] gpt-image não aceita reference images; usando nano-banana-pro (edit)"
+    );
+    model =
+      process.env.KAIROGEN_MODEL_EDIT?.trim() || "nano-banana-pro";
+  } else if (!refs.length && /nano-banana/i.test(model) && (purpose === "cover" || purpose === "volume")) {
+    // Prefer tipografia forte quando não há banco
+    model =
+      process.env.KAIROGEN_MODEL_COVER?.trim() ||
+      process.env.KAIROGEN_IMAGE_MODEL?.trim() ||
+      "gpt-image-2";
+  }
+
   const params: Record<string, unknown> = {
-    prompt: prompt.slice(0, 4000),
+    prompt: prompt.slice(0, 3500),
     aspect_ratio: aspectRatio,
     numImages: 1,
   };
   if (refs.length) params.images = refs;
-  // Tipografia legível em criativos IG (modelos GPT Image no Kairogen)
-  const purpose = (opts?.purpose || "cover").toLowerCase();
   if (/gpt-image/i.test(model)) {
-    params.quality = purpose === "draft" || purpose === "volume" ? "medium" : "high";
+    // Só params suportados — sem images
+    params.quality = purpose === "draft" ? "medium" : "high";
   }
 
   const body = { model, params };
@@ -324,10 +353,12 @@ export async function bufferFromKairogen(
     );
   }
 
-  const done = await pollGeneration(
-    json.generationId,
-    opts?.timeoutMs ?? 10 * 60 * 1000
-  );
+  // gpt-image high pode demorar; 3 min + erro claro (antes: 10 min cego)
+  const timeout =
+    opts?.timeoutMs ??
+    (/gpt-image/i.test(model) ? 4 * 60 * 1000 : 3 * 60 * 1000);
+
+  const done = await pollGeneration(json.generationId, timeout);
   const url = done.outputUrls?.[0];
   if (!url) throw new Error("Kairogen concluiu sem outputUrls.");
 
