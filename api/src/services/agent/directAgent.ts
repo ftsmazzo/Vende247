@@ -1,14 +1,14 @@
 import { chatJson } from "../llm.js";
 import { agentToken, type InstagramAccount } from "../instagramAccounts.js";
+import { loadCompanyBriefingForOwner } from "../companyKnowledge.js";
 import {
   firstNameFrom,
   latestCommentCtxForLead,
-  loadBrandForOwner,
   loadDmHistory,
   saveDmTurn,
   scrubRepeatedGreeting,
 } from "./agentContext.js";
-import { buildDirectSystem } from "./agentPrompts.js";
+import { brandFromBriefing, buildDirectSystem } from "./agentPrompts.js";
 import { fetchLeadProfile, sendIgDm } from "./graphAgent.js";
 import { query } from "../../db/index.js";
 
@@ -22,19 +22,19 @@ export async function handleDirectEvent(opts: {
   if (!token) return { replied: false, error: "Sem token na conta." };
   if (!opts.account.ig_user_id) return { replied: false, error: "ig_user_id ausente." };
 
-  const brand = await loadBrandForOwner(opts.account.owner_user_id);
-  const [profile, commentCtx, history] = await Promise.all([
+  const [brief, profile, commentCtx, history] = await Promise.all([
+    loadCompanyBriefingForOwner(opts.account.owner_user_id),
     fetchLeadProfile({ igScopedUserId: opts.senderId, accessToken: token }),
     latestCommentCtxForLead(opts.account.id, opts.senderId),
     loadDmHistory(opts.account.id, opts.senderId, 10),
   ]);
+  const brand = brandFromBriefing(brief);
 
   const firstName = firstNameFrom(profile.name, profile.username);
   const turn = history.filter((h) => h.role === "assistant").length + 1;
   const hasPost = Boolean(commentCtx?.caption_post || commentCtx?.comment_text);
-  const system = buildDirectSystem(opts.account, brand, { turn, firstName });
+  const system = buildDirectSystem(opts.account, brand, { turn, firstName, brief });
 
-  // Persiste a fala do lead antes de gerar (memória mesmo se o LLM falhar depois).
   try {
     await saveDmTurn({
       accountId: opts.account.id,
@@ -55,8 +55,10 @@ export async function handleDirectEvent(opts: {
         mensagem_atual: opts.text,
         instrucao:
           turn > 1
-            ? "Continue a conversa do histórico. Sem novo oi/olá/nome no começo. Responda ao que acabou de ser dito."
-            : "Abertura: natural, curta, amarre ao contexto se houver.",
+            ? "Continue o histórico. Sem novo oi/olá/nome. Responda ao que acabou de ser dito."
+            : hasPost
+              ? "Abertura pós-comentário: natural e curta."
+              : "Direct frio / sem posts: use a base da empresa e a carta de produtos.",
         perfil: {
           username: profile.username || null,
           nome: profile.name || null,
@@ -66,7 +68,6 @@ export async function handleDirectEvent(opts: {
           ? {
               legenda: commentCtx?.caption_post || null,
               comentario_original: commentCtx?.comment_text || null,
-              username_no_comentario: commentCtx?.username_lead || null,
             }
           : null,
         modo: hasPost
@@ -75,10 +76,7 @@ export async function handleDirectEvent(opts: {
             : "pos_comentario"
           : turn > 1
             ? "continuacao"
-            : "direct_frio",
-        marca: brand.marca,
-        produto: brand.produto || null,
-        oferta: brand.oferta || null,
+            : "direct_frio_sem_post",
       }),
       512,
       {
@@ -86,10 +84,7 @@ export async function handleDirectEvent(opts: {
         temperature: 0.45,
         history: history.map((h) => ({
           role: h.role,
-          content:
-            h.role === "assistant"
-              ? JSON.stringify({ reply: h.content })
-              : h.content,
+          content: h.role === "assistant" ? JSON.stringify({ reply: h.content }) : h.content,
         })),
       }
     );

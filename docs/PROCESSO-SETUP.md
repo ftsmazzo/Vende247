@@ -50,16 +50,20 @@ Se publicou no perfil errado: a conta **ativa** estava errada ou o token era de 
 
 ---
 
-## 3) Como o agente opera (sem n8n)
+## 3) Como o agente opera (SDR, sem n8n)
 
-1. Em **Agentes**, escolha a conta IG → marque **Agente ativo** → ajuste prompts → Salvar.  
-2. No App Meta, webhook aponta para:  
-   `{PUBLIC_API_URL}/api/webhooks/instagram`  
-   Verify token = valor de `META_WEBHOOK_VERIFY_TOKEN` no EasyPanel.  
-3. Meta manda evento (comentário ou DM) → API Vende247 → LLM gera resposta → Graph API responde.  
-4. Se o agente estiver **desligado** naquela conta, o webhook ignora.
+Espelho do fluxo **Agente-Instagram** original:
 
-n8n **não** é necessário. Só use n8n se quiser encaminhar o webhook Meta para a mesma URL (ponte).
+0. Em **Empresa**, preencha missão, público, diferenciais, **carta de produtos** e FAQ. Isso alimenta o agente mesmo com **zero posts** no feed (cliente novo).  
+1. Em **Agentes**, conta IG → **Agente ativo** → nome → refinamentos opcionais → Salvar.  
+2. Webhook Meta: `{PUBLIC_API_URL}/api/webhooks/instagram` + verify token.  
+3. **Comentário:** legenda do post (se houver) + base da empresa → reply público + **private reply** (push) → memória no Postgres.  
+4. **Direct:** histórico no Postgres; se veio de comentário, retoma; se frio, usa carta de produtos/missão.  
+5. LLM só via **OpenRouter** (`LLM_MODEL` / `LLM_MODEL_AGENT`).
+
+Memória de conversa = **Postgres** (`agent_interactions`). Redis fica opcional como cache depois; a fonte da verdade já é o banco.
+
+n8n **não** é necessário (salvo ponte de webhook).
 
 Checklist rápido:
 

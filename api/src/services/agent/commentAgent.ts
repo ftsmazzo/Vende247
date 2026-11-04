@@ -1,7 +1,8 @@
 import { chatJson } from "../llm.js";
 import { agentToken, type InstagramAccount } from "../instagramAccounts.js";
-import { loadBrandForOwner, saveCommentInteraction, saveDmTurn } from "./agentContext.js";
-import { buildCommentSystem } from "./agentPrompts.js";
+import { loadCompanyBriefingForOwner } from "../companyKnowledge.js";
+import { saveCommentInteraction, saveDmTurn } from "./agentContext.js";
+import { brandFromBriefing, buildCommentSystem } from "./agentPrompts.js";
 import {
   fetchMediaContext,
   replyToComment,
@@ -27,12 +28,13 @@ export async function handleCommentEvent(opts: {
   if (!token) return { replied: false, error: "Sem token na conta." };
   if (!opts.account.ig_user_id) return { replied: false, error: "ig_user_id ausente." };
 
-  const brand = await loadBrandForOwner(opts.account.owner_user_id);
+  const brief = await loadCompanyBriefingForOwner(opts.account.owner_user_id);
+  const brand = brandFromBriefing(brief);
   const media = opts.mediaId
     ? await fetchMediaContext({ mediaId: opts.mediaId, accessToken: token })
     : { caption: "", mediaType: "" };
 
-  const system = buildCommentSystem(opts.account, brand);
+  const system = buildCommentSystem(opts.account, brand, brief);
   let publicReply = "";
   let privateReply = "";
   try {
@@ -45,12 +47,10 @@ export async function handleCommentEvent(opts: {
       JSON.stringify({
         legenda_post: media.caption || null,
         tipo_midia: media.mediaType || null,
+        tem_contexto_de_post: Boolean(media.caption),
         comentario: opts.text,
         username_lead: opts.fromUsername || null,
         conta: opts.account.ig_username || opts.account.label,
-        marca: brand.marca,
-        produto: brand.produto || null,
-        oferta: brand.oferta || null,
       }),
       1024,
       { purpose: "agent" }
@@ -59,10 +59,7 @@ export async function handleCommentEvent(opts: {
     privateReply = (out.resposta_direct || "").trim().slice(0, 220);
     if (!privateReply && publicReply) {
       const who = opts.fromUsername ? `@${opts.fromUsername}` : "Oi";
-      privateReply = `${who}, vi seu comentário sobre isso — me conta o que você mais quer saber?`.slice(
-        0,
-        220
-      );
+      privateReply = `${who}, vi seu comentário — me conta o que você mais quer saber?`.slice(0, 220);
     }
   } catch (e) {
     return { replied: false, error: e instanceof Error ? e.message : String(e) };
@@ -125,7 +122,7 @@ export async function handleCommentEvent(opts: {
         mediaType: media.mediaType,
       });
     } catch {
-      /* não bloqueia resposta */
+      /* ignore */
     }
   }
 

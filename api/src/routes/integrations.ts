@@ -15,7 +15,7 @@ export const integrationsRoutes: FastifyPluginAsync = async (app) => {
   app.get("/status", async (req) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     const accounts = await listIgAccounts(getUserId(req));
-    const imageProvider = (process.env.IMAGE_PROVIDER || "openai").toLowerCase();
+    const imageProvider = (process.env.IMAGE_PROVIDER || "openrouter").toLowerCase();
     const publicApi =
       (process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || "").replace(/\/$/, "") ||
       "https://vendas247-api.kxryyk.easypanel.host";

@@ -15,6 +15,7 @@ import { campaignRoutes } from "./routes/campaigns.js";
 import { instagramAccountsRoutes } from "./routes/instagramAccounts.js";
 import { integrationsRoutes } from "./routes/integrations.js";
 import { webhooksInstagramRoutes } from "./routes/webhooksInstagram.js";
+import { knowledgeRoutes } from "./routes/knowledge.js";
 import { handleMcpRpc } from "./mcp/handler.js";
 import { startCronJob } from "./services/cron.js";
 import { getLocalUploadsDir } from "./services/storage.js";
@@ -44,6 +45,7 @@ async function build() {
   await app.register(landingRoutes, { prefix: "/api/landing" });
   await app.register(instagramAccountsRoutes, { prefix: "/api/instagram-accounts" });
   await app.register(integrationsRoutes, { prefix: "/api/integrations" });
+  await app.register(knowledgeRoutes, { prefix: "/api/knowledge" });
   await app.register(webhooksInstagramRoutes, { prefix: "/api/webhooks/instagram" });
 
   app.post("/mcp", async (req, reply) => {

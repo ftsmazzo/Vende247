@@ -198,6 +198,45 @@ export async function ensureTables(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_agent_interactions_lead
       ON agent_interactions (instagram_account_id, ig_lead_id, created_at DESC);
+
+    ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS missao TEXT NOT NULL DEFAULT '';
+    ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS publico_alvo TEXT NOT NULL DEFAULT '';
+    ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS diferenciais TEXT NOT NULL DEFAULT '';
+    ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS objecoes TEXT NOT NULL DEFAULT '';
+    ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS prova_social TEXT NOT NULL DEFAULT '';
+    ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS politicas TEXT NOT NULL DEFAULT '';
+
+    CREATE TABLE IF NOT EXISTS workspace_products (
+      id SERIAL PRIMARY KEY,
+      workspace_id INT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      nome TEXT NOT NULL DEFAULT '',
+      descricao TEXT NOT NULL DEFAULT '',
+      beneficios TEXT NOT NULL DEFAULT '',
+      preco_hint TEXT NOT NULL DEFAULT '',
+      para_quem TEXT NOT NULL DEFAULT '',
+      cta TEXT NOT NULL DEFAULT '',
+      objecoes TEXT NOT NULL DEFAULT '',
+      ativo BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_workspace_products_ws
+      ON workspace_products (workspace_id, sort_order, id);
+
+    CREATE TABLE IF NOT EXISTS workspace_knowledge (
+      id SERIAL PRIMARY KEY,
+      workspace_id INT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      category TEXT NOT NULL DEFAULT 'geral',
+      title TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      ativo BOOLEAN NOT NULL DEFAULT TRUE,
+      sort_order INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_workspace_knowledge_ws
+      ON workspace_knowledge (workspace_id, category, sort_order, id);
   `);
 
   await p.query(`

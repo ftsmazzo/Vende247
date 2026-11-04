@@ -1,4 +1,5 @@
 import type { InstagramAccount } from "../instagramAccounts.js";
+import type { CompanyBriefing } from "../companyKnowledge.js";
 
 export type BrandCtx = {
   marca: string;
@@ -7,6 +8,19 @@ export type BrandCtx = {
   oferta: string;
   tom_voz: string;
 };
+
+export function brandFromBriefing(brief: CompanyBriefing | null): BrandCtx {
+  if (!brief) {
+    return { marca: "nossa empresa", produto: "", nicho: "", oferta: "", tom_voz: "" };
+  }
+  return {
+    marca: brief.marca,
+    produto: brief.produto,
+    nicho: brief.nicho,
+    oferta: brief.oferta,
+    tom_voz: brief.tom_voz,
+  };
+}
 
 export function agentDisplayName(acc: InstagramAccount, brand: BrandCtx): string {
   const n = (acc.agent_nome || "").trim();
@@ -24,39 +38,41 @@ export function mergePrompt(base: string, refinements: string | null | undefined
     "--- REFINAMENTOS DA CONTA ---",
     extra,
     "",
-    "Os refinamentos complementam as regras acima; não invalidam humanização, contexto do post nem limites de inventar oferta.",
+    "Os refinamentos complementam as regras acima; não invalidam humanização, missão nem a base da empresa.",
   ].join("\n");
 }
 
-export function buildCommentSystem(acc: InstagramAccount, brand: BrandCtx): string {
+function briefBlock(brief: CompanyBriefing | null): string {
+  return brief?.agent_brief?.trim() || "Base da empresa ainda vazia — peça o essencial e não invente.";
+}
+
+export function buildCommentSystem(
+  acc: InstagramAccount,
+  brand: BrandCtx,
+  brief: CompanyBriefing | null
+): string {
   const nome = agentDisplayName(acc, brand);
   const tom =
     brand.tom_voz.trim() ||
-    "humanizado, acolhedor e profissional — como um SDR que genuinamente quer ajudar";
-  const produtoLinha = [brand.produto, brand.oferta, brand.nicho].filter(Boolean).join(" · ");
+    "humanizado, acolhedor e profissional — SDR alinhado à missão da empresa";
   return mergePrompt(
     [
       `Você é ${nome}, SDR digital de ${brand.marca || acc.label || "a marca"} no Instagram.`,
-      produtoLinha ? `O que vendemos / oferecemos: ${produtoLinha}.` : "",
       `Tom: ${tom}.`,
       "",
+      briefBlock(brief),
+      "",
       "PAPEL (comentário público + abertura no Direct via push):",
-      "- O comentário é público. Seja breve, caloroso e específico ao que a pessoa escreveu.",
-      "- Demonstre que leu (cite palavra, dúvida ou emoção). Nunca \"obrigado pelo interesse\".",
-      "- Use a legenda/tipo do post quando existirem — amarre a resposta ao conteúdo.",
-      "- Objetivo: micro-conexão + curiosidade para continuar no Direct (notificação push).",
+      "- Seja breve, caloroso e específico ao comentário. Nunca genérico.",
+      "- Se houver legenda do post, use. Se NÃO houver post/legenda, use missão + carta de produtos.",
+      "- Objetivo: micro-conexão + curiosidade para o Direct.",
       "",
-      "ESTRUTURA (JSON):",
-      '- "resposta_comentario": máx. 280 chars. 1 ideia + convite sutil ao Direct (\"te mando no privado\").',
-      '- "resposta_direct": 1ª msg privada — chame pelo @username se souber, retome o comentário, UMA pergunta aberta. Máx. 220 chars. Sem markdown.',
+      "JSON:",
+      '- "resposta_comentario": máx. 280 chars.',
+      '- "resposta_direct": 1ª msg privada, máx. 220 chars, UMA pergunta. Sem markdown.',
       "",
-      "REGRAS:",
-      "- Não invente preço/promoção. Não peça WhatsApp no comentário público.",
-      "- No máximo 1 emoji se combinar com o tom.",
-      "- CTA natural, nunca robótico.",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+      "Não invente preço/promoção fora da base. Sem WhatsApp no comentário público.",
+    ].join("\n"),
     acc.agent_prompt_comentarios
   );
 }
@@ -64,62 +80,50 @@ export function buildCommentSystem(acc: InstagramAccount, brand: BrandCtx): stri
 export function buildDirectSystem(
   acc: InstagramAccount,
   brand: BrandCtx,
-  opts?: { turn: number; firstName?: string }
+  opts?: { turn: number; firstName?: string; brief?: CompanyBriefing | null }
 ): string {
   const nome = agentDisplayName(acc, brand);
   const tom =
     brand.tom_voz.trim() ||
-    "consultivo, empático e persuasivo — vendedor de confiança, nunca robô de script";
-  const produtoLinha = [brand.produto, brand.oferta, brand.nicho].filter(Boolean).join(" · ");
+    "consultivo, empático e persuasivo — vendedor de confiança, nunca robô";
   const turn = opts?.turn ?? 1;
   const firstName = (opts?.firstName || "").trim();
   const isFollowUp = turn > 1;
+  const brief = opts?.brief ?? null;
 
   const continuity = isFollowUp
     ? [
-        "CONTINUIDADE (OBRIGATÓRIO — já existe histórico nesta conversa):",
-        "- NÃO cumprimente de novo (proibido: Oi/Olá/Bom dia + nome).",
-        firstName
-          ? `- Você JÁ sabe que se chama ${firstName}. Não repita o nome no começo de toda mensagem.`
-          : "- Não reinicie com nome/saudação.",
-        "- Continue o fio da última troca: responda o que a pessoa acabou de dizer.",
-        "- Se a pessoa mudou de assunto, acompanhe — não force o pitch antigo.",
-        "- Uma ideia + no máximo uma pergunta. Máx. 220 caracteres.",
-        "- Soe como alguém digitando no celular, não como chatbot.",
+        "CONTINUIDADE (já há histórico):",
+        "- Proibido novo Oi/Olá + nome.",
+        firstName ? `- Já sabe o nome (${firstName}); não repita no começo de toda msg.` : "",
+        "- Continue o fio da última fala do lead.",
+        "- Máx. 220 chars. Uma ideia + no máximo uma pergunta.",
       ]
     : [
-        "1ª MENSAGEM DESTA CONVERSA:",
-        firstName
-          ? `- Pode usar o primeiro nome (${firstName}) UMA vez, de forma natural — não em toda frase.`
-          : "- Se não tiver nome, não invente; use tom neutro ou pergunte como chama.",
-        "- Cumprimente no máximo uma vez; amarre ao contexto (post ou o que a pessoa escreveu).",
+        "1ª MENSAGEM:",
+        firstName ? `- Pode usar ${firstName} uma vez, natural.` : "- Sem nome inventado.",
+        "- Sem post de origem: apresente valor via missão/produtos da base, sem pitch frio de brochure.",
       ];
 
   return mergePrompt(
     [
       `Você é ${nome} da ${brand.marca || acc.label || "marca"}, SDR no Instagram Direct.`,
-      produtoLinha
-        ? `Produtos/oferta (use só se couber no fio): ${produtoLinha}.`
-        : "Se faltar dado de produto, pergunte — nunca invente.",
-      `Tom: ${tom}.`,
-      `Turno da conversa: ${turn}${isFollowUp ? " (continuação)" : " (abertura)"}.`,
+      `Tom: ${tom}. Turno: ${turn}${isFollowUp ? " (continuação)" : " (abertura)"}.`,
       "",
-      ...continuity,
+      briefBlock(brief),
       "",
-      "FUNIL (respeite o ponto em que a conversa já está — não reinicie do zero):",
-      "Conexão → descoberta (1 pergunta) → valor ligado ao que o lead falou → objeção → CTA natural.",
+      ...continuity.filter(Boolean),
       "",
-      "PROIBIDO:",
-      "- Repetir a mesma abertura/saudação.",
-      "- Reapresentar a empresa a cada mensagem.",
-      "- Respostas genéricas que ignorem a última fala do lead.",
-      "- Checklist, markdown, tom de IA (\"como posso ajudar hoje?\").",
-      "- Inventar preço/estoque.",
+      "COMPORTAMENTO:",
+      "- Alinhe à missão. Use a carta de produtos para responder o que vendemos.",
+      "- Direct frio (sem post): descubra necessidade e ofereça o produto certo da carta.",
+      "- Objeções: use as respostas da base; se não houver, acolha e ofereça próximo passo.",
+      "- CTA preferido da empresa quando houver interesse real.",
       "",
-      'JSON: {"reply":"texto da mensagem"}',
-    ]
-      .filter(Boolean)
-      .join("\n"),
+      "PROIBIDO: inventar fora da base; checklist; 'como posso ajudar hoje?'; reapresentar empresa a cada msg.",
+      "",
+      'JSON: {"reply":"texto"}',
+    ].join("\n"),
     acc.agent_prompt_direct
   );
 }

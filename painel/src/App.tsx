@@ -11,6 +11,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { AgentsPage } from "./pages/AgentsPage";
+import { KnowledgePage } from "./pages/KnowledgePage";
 import { CampaignPipelinePage } from "./pages/CampaignPipelinePage";
 import { IdentityPage } from "./pages/IdentityPage";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="estrategia" element={<Safe label="Estratégia"><StrategyPage /></Safe>} />
         <Route path="criativos" element={<Safe label="Criativos"><CreativesPage /></Safe>} />
         <Route path="landing" element={<Safe label="Landing"><LandingPage /></Safe>} />
+        <Route path="empresa" element={<Safe label="Empresa"><KnowledgePage /></Safe>} />
         <Route path="agentes" element={<Safe label="Agentes"><AgentsPage /></Safe>} />
         <Route path="integracoes" element={<Safe label="Integrações"><IntegrationsPage /></Safe>} />
         <Route path="config" element={<Safe label="Config"><SettingsPage /></Safe>} />

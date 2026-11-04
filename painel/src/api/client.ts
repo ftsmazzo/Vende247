@@ -84,6 +84,44 @@ export type InstagramAccount = {
   last_agent_event_at: string | null;
 };
 
+export type CompanyProfile = {
+  workspace_id: number;
+  marca: string;
+  nicho: string;
+  produto: string;
+  oferta: string;
+  cta: string;
+  tom_voz: string;
+  missao: string;
+  publico_alvo: string;
+  diferenciais: string;
+  objecoes: string;
+  prova_social: string;
+  politicas: string;
+};
+
+export type ProductCard = {
+  id: number;
+  nome: string;
+  descricao: string;
+  beneficios: string;
+  preco_hint: string;
+  para_quem: string;
+  cta: string;
+  objecoes: string;
+  ativo: boolean;
+  sort_order: number;
+};
+
+export type KnowledgeItem = {
+  id: number;
+  category: string;
+  title: string;
+  body: string;
+  ativo: boolean;
+  sort_order: number;
+};
+
 export const api = {
   auth: {
     status: () => request<{ db: boolean; canRegister: boolean }>("/api/auth/status"),
@@ -170,6 +208,35 @@ export const api = {
   },
   integrations: {
     status: () => request<Record<string, unknown>>("/api/integrations/status"),
+  },
+  knowledge: {
+    get: () =>
+      request<{
+        profile: CompanyProfile | null;
+        products: ProductCard[];
+        knowledge: KnowledgeItem[];
+        agent_brief_preview: string;
+        tip?: string;
+      }>("/api/knowledge"),
+    updateProfile: (body: Record<string, string | undefined>) =>
+      request<{ profile: CompanyProfile }>("/api/knowledge/profile", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    createProduct: (body: Record<string, unknown>) =>
+      request<{ product: ProductCard }>("/api/knowledge/products", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    deleteProduct: (id: number) =>
+      request<{ ok: boolean }>(`/api/knowledge/products/${id}`, { method: "DELETE" }),
+    createItem: (body: Record<string, unknown>) =>
+      request<{ item: KnowledgeItem }>("/api/knowledge/items", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    deleteItem: (id: number) =>
+      request<{ ok: boolean }>(`/api/knowledge/items/${id}`, { method: "DELETE" }),
   },
   campaigns: {
     list: () => request<{ campaigns: Campaign[] }>("/api/campaigns"),
