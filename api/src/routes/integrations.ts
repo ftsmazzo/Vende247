@@ -26,11 +26,15 @@ export const integrationsRoutes: FastifyPluginAsync = async (app) => {
       instagram_accounts: accounts.map(publicIgAccount),
       webhook: {
         url: `${publicApi}/api/webhooks/instagram`,
-        verify_token_configured: Boolean(
+        // Sempre há um token efetivo (env ou default vende247-verify).
+        verify_token_configured: true,
+        verify_token_from_env: Boolean(
           process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() ||
             process.env.IG_WEBHOOK_VERIFY_TOKEN?.trim()
         ),
-        note: "No App Meta, callback = esta URL; verify token = META_WEBHOOK_VERIFY_TOKEN no EasyPanel.",
+        verify_token_hint: "vende247-verify (default se a env não existir)",
+        note:
+          "Callback = esta URL. Verify token na Meta = META_WEBHOOK_VERIFY_TOKEN no EasyPanel, ou o default vende247-verify. Depois inscreva comments + messages no tópico Instagram.",
       },
       mcp: {
         url: `${publicApi}/mcp`,

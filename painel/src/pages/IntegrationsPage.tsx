@@ -3,7 +3,13 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 
 type Status = {
-  webhook?: { url?: string; verify_token_configured?: boolean; note?: string };
+  webhook?: {
+    url?: string;
+    verify_token_configured?: boolean;
+    verify_token_from_env?: boolean;
+    verify_token_hint?: string;
+    note?: string;
+  };
   mcp?: { url?: string; note?: string };
   providers?: Record<string, { configured?: boolean; hint?: string | null } | string | null>;
   instagram_accounts?: Array<{
@@ -84,10 +90,21 @@ export function IntegrationsPage() {
               Agentes
             </Link>
             : ligar na conta → prompts → Salvar. Meta manda webhook → API responde no Graph.
-            <div className="mt-1">
-              Agente ligado: <Badge ok={agentOn} /> Webhook verify env:{" "}
-              <Badge ok={Boolean(status.webhook?.verify_token_configured)} />
+            <div className="mt-1 flex flex-wrap gap-2 items-center">
+              Agente ligado: <Badge ok={agentOn} />
+              Verify API: <Badge ok={Boolean(status.webhook?.verify_token_configured)} labelOk="ok" />
+              Env EasyPanel:{" "}
+              <Badge
+                ok={Boolean(status.webhook?.verify_token_from_env)}
+                labelOk="setada"
+                labelNo="usando default"
+              />
             </div>
+            <p className="mt-1 text-xs text-white/45">
+              Token na Meta: <code>{status.webhook?.verify_token_hint || "vende247-verify"}</code>
+              . Verde na Meta = URL ok. Ainda precisa inscrever campos <code>comments</code> e{" "}
+              <code>messages</code> no webhook Instagram.
+            </p>
           </li>
           <li>
             <strong className="text-white">Claude MCP (opcional)</strong> — Contas Instagram → Claude MCP →
