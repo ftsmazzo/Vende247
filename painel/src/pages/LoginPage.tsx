@@ -88,7 +88,7 @@ export function LoginPage() {
                 </button>
               </>
             ) : (
-              "Cadastro fechado — peça acesso ao admin."
+              "Cadastro fechado. No EasyPanel da API: ALLOW_OPEN_REGISTER=true para liberar novos usuários."
             )
           ) : (
             <>

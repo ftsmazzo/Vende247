@@ -10,7 +10,7 @@ const links = [
   { to: "/landing", label: "Landing" },
   { to: "/agentes", label: "Agentes" },
   { to: "/integracoes", label: "Integrações" },
-  { to: "/config", label: "Conta" },
+  { to: "/config", label: "Instagram" },
 ];
 
 export function AppLayout() {

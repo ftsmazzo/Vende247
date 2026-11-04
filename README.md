@@ -25,12 +25,18 @@ Vende247/
 └── Dockerfile  # Build do painel
 ```
 
-## Fluxo do MVP
+## Processo (não misturar)
 
-1. **Onboarding** — nicho, produto, oferta, CTA, 3–5 concorrentes, conta IG
-2. **Research** — coleta posts/ads → relatório de padrões
-3. **Estratégia** — plano 7–14 dias com briefs
-4. **Criativos** — lote de mídias → aprovar → publicar/agendar
+1. **Usuário** (login) → 2. **Conta Instagram** (token) → 3. **Campanha** → 4. **Agente** (opcional) → 5. **MCP Claude** (opcional)
+
+Guia passo a passo: [docs/PROCESSO-SETUP.md](docs/PROCESSO-SETUP.md) · no painel: **Integrações**
+
+## Fluxo do produto
+
+1. **Onboarding** — nicho, produto, oferta, CTA, concorrentes
+2. **Research** — coleta posts/ads → relatório
+3. **Estratégia** — plano 7–14 dias
+4. **Criativos** — gerar → aprovar → publicar (conta IG **ativa**)
 
 ## Como rodar local
 

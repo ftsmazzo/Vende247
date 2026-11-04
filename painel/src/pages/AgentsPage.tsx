@@ -16,11 +16,12 @@ export function AgentsPage() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
 
-  async function reload() {
+  async function reload(preferId?: number | null) {
     const ig = await api.instagramAccounts.list();
     setAccounts(ig.accounts);
     setDefaults(ig.defaults);
-    const id = selected ?? ig.active_instagram_account_id ?? ig.accounts[0]?.id ?? null;
+    const id =
+      preferId ?? selected ?? ig.active_instagram_account_id ?? ig.accounts[0]?.id ?? null;
     setSelected(id);
     const acc = ig.accounts.find((a) => a.id === id);
     if (acc) {
@@ -65,8 +66,12 @@ export function AgentsPage() {
       };
       if (form.agent_access_token.trim()) body.agent_access_token = form.agent_access_token.trim();
       await api.instagramAccounts.update(selected, body);
-      await reload();
-      setMsg("Agente salvo nesta conta.");
+      await reload(selected);
+      setMsg(
+        form.agent_ativo
+          ? "Agente LIGADO. Falta o webhook Meta apontar para a API (veja Integrações)."
+          : "Agente desligado nesta conta."
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha");
     }
@@ -75,11 +80,26 @@ export function AgentsPage() {
   return (
     <div className="animate-rise max-w-2xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold">Agentes</h1>
+        <h1 className="font-display text-3xl font-bold">Agente comentário / Direct</h1>
         <p className="text-white/55 mt-1">
-          Comentário → Direct interno (sem n8n). Runtime na API + webhook Meta em{" "}
+          Responde sozinho quando alguém comenta ou manda DM. Roda <strong>dentro da API</strong> — não
+          depende de n8n.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/65 space-y-2">
+        <p>
+          <strong className="text-white/90">Fluxo:</strong> Instagram → webhook Meta → Vende247 → LLM →
+          resposta no Graph.
+        </p>
+        <p>
+          Configure o callback em{" "}
           <Link className="text-signal underline" to="/integracoes">
             Integrações
+          </Link>
+          . Credenciais do perfil em{" "}
+          <Link className="text-signal underline" to="/config">
+            Contas Instagram
           </Link>
           .
         </p>
@@ -87,12 +107,16 @@ export function AgentsPage() {
 
       {accounts.length === 0 ? (
         <p className="text-white/50">
-          Cadastre uma conta IG em <Link className="text-signal underline" to="/config">Conta</Link>.
+          Cadastre um perfil em{" "}
+          <Link className="text-signal underline" to="/config">
+            Contas Instagram
+          </Link>{" "}
+          antes.
         </p>
       ) : (
         <>
           <label className="block card">
-            <span className="label">Conta</span>
+            <span className="label">Qual conta Instagram?</span>
             <select
               className="field"
               value={selected ?? ""}
@@ -101,6 +125,7 @@ export function AgentsPage() {
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.label || a.ig_username || a.id}
+                  {a.agent_ativo ? " (ligado)" : ""}
                 </option>
               ))}
             </select>
@@ -113,7 +138,7 @@ export function AgentsPage() {
                 checked={form.agent_ativo}
                 onChange={(e) => setForm((f) => ({ ...f, agent_ativo: e.target.checked }))}
               />
-              Agente ativo
+              Agente ativo nesta conta
             </label>
             <label className="block">
               <span className="label">Nome do agente</span>
@@ -124,7 +149,7 @@ export function AgentsPage() {
               />
             </label>
             <label className="block">
-              <span className="label">Prompt comentários</span>
+              <span className="label">Prompt — respostas a comentários</span>
               <textarea
                 className="field min-h-[120px]"
                 value={form.agent_prompt_comentarios}
@@ -132,7 +157,7 @@ export function AgentsPage() {
               />
             </label>
             <label className="block">
-              <span className="label">Prompt Direct</span>
+              <span className="label">Prompt — Direct</span>
               <textarea
                 className="field min-h-[120px]"
                 value={form.agent_prompt_direct}
@@ -140,12 +165,12 @@ export function AgentsPage() {
               />
             </label>
             <label className="block">
-              <span className="label">Token agente (opcional — senão usa o da conta)</span>
+              <span className="label">Token só do agente (opcional)</span>
               <input
                 className="field"
                 value={form.agent_access_token}
                 onChange={(e) => setForm((f) => ({ ...f, agent_access_token: e.target.value }))}
-                placeholder="Deixe vazio para manter"
+                placeholder="Vazio = usa o token da conta"
               />
             </label>
             {error && <p className="text-coral text-sm">{error}</p>}
