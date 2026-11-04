@@ -6,6 +6,7 @@ import {
   lockVisualToNiche,
   looksIndustrialVisual,
 } from "./nicheVisual.js";
+import { TILLI_SYSTEM_STRATEGY } from "../data/tilliPrompts.js";
 
 export type CarouselSlide = {
   titulo: string;
@@ -64,7 +65,9 @@ export async function generateStrategy(
   const n = Math.min(Math.max(days, 7), 14);
 
   const plan = await chatJson<StrategyPlan>(
-    `Você é diretor de conteúdo Instagram (Brasil). A identidade visual AINDA NÃO EXISTE — planeje MENSAGEM e CENAS do produto, não paleta de outra campanha.
+    `${TILLI_SYSTEM_STRATEGY}
+
+Você é diretor de conteúdo Instagram (Brasil). A identidade visual AINDA NÃO EXISTE — planeje MENSAGEM e CENAS do produto, não paleta de outra campanha.
 
 Campanha: tipo=${ctx.type || "?"} nome=${ctx.name || ctx.produto}. Nicho: ${ctx.nicho}. Tom: ${ctx.tom_voz}.
 Use research (hooks, oportunidades, direcao_visual). Plano de exatamente ${n} dias, cada post diferente.

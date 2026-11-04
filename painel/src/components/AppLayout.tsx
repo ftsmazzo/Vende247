@@ -8,6 +8,8 @@ const links = [
   { to: "/estrategia", label: "Estratégia" },
   { to: "/criativos", label: "Criativos" },
   { to: "/landing", label: "Landing" },
+  { to: "/agentes", label: "Agentes" },
+  { to: "/integracoes", label: "Integrações" },
   { to: "/config", label: "Conta" },
 ];
 

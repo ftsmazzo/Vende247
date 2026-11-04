@@ -519,8 +519,12 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { id: string } }>("/:id/publish", async (req, reply) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
-    if (!ws.ig_user_id || !ws.ig_access_token) {
-      return reply.status(400).send({ error: "Configure ig_user_id e token no onboarding." });
+    const { resolvePublishCredentials } = await import("../services/instagramAccounts.js");
+    const creds = await resolvePublishCredentials(ws.id);
+    if (!creds) {
+      return reply.status(400).send({
+        error: "Vincule uma conta Instagram em Conta/Integrações (ig_user_id + token).",
+      });
     }
     const id = Number(req.params.id);
     const cur = await query<{
@@ -543,14 +547,14 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
       const isCarousel = cur.rows[0].format === "carrossel" && urls.length > 1;
       const mediaId = isCarousel
         ? await publishCarousel({
-            igUserId: ws.ig_user_id,
-            accessToken: ws.ig_access_token,
+            igUserId: creds.igUserId,
+            accessToken: creds.accessToken,
             imageUrls: urls,
             caption: cur.rows[0].caption,
           })
         : await publishImage({
-            igUserId: ws.ig_user_id,
-            accessToken: ws.ig_access_token,
+            igUserId: creds.igUserId,
+            accessToken: creds.accessToken,
             imageUrl: cur.rows[0].media_url,
             caption: cur.rows[0].caption,
           });

@@ -16,6 +16,8 @@ STORAGE=cloudinary
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_UPLOAD_PRESET=
 APIFY_TOKEN=
+PUBLIC_API_URL=https://vendas247-api.kxryyk.easypanel.host
+META_WEBHOOK_VERIFY_TOKEN=vende247-verify
 ```
 
 ## Referência completa

@@ -1,6 +1,7 @@
 import { scrapeCompetitors, type CompetitorProfile } from "./apify.js";
 import { searchAdsForResearch, type AdSnippet } from "./adLibrary.js";
 import { chatJson } from "./llm.js";
+import { TILLI_SYSTEM_RESEARCH } from "../data/tilliPrompts.js";
 
 export type ResearchReport = {
   resumo: string;
@@ -91,9 +92,12 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
   }));
 
   const report = await chatJson<ResearchReport>(
-    `Você é pesquisador de mercado para Instagram (Brasil). NÃO há identidade visual ainda — NÃO fale de paleta, contrato de marca, conflito de identidade, Gotham, numeral 22, brand_kit.
+    `${TILLI_SYSTEM_RESEARCH}
+
+Você é pesquisador de mercado para Instagram (Brasil). NÃO há identidade visual ainda — NÃO fale de paleta, contrato de marca, conflito de identidade, Gotham, numeral 22, brand_kit.
 
 Missão: o que o MERCADO (concorrentes + ads) faz, e o que ESTE produto pode ganhar. Campanha tipo=${ctx.type || "produto"} nome=${ctx.name || ctx.produto}.
+Inclua no JSON campos extras se couber: prioridade_critica[], prioridade_alto_impacto[], vazamentos_funil[].
 
 PROIBIDO:
 - abrir o resumo com "CONFLITO" / "identidade incompatível" / "skill campaign-design-apply"

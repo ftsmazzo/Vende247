@@ -12,6 +12,10 @@ import { strategyRoutes } from "./routes/strategy.js";
 import { creativesRoutes } from "./routes/creatives.js";
 import { landingRoutes } from "./routes/landing.js";
 import { campaignRoutes } from "./routes/campaigns.js";
+import { instagramAccountsRoutes } from "./routes/instagramAccounts.js";
+import { integrationsRoutes } from "./routes/integrations.js";
+import { webhooksInstagramRoutes } from "./routes/webhooksInstagram.js";
+import { handleMcpRpc } from "./mcp/handler.js";
 import { startCronJob } from "./services/cron.js";
 import { getLocalUploadsDir } from "./services/storage.js";
 
@@ -38,6 +42,26 @@ async function build() {
   await app.register(strategyRoutes, { prefix: "/api/strategy" });
   await app.register(creativesRoutes, { prefix: "/api/creatives" });
   await app.register(landingRoutes, { prefix: "/api/landing" });
+  await app.register(instagramAccountsRoutes, { prefix: "/api/instagram-accounts" });
+  await app.register(integrationsRoutes, { prefix: "/api/integrations" });
+  await app.register(webhooksInstagramRoutes, { prefix: "/api/webhooks/instagram" });
+
+  app.post("/mcp", async (req, reply) => {
+    const auth = req.headers.authorization;
+    const result = await handleMcpRpc(
+      typeof auth === "string" ? auth : undefined,
+      (req.body || {}) as { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> }
+    );
+    return reply.send(result);
+  });
+  app.get("/mcp", async (_req, reply) => {
+    return reply.send({
+      ok: true,
+      service: "vende247-mcp",
+      transport: "json-rpc-http",
+      hint: "POST /mcp com Authorization: Bearer <mcp_api_key da conta IG>",
+    });
+  });
 
   // Rota também no root (garantia — alguns deploys não pegavam a do plugin)
   app.post<{ Body: { url?: string; logo_url?: string } }>(

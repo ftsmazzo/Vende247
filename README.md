@@ -2,7 +2,7 @@
 
 Painel para research de nicho/concorrentes, estratégia de conteúdo e criativos viralizantes — com publicação no Instagram.
 
-Produto da **FabriaIA**. O agente comentário → Direct → WhatsApp entra na fase 2 (referência: Agente-Instagram / Vende24).
+Produto da **FabriaIA**. Contas Instagram **N por usuário**, agente comentário→Direct **interno** (webhook Meta), página Integrações, MCP Claude por conta. Skill de análise: `.cursor/skills/instagram-growth-tilli`.
 
 ## Stack
 

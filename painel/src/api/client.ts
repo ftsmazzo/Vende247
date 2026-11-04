@@ -61,9 +61,27 @@ export type Workspace = {
   ig_user_id: string;
   ig_username: string;
   has_ig_token: boolean;
+  instagram_account_id?: number | null;
   onboarding_done: boolean;
   brand_kit?: BrandKit;
   brand_warning?: string | null;
+};
+
+export type InstagramAccount = {
+  id: number;
+  label: string;
+  ig_user_id: string;
+  ig_username: string;
+  facebook_page_id: string;
+  has_ig_token: boolean;
+  has_agent_token: boolean;
+  agent_ativo: boolean;
+  agent_nome: string;
+  agent_prompt_comentarios: string;
+  agent_prompt_direct: string;
+  has_mcp_key: boolean;
+  mcp_api_key: string | null;
+  last_agent_event_at: string | null;
 };
 
 export const api = {
@@ -114,6 +132,44 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ keep_logo }),
       }),
+  },
+  instagramAccounts: {
+    list: () =>
+      request<{
+        accounts: InstagramAccount[];
+        active_instagram_account_id: number | null;
+        defaults: { agent_prompt_comentarios: string; agent_prompt_direct: string };
+      }>("/api/instagram-accounts"),
+    create: (body: Record<string, unknown>) =>
+      request<{ account: InstagramAccount }>("/api/instagram-accounts", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    update: (id: number, body: Record<string, unknown>) =>
+      request<{ account: InstagramAccount }>(`/api/instagram-accounts/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    remove: (id: number) =>
+      request<{ ok: boolean }>(`/api/instagram-accounts/${id}`, { method: "DELETE" }),
+    activate: (id: number) =>
+      request<{ account: InstagramAccount; active_instagram_account_id: number }>(
+        `/api/instagram-accounts/${id}/activate`,
+        { method: "POST" }
+      ),
+    mcpKey: (id: number) =>
+      request<{
+        account: InstagramAccount;
+        mcp: {
+          url: string;
+          token: string;
+          claude_desktop: unknown;
+          cursor: unknown;
+        };
+      }>(`/api/instagram-accounts/${id}/mcp-key`, { method: "POST" }),
+  },
+  integrations: {
+    status: () => request<Record<string, unknown>>("/api/integrations/status"),
   },
   campaigns: {
     list: () => request<{ campaigns: Campaign[] }>("/api/campaigns"),

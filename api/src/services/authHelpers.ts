@@ -32,6 +32,7 @@ export async function getWorkspaceForUser(userId: number) {
     ig_user_id: string;
     ig_username: string;
     ig_access_token: string;
+    instagram_account_id: number | null;
     brand_kit: Record<string, unknown>;
     onboarding_done: boolean;
   }>(
@@ -40,6 +41,7 @@ export async function getWorkspaceForUser(userId: number) {
             COALESCE(ig_user_id, '') AS ig_user_id,
             COALESCE(ig_username, '') AS ig_username,
             COALESCE(ig_access_token, '') AS ig_access_token,
+            instagram_account_id,
             COALESCE(brand_kit, '{}'::jsonb) AS brand_kit,
             COALESCE(onboarding_done, FALSE) AS onboarding_done
      FROM workspaces WHERE owner_user_id = $1 ORDER BY id ASC LIMIT 1`,
@@ -63,6 +65,7 @@ export function publicWorkspace(ws: Awaited<ReturnType<typeof getWorkspaceForUse
     ig_user_id: ws.ig_user_id,
     ig_username: ws.ig_username,
     has_ig_token: Boolean(ws.ig_access_token?.trim()),
+    instagram_account_id: ws.instagram_account_id,
     brand_kit: ws.brand_kit,
     brand_warning: brandMismatchReason(brand, {
       nicho: ws.nicho,

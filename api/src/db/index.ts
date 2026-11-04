@@ -157,6 +157,62 @@ export async function ensureTables(): Promise<void> {
       value JSONB NOT NULL DEFAULT '{}'::jsonb,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS instagram_accounts (
+      id SERIAL PRIMARY KEY,
+      owner_user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      label TEXT NOT NULL DEFAULT '',
+      ig_user_id TEXT NOT NULL DEFAULT '',
+      ig_username TEXT NOT NULL DEFAULT '',
+      ig_access_token TEXT NOT NULL DEFAULT '',
+      facebook_page_id TEXT NOT NULL DEFAULT '',
+      agent_ativo BOOLEAN NOT NULL DEFAULT FALSE,
+      agent_nome TEXT NOT NULL DEFAULT '',
+      agent_prompt_comentarios TEXT NOT NULL DEFAULT '',
+      agent_prompt_direct TEXT NOT NULL DEFAULT '',
+      agent_access_token TEXT NOT NULL DEFAULT '',
+      mcp_api_key TEXT UNIQUE,
+      last_agent_event_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ig_accounts_owner ON instagram_accounts (owner_user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ig_accounts_mcp_key
+      ON instagram_accounts (mcp_api_key) WHERE mcp_api_key IS NOT NULL AND mcp_api_key <> '';
+
+    ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS instagram_account_id INT REFERENCES instagram_accounts(id) ON DELETE SET NULL;
+  `);
+
+  await p.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM schema_patches WHERE name = 'migrate_workspace_ig_to_accounts') THEN
+        INSERT INTO instagram_accounts (
+          owner_user_id, label, ig_user_id, ig_username, ig_access_token
+        )
+        SELECT
+          w.owner_user_id,
+          COALESCE(NULLIF(w.ig_username, ''), NULLIF(w.name, ''), 'Conta Instagram'),
+          COALESCE(w.ig_user_id, ''),
+          COALESCE(w.ig_username, ''),
+          COALESCE(w.ig_access_token, '')
+        FROM workspaces w
+        WHERE (COALESCE(w.ig_user_id, '') <> '' OR COALESCE(w.ig_access_token, '') <> '')
+          AND NOT EXISTS (
+            SELECT 1 FROM instagram_accounts a WHERE a.owner_user_id = w.owner_user_id
+          );
+
+        UPDATE workspaces w
+        SET instagram_account_id = a.id
+        FROM instagram_accounts a
+        WHERE a.owner_user_id = w.owner_user_id
+          AND w.instagram_account_id IS NULL
+          AND (COALESCE(w.ig_user_id, '') <> '' OR COALESCE(w.ig_access_token, '') <> '');
+
+        INSERT INTO schema_patches (name) VALUES ('migrate_workspace_ig_to_accounts');
+      END IF;
+    END $$;
   `);
 
   await p.query(`
