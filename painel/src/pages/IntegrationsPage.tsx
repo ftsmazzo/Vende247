@@ -133,15 +133,15 @@ export function IntegrationsPage() {
       <section className="card space-y-3">
         <h2 className="font-semibold">Provedores no servidor (EasyPanel)</h2>
         <p className="text-xs text-white/45">
-          Você não cola Apify/OpenAI no painel — só no env da API. Aqui só o status.
+          Texto/JSON do produto usa só OpenRouter. Troque o modelo em{" "}
+          <code className="text-xs">LLM_MODEL</code> / <code className="text-xs">LLM_MODEL_AGENT</code>{" "}
+          no EasyPanel (slug OpenRouter).
         </p>
         {(
           [
+            ["openrouter", "OpenRouter (LLM + imagens)"],
             ["apify", "Apify (research)"],
-            ["openai", "OpenAI"],
-            ["gemini", "Gemini"],
-            ["anthropic", "Anthropic"],
-            ["kairogen", "Kairogen"],
+            ["kairogen", "Kairogen (opcional)"],
           ] as const
         ).map(([key, label]) => {
           const v = p[key];
@@ -158,7 +158,8 @@ export function IntegrationsPage() {
           );
         })}
         <p className="text-xs text-white/40">
-          LLM: {String(p.llm_provider || "openai")} · Imagem: {String(p.image_provider || "openai")}
+          LLM: openrouter · modelo: {String(p.llm_model || "—")} · agente:{" "}
+          {String(p.llm_model_agent || "—")} · Imagem: {String(p.image_provider || "openrouter")}
         </p>
       </section>
     </div>

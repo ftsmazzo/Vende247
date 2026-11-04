@@ -26,7 +26,9 @@ export async function handleCommentEvent(opts: {
         comentario: opts.text,
         de: opts.fromUsername || null,
         conta: opts.account.ig_username || opts.account.label,
-      })
+      }),
+      1024,
+      { purpose: "agent" }
     );
     replyText = (out.reply || "").trim();
   } catch (e) {

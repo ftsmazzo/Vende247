@@ -436,7 +436,7 @@ export async function gerarImagemViral(
   const purpose: ImagePurpose =
     opts?.purpose ?? (mode === "photo" ? "photo" : "cover");
   const aspectRatio = opts?.aspectRatio ?? "4:5";
-  const provider = (process.env.IMAGE_PROVIDER ?? "openai").toLowerCase();
+  const provider = (process.env.IMAGE_PROVIDER ?? "openrouter").toLowerCase();
   const enriched = buildPrompt(prompt, brand, mode, {
     diversityIndex: opts?.diversityIndex,
     researchCue: opts?.researchCue,

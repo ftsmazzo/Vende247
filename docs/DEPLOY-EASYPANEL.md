@@ -27,8 +27,7 @@ Antes de abrir o EasyPanel, separe estas chaves (pode deixar em um bloco de nota
 |------|------------|---------------------------|
 | Conta GitHub com acesso ao repo `ftsmazzo/Vende247` | GitHub | Sim |
 | EasyPanel no ar | Seu servidor | Sim |
-| `OPENAI_API_KEY` | platform.openai.com | Sim (imagens gpt-image; texto se usar OpenAI) |
-| `ANTHROPIC_API_KEY` | console.anthropic.com | Não (só se `LLM_PROVIDER=anthropic`) |
+| `OPENROUTER_API_KEY` | openrouter.ai | Sim (LLM texto + imagens via OpenRouter) |
 | `APIFY_TOKEN` | console.apify.com → Integrations → API token | Recomendado (sem isso o research fica “degradado”) |
 | Conta Cloudinary (cloud name + upload preset **unsigned**) | cloudinary.com | Recomendado em produção |
 | `META_ACCESS_TOKEN` | Meta for Developers (Ad Library) | Não (opcional) |
@@ -122,7 +121,9 @@ HOST=0.0.0.0
 NODE_ENV=production
 DATABASE_URL=postgresql://USUARIO:SENHA@HOST_INTERNO:5432/vende247
 JWT_SECRET=COLE_O_SEGREDO_GERADO_NA_PARTE_0
-OPENAI_API_KEY=sk-...
+OPENROUTER_API_KEY=sk-or-v1-...
+LLM_MODEL=openai/gpt-4o-mini
+IMAGE_PROVIDER=openrouter
 ```
 
 ### 3.2 Research (fortemente recomendado)
@@ -158,18 +159,16 @@ E monte um volume persistente no caminho `/app/data` (ou `data`), senão as imag
 ### 3.4 Opcionais
 
 ```env
-# Texto com Claude (teste de qualidade de copy)
-ANTHROPIC_API_KEY=sk-ant-...
-LLM_PROVIDER=anthropic
-LLM_MODEL=claude-sonnet-4-6
-# Voltar ao barato: LLM_PROVIDER=openai + LLM_MODEL=gpt-4o-mini
-IMAGE_PROVIDER=openai
-OPENAI_IMAGE_MODEL=gpt-image-2
-# gpt-image-2: size 4:5 nativo (menos corte de texto). Alt: gpt-image-1.5
-# OpenRouter (roteamento): IMAGE_PROVIDER=openrouter + OPENROUTER_API_KEY
-# volume=seedream-4.5 | cover=gemini-3-pro-image | photo=flux.2-pro
+# LLM só via OpenRouter — troque o slug quando quiser outro modelo
+# LLM_MODEL=anthropic/claude-sonnet-4
+# LLM_MODEL_AGENT=openai/gpt-4o-mini
+OR_MODEL_VOLUME=qwen/qwen-image-3
+OR_MODEL_COVER=qwen/qwen-image-3-pro
+OR_MODEL_PHOTO=krea/krea-2-large
 META_ACCESS_TOKEN=
 META_AD_LIBRARY_SEARCH_COUNTRY=BR
+PUBLIC_API_URL=https://vendas247-api.kxryyk.easypanel.host
+META_WEBHOOK_VERIFY_TOKEN=vende247-verify
 ALLOW_OPEN_REGISTER=false
 ```
 
@@ -222,7 +221,7 @@ Marque antes de ir para o painel:
 - [ ] `/api/auth/status` com `db: true`
 - [ ] `DATABASE_URL` apontando para Postgres interno
 - [ ] `JWT_SECRET` forte definido
-- [ ] `OPENAI_API_KEY` definida
+- [ ] `OPENROUTER_API_KEY` + `LLM_MODEL` definidos
 - [ ] Storage configurado (Cloudinary **ou** local + `MEDIA_BASE_URL` + volume)
 - [ ] URL pública da API anotada para o próximo passo (painel)
 

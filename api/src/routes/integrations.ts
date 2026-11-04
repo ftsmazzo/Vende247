@@ -41,12 +41,15 @@ export const integrationsRoutes: FastifyPluginAsync = async (app) => {
         note: "Gere a chave em Conta → Contas Instagram → Conectar Claude.",
       },
       providers: {
+        openrouter: masked(process.env.OPENROUTER_API_KEY),
         apify: masked(process.env.APIFY_TOKEN),
-        openai: masked(process.env.OPENAI_API_KEY),
-        gemini: masked(process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY),
-        anthropic: masked(process.env.ANTHROPIC_API_KEY),
         kairogen: masked(process.env.KAIROGEN_ACCESS_TOKEN),
-        llm_provider: process.env.LLM_PROVIDER || "openai",
+        llm_provider: "openrouter",
+        llm_model: process.env.LLM_MODEL?.trim() || "openai/gpt-4o-mini",
+        llm_model_agent:
+          process.env.LLM_MODEL_AGENT?.trim() ||
+          process.env.LLM_MODEL?.trim() ||
+          "openai/gpt-4o-mini",
         image_provider: imageProvider,
         video_provider: process.env.VIDEO_PROVIDER || null,
       },

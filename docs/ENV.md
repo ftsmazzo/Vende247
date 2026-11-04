@@ -11,7 +11,9 @@ HOST=0.0.0.0
 NODE_ENV=production
 DATABASE_URL=postgresql://USUARIO:SENHA@HOST_INTERNO:5432/vende247
 JWT_SECRET=
-OPENAI_API_KEY=
+OPENROUTER_API_KEY=
+LLM_MODEL=openai/gpt-4o-mini
+IMAGE_PROVIDER=openrouter
 STORAGE=cloudinary
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_UPLOAD_PRESET=
@@ -29,14 +31,13 @@ META_WEBHOOK_VERIFY_TOKEN=vende247-verify
 | `NODE_ENV` | não | — | Use `production` |
 | `DATABASE_URL` | sim | — | Postgres; tabelas criadas no boot |
 | `JWT_SECRET` | sim | fraco em dev | Assina login |
-| `OPENAI_API_KEY` | sim* | — | Imagem (gpt-image) e/ou texto se `LLM_PROVIDER=openai` |
-| `ANTHROPIC_API_KEY` | alt | — | Se `LLM_PROVIDER=anthropic` (Claude) |
-| `GEMINI_API_KEY` | alt | — | Se `LLM_PROVIDER=gemini` ou `IMAGE_PROVIDER=gemini` |
-| `LLM_PROVIDER` | não | `openai` | `openai`, `gemini` ou `anthropic` |
-| `LLM_MODEL` | não | depende | Ex.: `gpt-4o-mini`, `claude-sonnet-4-6` |
-| `IMAGE_PROVIDER` | não | `openai` | Padrão `openai` (gpt-image-2). Opções: `gemini`, `openrouter`, `kairogen` (hub opcional) |
-| `OPENAI_IMAGE_MODEL` | não | `gpt-image-2` | Preferir `gpt-image-2` (4:5 nativo). Alt: `gpt-image-1.5` |
-| `OPENROUTER_API_KEY` | alt | — | Obrigatória se `IMAGE_PROVIDER=openrouter` |
+| `OPENROUTER_API_KEY` | sim* | — | **Única chave de LLM** (texto + imagens via OpenRouter) |
+| `LLM_MODEL` | não | `openai/gpt-4o-mini` | Slug OpenRouter (ex. `anthropic/claude-sonnet-4`) |
+| `LLM_MODEL_AGENT` | não | = `LLM_MODEL` | Modelo só do agente comentário/DM |
+| `OPENROUTER_HTTP_REFERER` | não | vende247.app | Header OpenRouter |
+| `OPENROUTER_APP_TITLE` | não | Vende247 | Header OpenRouter |
+| `IMAGE_PROVIDER` | não | `openrouter` | Preferir `openrouter`. Alt: `kairogen` |
+| `OPENAI_IMAGE_MODEL` | não | `gpt-image-2` | Legado se ainda usar provider openai direto |
 | `OR_MODEL_VOLUME` | não | `qwen/qwen-image-3` | Slides / volume (~$0,03) — texto PT |
 | `OR_MODEL_COVER` | não | `qwen/qwen-image-3-pro` | Feed / capa (~$0,04) |
 | `OR_MODEL_PHOTO` | não | `krea/krea-2-large` | Hero landing (~$0,06) fotoreal |

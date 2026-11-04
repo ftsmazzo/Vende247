@@ -1,85 +1,58 @@
 import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GEMINI_API_KEY;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+/**
+ * Texto/JSON do Vende247 passa só pelo OpenRouter.
+ * Troque o modelo via LLM_MODEL (slug OpenRouter), ex.:
+ *   openai/gpt-4o-mini
+ *   anthropic/claude-sonnet-4
+ *   google/gemini-2.5-flash
+ * Opcional: LLM_MODEL_AGENT para comentário/DM (senão usa LLM_MODEL).
+ */
 
-export type LlmProvider = "openai" | "gemini" | "anthropic";
+const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 
-function provider(): LlmProvider {
-  const p = (process.env.LLM_PROVIDER ?? "openai").toLowerCase();
-  if (p === "gemini") return "gemini";
-  if (p === "anthropic" || p === "claude") return "anthropic";
-  return "openai";
+function openRouterKey(): string {
+  const k = process.env.OPENROUTER_API_KEY?.trim();
+  if (!k) throw new Error("OPENROUTER_API_KEY não configurada (LLM só via OpenRouter).");
+  return k;
 }
 
-function openaiModel() {
-  return process.env.LLM_MODEL?.trim() || "gpt-4o-mini";
-}
-
-function anthropicModel() {
-  return process.env.LLM_MODEL?.trim() || "claude-sonnet-4-6";
-}
-
-async function chatJsonAnthropic<T>(system: string, user: string, maxTokens: number): Promise<T> {
-  if (!ANTHROPIC_API_KEY?.trim()) {
-    throw new Error("ANTHROPIC_API_KEY não configurada.");
+export function llmModel(purpose: "default" | "agent" = "default"): string {
+  if (purpose === "agent") {
+    const agent = process.env.LLM_MODEL_AGENT?.trim();
+    if (agent) return agent;
   }
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY.trim(),
-      "anthropic-version": "2023-06-01",
+  return process.env.LLM_MODEL?.trim() || "openai/gpt-4o-mini";
+}
+
+function client(): OpenAI {
+  return new OpenAI({
+    apiKey: openRouterKey(),
+    baseURL: OPENROUTER_BASE,
+    defaultHeaders: {
+      "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER || "https://vende247.app",
+      "X-Title": process.env.OPENROUTER_APP_TITLE || "Vende247",
     },
-    body: JSON.stringify({
-      model: anthropicModel(),
-      max_tokens: maxTokens,
-      temperature: 0.4,
-      system: `${system}\n\nResponda APENAS com JSON compacto e válido. Sem markdown. Sintetize.`,
-      messages: [{ role: "user", content: user }],
-    }),
   });
-  const json = (await res.json()) as {
-    content?: Array<{ type?: string; text?: string }>;
-    error?: { message?: string };
-  };
-  if (!res.ok) {
-    throw new Error(json.error?.message || `Anthropic HTTP ${res.status}`);
-  }
-  const text = (json.content || [])
-    .filter((b) => b.type === "text" && b.text)
-    .map((b) => b.text)
-    .join("\n");
-  return parseLlmJson<T>(text || "{}");
 }
 
-export async function chatJson<T>(system: string, user: string, maxTokens = 4096): Promise<T> {
-  const prov = provider();
-  if (prov === "anthropic") {
-    return chatJsonAnthropic<T>(system, user, maxTokens);
-  }
-  if (prov === "gemini") {
-    if (!GEMINI_API_KEY?.trim()) throw new Error("GEMINI_API_KEY não configurada.");
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.trim() });
-    const model = process.env.LLM_MODEL?.trim() || "gemini-2.0-flash";
-    const res = await ai.models.generateContent({
-      model,
-      contents: `${system}\n\n---\n\n${user}\n\nResponda APENAS com JSON válido.`,
-      config: { responseMimeType: "application/json" },
-    });
-    const text = (res as { text?: string }).text ?? "";
-    return parseLlmJson<T>(text);
-  }
-
-  if (!OPENAI_API_KEY?.trim()) throw new Error("OPENAI_API_KEY não configurada.");
-  const openai = new OpenAI({ apiKey: OPENAI_API_KEY.trim() });
+export async function chatJson<T>(
+  system: string,
+  user: string,
+  maxTokens = 4096,
+  opts?: { purpose?: "default" | "agent" }
+): Promise<T> {
+  const model = llmModel(opts?.purpose ?? "default");
+  const openai = client();
   const res = await openai.chat.completions.create({
-    model: openaiModel(),
+    model,
     response_format: { type: "json_object" },
+    max_tokens: maxTokens,
     messages: [
-      { role: "system", content: system },
+      {
+        role: "system",
+        content: `${system}\n\nResponda APENAS com JSON compacto e válido. Sem markdown.`,
+      },
       { role: "user", content: user },
     ],
     temperature: 0.7,

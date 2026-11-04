@@ -25,7 +25,9 @@ export async function handleDirectEvent(opts: {
       JSON.stringify({
         mensagem: opts.text,
         conta: opts.account.ig_username || opts.account.label,
-      })
+      }),
+      1024,
+      { purpose: "agent" }
     );
     replyText = (out.reply || "").trim();
   } catch (e) {
