@@ -36,14 +36,22 @@ function client(): OpenAI {
   });
 }
 
+export type ChatTurn = { role: "user" | "assistant"; content: string };
+
 export async function chatJson<T>(
   system: string,
   user: string,
   maxTokens = 4096,
-  opts?: { purpose?: "default" | "agent" }
+  opts?: {
+    purpose?: "default" | "agent";
+    temperature?: number;
+    /** Histórico anterior (não incluir a mensagem atual — vai em `user`). */
+    history?: ChatTurn[];
+  }
 ): Promise<T> {
   const model = llmModel(opts?.purpose ?? "default");
   const openai = client();
+  const history = (opts?.history || []).slice(-12);
   const res = await openai.chat.completions.create({
     model,
     response_format: { type: "json_object" },
@@ -53,9 +61,10 @@ export async function chatJson<T>(
         role: "system",
         content: `${system}\n\nResponda APENAS com JSON compacto e válido. Sem markdown.`,
       },
+      ...history.map((h) => ({ role: h.role, content: h.content })),
       { role: "user", content: user },
     ],
-    temperature: 0.7,
+    temperature: opts?.temperature ?? (opts?.purpose === "agent" ? 0.55 : 0.7),
   });
   const text = res.choices[0]?.message?.content ?? "{}";
   return parseLlmJson<T>(text);

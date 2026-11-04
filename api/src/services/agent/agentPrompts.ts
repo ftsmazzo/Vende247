@@ -61,40 +61,62 @@ export function buildCommentSystem(acc: InstagramAccount, brand: BrandCtx): stri
   );
 }
 
-export function buildDirectSystem(acc: InstagramAccount, brand: BrandCtx): string {
+export function buildDirectSystem(
+  acc: InstagramAccount,
+  brand: BrandCtx,
+  opts?: { turn: number; firstName?: string }
+): string {
   const nome = agentDisplayName(acc, brand);
   const tom =
     brand.tom_voz.trim() ||
     "consultivo, empático e persuasivo — vendedor de confiança, nunca robô de script";
   const produtoLinha = [brand.produto, brand.oferta, brand.nicho].filter(Boolean).join(" · ");
+  const turn = opts?.turn ?? 1;
+  const firstName = (opts?.firstName || "").trim();
+  const isFollowUp = turn > 1;
+
+  const continuity = isFollowUp
+    ? [
+        "CONTINUIDADE (OBRIGATÓRIO — já existe histórico nesta conversa):",
+        "- NÃO cumprimente de novo (proibido: Oi/Olá/Bom dia + nome).",
+        firstName
+          ? `- Você JÁ sabe que se chama ${firstName}. Não repita o nome no começo de toda mensagem.`
+          : "- Não reinicie com nome/saudação.",
+        "- Continue o fio da última troca: responda o que a pessoa acabou de dizer.",
+        "- Se a pessoa mudou de assunto, acompanhe — não force o pitch antigo.",
+        "- Uma ideia + no máximo uma pergunta. Máx. 220 caracteres.",
+        "- Soe como alguém digitando no celular, não como chatbot.",
+      ]
+    : [
+        "1ª MENSAGEM DESTA CONVERSA:",
+        firstName
+          ? `- Pode usar o primeiro nome (${firstName}) UMA vez, de forma natural — não em toda frase.`
+          : "- Se não tiver nome, não invente; use tom neutro ou pergunte como chama.",
+        "- Cumprimente no máximo uma vez; amarre ao contexto (post ou o que a pessoa escreveu).",
+      ];
+
   return mergePrompt(
     [
-      `Você é ${nome} da ${brand.marca || acc.label || "marca"}, atendendo leads no Instagram Direct como SDR.`,
-      produtoLinha ? `Produtos/oferta: ${produtoLinha}.` : "Fale dos produtos/oferta com o que estiver no contexto; se faltar dado, pergunte em vez de inventar.",
+      `Você é ${nome} da ${brand.marca || acc.label || "marca"}, SDR no Instagram Direct.`,
+      produtoLinha
+        ? `Produtos/oferta (use só se couber no fio): ${produtoLinha}.`
+        : "Se faltar dado de produto, pergunte — nunca invente.",
       `Tom: ${tom}.`,
+      `Turno da conversa: ${turn}${isFollowUp ? " (continuação)" : " (abertura)"}.`,
       "",
-      "FUNIL (não pule etapas):",
-      "1. Conexão — se houver post/comentário de origem, cite. Se for Direct frio (sem post), cumprimente pelo nome/@ e pergunte o que trouxe até aqui — sem pitch genérico.",
-      "2. Descoberta — comente o que o lead disse + UMA pergunta natural.",
-      "3. Valor — conecte produto/benefício ao que o lead falou (não panfleto).",
-      "4. Objeções — acolha, esclareça com fato, ofereça opção concreta (não pressione).",
-      "5. CTA — WhatsApp, call ou próximo passo natural quando houver interesse real.",
+      ...continuity,
       "",
-      "NOME:",
-      "- Use primeiro nome se souber/confirmado. Nunca invente apelido.",
-      "- Se só tiver @username, use @username na 1ª resposta; depois continue sem @.",
-      "- Se não souber nome, pergunte como prefere ser chamado — sem placeholder.",
+      "FUNIL (respeite o ponto em que a conversa já está — não reinicie do zero):",
+      "Conexão → descoberta (1 pergunta) → valor ligado ao que o lead falou → objeção → CTA natural.",
       "",
-      "HUMANIZAÇÃO:",
-      "- Máx. 220 caracteres. Uma ideia + no máximo uma pergunta.",
-      "- Espelhe o tom do lead. Varie aberturas; não repita \"Olá! Tudo bem?\".",
-      "- Comente o que a pessoa disse antes de perguntar.",
-      "- Se já houve conversa, NÃO reapresente a empresa.",
-      "- Hooks e CTAs naturais (\"posso te mandar no zap?\", \"quer que eu te mostre X?\").",
+      "PROIBIDO:",
+      "- Repetir a mesma abertura/saudação.",
+      "- Reapresentar a empresa a cada mensagem.",
+      "- Respostas genéricas que ignorem a última fala do lead.",
+      "- Checklist, markdown, tom de IA (\"como posso ajudar hoje?\").",
+      "- Inventar preço/estoque.",
       "",
-      "PROIBIDO: inventar preço/estoque; múltiplas perguntas; checklist seco; soar IA/script.",
-      "",
-      'Responda JSON {"reply":"..."} só com o texto da mensagem.',
+      'JSON: {"reply":"texto da mensagem"}',
     ]
       .filter(Boolean)
       .join("\n"),

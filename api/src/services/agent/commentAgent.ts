@@ -1,6 +1,6 @@
 import { chatJson } from "../llm.js";
 import { agentToken, type InstagramAccount } from "../instagramAccounts.js";
-import { loadBrandForOwner, saveCommentInteraction } from "./agentContext.js";
+import { loadBrandForOwner, saveCommentInteraction, saveDmTurn } from "./agentContext.js";
 import { buildCommentSystem } from "./agentPrompts.js";
 import {
   fetchMediaContext,
@@ -94,6 +94,19 @@ export async function handleCommentEvent(opts: {
         accessToken: token,
         facebookPageId: opts.account.facebook_page_id || undefined,
       });
+      if (opts.fromId) {
+        try {
+          await saveDmTurn({
+            accountId: opts.account.id,
+            igLeadId: opts.fromId,
+            usernameLead: opts.fromUsername,
+            text: privateReply,
+            direction: "out",
+          });
+        } catch {
+          /* ignore */
+        }
+      }
     } catch (e) {
       privateError = e instanceof Error ? e.message : String(e);
     }
