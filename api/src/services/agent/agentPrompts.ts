@@ -1,5 +1,5 @@
 import type { InstagramAccount } from "../instagramAccounts.js";
-import type { CompanyBriefing } from "../companyKnowledge.js";
+import type { CompanyBriefing, WorkspaceProduct } from "../companyKnowledge.js";
 
 export type BrandCtx = {
   marca: string;
@@ -8,6 +8,8 @@ export type BrandCtx = {
   oferta: string;
   tom_voz: string;
 };
+
+export type DirectMode = "direct_frio" | "pos_comentario" | "continuacao";
 
 export function brandFromBriefing(brief: CompanyBriefing | null): BrandCtx {
   if (!brief) {
@@ -46,6 +48,34 @@ function briefBlock(brief: CompanyBriefing | null): string {
   return brief?.agent_brief?.trim() || "Base da empresa ainda vazia — peça o essencial e não invente.";
 }
 
+/** Heurística leve: produto da carta que mais “bate” com post/comentário. */
+export function matchProductFromText(
+  text: string,
+  products: WorkspaceProduct[]
+): WorkspaceProduct | null {
+  const hay = text.toLowerCase();
+  if (!hay || !products.length) return null;
+  let best: WorkspaceProduct | null = null;
+  let score = 0;
+  for (const p of products.filter((x) => x.ativo)) {
+    let s = 0;
+    const parts = [p.nome, p.descricao, p.beneficios, p.para_quem]
+      .join(" ")
+      .toLowerCase()
+      .split(/[^a-z0-9à-ú]+/i)
+      .filter((w) => w.length >= 4);
+    for (const w of parts) {
+      if (hay.includes(w)) s += 1;
+    }
+    if (p.nome && hay.includes(p.nome.toLowerCase())) s += 5;
+    if (s > score) {
+      score = s;
+      best = p;
+    }
+  }
+  return score > 0 ? best : products.find((p) => p.ativo) || null;
+}
+
 export function buildCommentSystem(
   acc: InstagramAccount,
   brand: BrandCtx,
@@ -62,16 +92,15 @@ export function buildCommentSystem(
       "",
       briefBlock(brief),
       "",
-      "PAPEL (comentário público + abertura no Direct via push):",
-      "- Seja breve, caloroso e específico ao comentário. Nunca genérico.",
-      "- Se houver legenda do post, use. Se NÃO houver post/legenda, use missão + carta de produtos.",
-      "- Objetivo: micro-conexão + curiosidade para o Direct.",
+      "PAPEL (comentário → push no Direct):",
+      "- Público: curto, específico ao comentário + ao post (se houver legenda).",
+      "- Direct privado: 1ª abertura — retome o comentário e o tema do post; amarre a UM produto da carta se fizer sentido.",
+      "- Se o post não tiver legenda, use missão + carta (não dependa do feed).",
       "",
       "JSON:",
       '- "resposta_comentario": máx. 280 chars.',
-      '- "resposta_direct": 1ª msg privada, máx. 220 chars, UMA pergunta. Sem markdown.',
-      "",
-      "Não invente preço/promoção fora da base. Sem WhatsApp no comentário público.",
+      '- "resposta_direct": máx. 220 chars, UMA pergunta. Sem markdown.',
+      "- Sem WhatsApp no público. Não invente fora da base.",
     ].join("\n"),
     acc.agent_prompt_comentarios
   );
@@ -80,47 +109,70 @@ export function buildCommentSystem(
 export function buildDirectSystem(
   acc: InstagramAccount,
   brand: BrandCtx,
-  opts?: { turn: number; firstName?: string; brief?: CompanyBriefing | null }
+  opts: {
+    turn: number;
+    firstName?: string;
+    brief?: CompanyBriefing | null;
+    mode: DirectMode;
+    fromComment: boolean;
+  }
 ): string {
   const nome = agentDisplayName(acc, brand);
   const tom =
     brand.tom_voz.trim() ||
     "consultivo, empático e persuasivo — vendedor de confiança, nunca robô";
-  const turn = opts?.turn ?? 1;
-  const firstName = (opts?.firstName || "").trim();
+  const turn = opts.turn;
+  const firstName = (opts.firstName || "").trim();
   const isFollowUp = turn > 1;
-  const brief = opts?.brief ?? null;
+  const brief = opts.brief ?? null;
+  const fromComment = opts.fromComment;
+
+  const modeBlock = fromComment
+    ? [
+        "MODO: VEIO DE COMENTÁRIO (obrigatório recuperar contexto).",
+        "- Na 1ª resposta do lead (e enquanto o assunto for o post), você JÁ sabe: legenda, comentário original e produto sugerido no payload.",
+        "- Comece pelo post/comentário — não peça \"o que te trouxe\" como se fosse Direct frio.",
+        "- Use o produto sugerido se couber; se o lead pedir outra coisa, troque para outro item da CARTA DE PRODUTOS.",
+        "- Continuidade: mantenha o fio do post até o lead mudar de assunto.",
+      ]
+    : [
+        "MODO: DIRECT FRIO (não dependa de post/feed).",
+        "- Perfil pode estar zerado. Sua única fonte é a BASE DA EMPRESA + CARTA DE PRODUTOS.",
+        "- Descubra necessidade e ofereça o produto certo. Sem esperar legenda/post.",
+      ];
 
   const continuity = isFollowUp
     ? [
-        "CONTINUIDADE (já há histórico):",
+        "CONTINUIDADE:",
         "- Proibido novo Oi/Olá + nome.",
-        firstName ? `- Já sabe o nome (${firstName}); não repita no começo de toda msg.` : "",
-        "- Continue o fio da última fala do lead.",
+        firstName ? `- Nome já conhecido (${firstName}); não repetir no começo.` : "",
+        "- Responda ao que a pessoa acabou de dizer.",
         "- Máx. 220 chars. Uma ideia + no máximo uma pergunta.",
       ]
     : [
-        "1ª MENSAGEM:",
-        firstName ? `- Pode usar ${firstName} uma vez, natural.` : "- Sem nome inventado.",
-        "- Sem post de origem: apresente valor via missão/produtos da base, sem pitch frio de brochure.",
+        "ABERTURA:",
+        firstName ? `- Pode usar ${firstName} uma vez.` : "- Sem nome inventado.",
+        fromComment
+          ? "- Retome post + comentário + produto; UMA pergunta natural."
+          : "- Sem post: missão/produtos, tom humano, UMA pergunta.",
       ];
 
   return mergePrompt(
     [
       `Você é ${nome} da ${brand.marca || acc.label || "marca"}, SDR no Instagram Direct.`,
-      `Tom: ${tom}. Turno: ${turn}${isFollowUp ? " (continuação)" : " (abertura)"}.`,
+      `Tom: ${tom}. Turno: ${turn}. Modo payload: ${opts.mode}.`,
       "",
       briefBlock(brief),
       "",
+      ...modeBlock,
+      "",
       ...continuity.filter(Boolean),
       "",
-      "COMPORTAMENTO:",
-      "- Alinhe à missão. Use a carta de produtos para responder o que vendemos.",
-      "- Direct frio (sem post): descubra necessidade e ofereça o produto certo da carta.",
-      "- Objeções: use as respostas da base; se não houver, acolha e ofereça próximo passo.",
-      "- CTA preferido da empresa quando houver interesse real.",
+      "PRODUTOS:",
+      "- Sempre pode oferecer outro item da carta se o lead mudar o interesse.",
+      "- Não invente preço/condição fora da base; se faltar, diga que confirma no próximo passo (WhatsApp/CTA).",
       "",
-      "PROIBIDO: inventar fora da base; checklist; 'como posso ajudar hoje?'; reapresentar empresa a cada msg.",
+      "PROIBIDO: checklist; 'como posso ajudar hoje?'; reapresentar a empresa a cada msg; ignorar contexto do post quando existir.",
       "",
       'JSON: {"reply":"texto"}',
     ].join("\n"),

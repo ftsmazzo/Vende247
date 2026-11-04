@@ -2,7 +2,7 @@ import { chatJson } from "../llm.js";
 import { agentToken, type InstagramAccount } from "../instagramAccounts.js";
 import { loadCompanyBriefingForOwner } from "../companyKnowledge.js";
 import { saveCommentInteraction, saveDmTurn } from "./agentContext.js";
-import { brandFromBriefing, buildCommentSystem } from "./agentPrompts.js";
+import { brandFromBriefing, buildCommentSystem, matchProductFromText } from "./agentPrompts.js";
 import {
   fetchMediaContext,
   replyToComment,
@@ -35,6 +35,10 @@ export async function handleCommentEvent(opts: {
     : { caption: "", mediaType: "" };
 
   const system = buildCommentSystem(opts.account, brand, brief);
+  const matched = matchProductFromText(
+    `${media.caption} ${opts.text}`,
+    brief?.products || []
+  );
   let publicReply = "";
   let privateReply = "";
   try {
@@ -51,6 +55,19 @@ export async function handleCommentEvent(opts: {
         comentario: opts.text,
         username_lead: opts.fromUsername || null,
         conta: opts.account.ig_username || opts.account.label,
+        produto_sugerido: matched
+          ? {
+              nome: matched.nome,
+              descricao: matched.descricao || null,
+              beneficios: matched.beneficios || null,
+              preco_hint: matched.preco_hint || null,
+            }
+          : null,
+        outros_produtos: (brief?.products || [])
+          .filter((p) => p.ativo)
+          .slice(0, 8)
+          .map((p) => p.nome),
+        nota: "O Direct privado deve carregar o contexto do post/comentário para a próxima mensagem do lead.",
       }),
       1024,
       { purpose: "agent" }

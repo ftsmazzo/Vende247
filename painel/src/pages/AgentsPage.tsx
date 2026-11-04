@@ -88,16 +88,20 @@ export function AgentsPage() {
 
       <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/65 space-y-2">
         <p>
-          <strong className="text-white/90">Comentário:</strong> lê a legenda do post → responde no
-          público → manda Direct privado (notificação/push) chamando pelo @.
+          <strong className="text-white/90">Comentário → Direct:</strong> responde no público, manda
+          push privado e na 1ª resposta do lead recupera post + comentário + produto da carta (pode
+          oferecer outro item se precisar).
         </p>
         <p>
-          <strong className="text-white/90">Direct:</strong> se veio de comentário, usa esse contexto;
-          se for DM frio, fala de produto/oferta do workspace sem soar robô. Quebra objeção + CTA.
+          <strong className="text-white/90">Direct frio:</strong> não depende de post/feed — só da
+          base em{" "}
+          <Link className="text-signal underline" to="/empresa">
+            Empresa
+          </Link>
+          .
         </p>
         <p>
-          Produto/tom vêm do workspace. Os campos abaixo são só <em>refinamentos</em> (vazio = prompt
-          SDR padrão). Webhook em{" "}
+          Campos abaixo = refinamentos opcionais. Webhook em{" "}
           <Link className="text-signal underline" to="/integracoes">
             Integrações
           </Link>

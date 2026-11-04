@@ -8,7 +8,12 @@ import {
   saveDmTurn,
   scrubRepeatedGreeting,
 } from "./agentContext.js";
-import { brandFromBriefing, buildDirectSystem } from "./agentPrompts.js";
+import {
+  brandFromBriefing,
+  buildDirectSystem,
+  matchProductFromText,
+  type DirectMode,
+} from "./agentPrompts.js";
 import { fetchLeadProfile, sendIgDm } from "./graphAgent.js";
 import { query } from "../../db/index.js";
 
@@ -29,11 +34,37 @@ export async function handleDirectEvent(opts: {
     loadDmHistory(opts.account.id, opts.senderId, 10),
   ]);
   const brand = brandFromBriefing(brief);
+  const products = brief?.products || [];
 
   const firstName = firstNameFrom(profile.name, profile.username);
-  const turn = history.filter((h) => h.role === "assistant").length + 1;
-  const hasPost = Boolean(commentCtx?.caption_post || commentCtx?.comment_text);
-  const system = buildDirectSystem(opts.account, brand, { turn, firstName, brief });
+  const assistantTurns = history.filter((h) => h.role === "assistant").length;
+  const turn = assistantTurns + 1;
+  const fromComment = Boolean(commentCtx?.comment_text || commentCtx?.caption_post);
+
+  // Private reply do comentário já conta como 1ª saída do bot → a 1ª fala do lead ainda é “pós-comentário”.
+  const earlyAfterComment = fromComment && assistantTurns <= 2;
+  const mode: DirectMode = fromComment
+    ? earlyAfterComment || turn === 1
+      ? "pos_comentario"
+      : "continuacao"
+    : turn > 1
+      ? "continuacao"
+      : "direct_frio";
+
+  const matched = fromComment
+    ? matchProductFromText(
+        `${commentCtx?.caption_post || ""} ${commentCtx?.comment_text || ""} ${opts.text}`,
+        products
+      )
+    : matchProductFromText(opts.text, products);
+
+  const system = buildDirectSystem(opts.account, brand, {
+    turn,
+    firstName,
+    brief,
+    mode,
+    fromComment,
+  });
 
   try {
     await saveDmTurn({
@@ -47,36 +78,49 @@ export async function handleDirectEvent(opts: {
     /* ignore */
   }
 
+  const produtoSugerido = matched
+    ? {
+        nome: matched.nome,
+        descricao: matched.descricao || null,
+        beneficios: matched.beneficios || null,
+        preco_hint: matched.preco_hint || null,
+        cta: matched.cta || null,
+      }
+    : null;
+
   let replyText: string;
   try {
     const out = await chatJson<{ reply: string }>(
       system,
       JSON.stringify({
         mensagem_atual: opts.text,
-        instrucao:
-          turn > 1
-            ? "Continue o histórico. Sem novo oi/olá/nome. Responda ao que acabou de ser dito."
-            : hasPost
-              ? "Abertura pós-comentário: natural e curta."
-              : "Direct frio / sem posts: use a base da empresa e a carta de produtos.",
+        instrucao: fromComment
+          ? earlyAfterComment
+            ? "VEIO DE COMENTÁRIO: recupere post + comentário + produto sugerido. Não trate como Direct frio. Se o lead pedir outra coisa, ofereça outro item da carta."
+            : "Continuação pós-comentário: mantenha o fio; pode pivotar produto se o lead pedir."
+          : turn > 1
+            ? "Direct frio em continuidade: sem novo cumprimento; use a base/carta. Pode trocar de produto."
+            : "Direct frio: NÃO dependa de post. Use missão + carta de produtos.",
         perfil: {
           username: profile.username || null,
           nome: profile.name || null,
           primeiro_nome: firstName || null,
         },
-        origem_post: hasPost
+        origem_comentario: fromComment
           ? {
-              legenda: commentCtx?.caption_post || null,
+              legenda_post: commentCtx?.caption_post || null,
+              tipo_midia: commentCtx?.media_type || null,
               comentario_original: commentCtx?.comment_text || null,
+              username_no_comentario: commentCtx?.username_lead || null,
+              media_id: commentCtx?.media_id || null,
             }
           : null,
-        modo: hasPost
-          ? turn > 1
-            ? "continuacao"
-            : "pos_comentario"
-          : turn > 1
-            ? "continuacao"
-            : "direct_frio_sem_post",
+        produto_sugerido: produtoSugerido,
+        outros_produtos_disponiveis: products
+          .filter((p) => p.ativo)
+          .slice(0, 8)
+          .map((p) => p.nome),
+        modo: mode,
       }),
       512,
       {
