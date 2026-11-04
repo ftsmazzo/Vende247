@@ -270,12 +270,7 @@ export function agentToken(acc: InstagramAccount): string {
   return (acc.agent_access_token || acc.ig_access_token || "").trim();
 }
 
-export const DEFAULT_COMMENT_PROMPT = `Você responde comentários no Instagram de forma humana, curta e comercial.
-Objetivo: qualificar interesse e convidar para o Direct sem soar spam.
-Regras: 1-2 frases; sem emojis em excesso; se for pergunta de preço/compra, peça DM com "me chama no Direct".
-Nunca invente promoção inexistente.`;
+/** Refinamentos opcionais — o prompt-base SDR vive em agent/agentPrompts.ts */
+export const DEFAULT_COMMENT_PROMPT = "";
 
-export const DEFAULT_DIRECT_PROMPT = `Você atende Direct do Instagram como closer consultivo.
-Objetivo: entender necessidade, responder objeção e conduzir ao próximo passo (WhatsApp/link/call).
-Regras: mensagens curtas; uma pergunta por vez; não seja insistente; respeite janela 24h Meta.
-Se o lead pedir humano, diga que um especialista vai assumir.`;
+export const DEFAULT_DIRECT_PROMPT = "";

@@ -1,10 +1,12 @@
 import { chatJson } from "../llm.js";
+import { agentToken, type InstagramAccount } from "../instagramAccounts.js";
+import { loadBrandForOwner, saveCommentInteraction } from "./agentContext.js";
+import { buildCommentSystem } from "./agentPrompts.js";
 import {
-  agentToken,
-  DEFAULT_COMMENT_PROMPT,
-  type InstagramAccount,
-} from "../instagramAccounts.js";
-import { replyToComment } from "./graphAgent.js";
+  fetchMediaContext,
+  replyToComment,
+  sendPrivateReplyFromComment,
+} from "./graphAgent.js";
 import { query } from "../../db/index.js";
 
 export async function handleCommentEvent(opts: {
@@ -12,42 +14,117 @@ export async function handleCommentEvent(opts: {
   commentId: string;
   text: string;
   fromUsername?: string;
-}): Promise<{ replied: boolean; reply?: string; error?: string }> {
+  fromId?: string;
+  mediaId?: string;
+}): Promise<{
+  replied: boolean;
+  reply?: string;
+  private_reply?: string;
+  error?: string;
+}> {
   if (!opts.account.agent_ativo) return { replied: false, error: "Agente desligado nesta conta." };
   const token = agentToken(opts.account);
   if (!token) return { replied: false, error: "Sem token na conta." };
+  if (!opts.account.ig_user_id) return { replied: false, error: "ig_user_id ausente." };
 
-  const system = opts.account.agent_prompt_comentarios?.trim() || DEFAULT_COMMENT_PROMPT;
-  let replyText: string;
+  const brand = await loadBrandForOwner(opts.account.owner_user_id);
+  const media = opts.mediaId
+    ? await fetchMediaContext({ mediaId: opts.mediaId, accessToken: token })
+    : { caption: "", mediaType: "" };
+
+  const system = buildCommentSystem(opts.account, brand);
+  let publicReply = "";
+  let privateReply = "";
   try {
-    const out = await chatJson<{ reply: string }>(
-      `${system}\nResponda JSON {"reply":"..."} com no máximo 280 caracteres.`,
+    const out = await chatJson<{
+      resposta_comentario?: string;
+      resposta_direct?: string;
+      reply?: string;
+    }>(
+      system,
       JSON.stringify({
+        legenda_post: media.caption || null,
+        tipo_midia: media.mediaType || null,
         comentario: opts.text,
-        de: opts.fromUsername || null,
+        username_lead: opts.fromUsername || null,
         conta: opts.account.ig_username || opts.account.label,
+        marca: brand.marca,
+        produto: brand.produto || null,
+        oferta: brand.oferta || null,
       }),
       1024,
       { purpose: "agent" }
     );
-    replyText = (out.reply || "").trim();
+    publicReply = (out.resposta_comentario || out.reply || "").trim().slice(0, 280);
+    privateReply = (out.resposta_direct || "").trim().slice(0, 220);
+    if (!privateReply && publicReply) {
+      const who = opts.fromUsername ? `@${opts.fromUsername}` : "Oi";
+      privateReply = `${who}, vi seu comentário sobre isso — me conta o que você mais quer saber?`.slice(
+        0,
+        220
+      );
+    }
   } catch (e) {
     return { replied: false, error: e instanceof Error ? e.message : String(e) };
   }
-  if (!replyText) return { replied: false, error: "LLM não gerou reply." };
+  if (!publicReply) return { replied: false, error: "LLM não gerou resposta_comentario." };
 
   try {
     await replyToComment({
       commentId: opts.commentId,
-      message: replyText,
+      message: publicReply,
       accessToken: token,
     });
-    await query(
-      `UPDATE instagram_accounts SET last_agent_event_at = NOW(), updated_at = NOW() WHERE id = $1`,
-      [opts.account.id]
-    );
-    return { replied: true, reply: replyText };
   } catch (e) {
-    return { replied: false, reply: replyText, error: e instanceof Error ? e.message : String(e) };
+    return {
+      replied: false,
+      reply: publicReply,
+      private_reply: privateReply,
+      error: e instanceof Error ? e.message : String(e),
+    };
   }
+
+  let privateError: string | undefined;
+  if (privateReply) {
+    try {
+      await sendPrivateReplyFromComment({
+        igUserId: opts.account.ig_user_id,
+        commentId: opts.commentId,
+        text: privateReply,
+        accessToken: token,
+        facebookPageId: opts.account.facebook_page_id || undefined,
+      });
+    } catch (e) {
+      privateError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  if (opts.fromId) {
+    try {
+      await saveCommentInteraction({
+        accountId: opts.account.id,
+        igLeadId: opts.fromId,
+        usernameLead: opts.fromUsername,
+        commentId: opts.commentId,
+        mediaId: opts.mediaId,
+        commentText: opts.text,
+        captionPost: media.caption,
+        mediaType: media.mediaType,
+      });
+    } catch {
+      /* não bloqueia resposta */
+    }
+  }
+
+  await query(
+    `UPDATE instagram_accounts SET last_agent_event_at = NOW(), updated_at = NOW() WHERE id = $1`,
+    [opts.account.id]
+  );
+
+  return {
+    replied: true,
+    reply: publicReply,
+    private_reply: privateReply,
+    error: privateError,
+  };
 }

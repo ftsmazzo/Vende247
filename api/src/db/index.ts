@@ -182,6 +182,22 @@ export async function ensureTables(): Promise<void> {
       ON instagram_accounts (mcp_api_key) WHERE mcp_api_key IS NOT NULL AND mcp_api_key <> '';
 
     ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS instagram_account_id INT REFERENCES instagram_accounts(id) ON DELETE SET NULL;
+
+    CREATE TABLE IF NOT EXISTS agent_interactions (
+      id SERIAL PRIMARY KEY,
+      instagram_account_id INT NOT NULL REFERENCES instagram_accounts(id) ON DELETE CASCADE,
+      ig_lead_id TEXT NOT NULL DEFAULT '',
+      username_lead TEXT NOT NULL DEFAULT '',
+      comment_id TEXT NOT NULL DEFAULT '',
+      media_id TEXT NOT NULL DEFAULT '',
+      comment_text TEXT NOT NULL DEFAULT '',
+      caption_post TEXT NOT NULL DEFAULT '',
+      media_type TEXT NOT NULL DEFAULT '',
+      channel TEXT NOT NULL DEFAULT 'comment',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_interactions_lead
+      ON agent_interactions (instagram_account_id, ig_lead_id, created_at DESC);
   `);
 
   await p.query(`

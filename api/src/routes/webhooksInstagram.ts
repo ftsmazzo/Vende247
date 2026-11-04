@@ -52,14 +52,19 @@ export const webhooksInstagramRoutes: FastifyPluginAsync = async (app) => {
               const commentId = String(v.id || v.comment_id || "");
               const text = String(v.text || "");
               const from = v.from as { username?: string; id?: string } | undefined;
+              const media = v.media as { id?: string } | undefined;
+              // ignora comentário da própria conta
+              if (from?.id && from.id === igUserId) continue;
               if (commentId && text) {
                 const result = await handleCommentEvent({
                   account,
                   commentId,
                   text,
                   fromUsername: from?.username,
+                  fromId: from?.id,
+                  mediaId: media?.id ? String(media.id) : undefined,
                 });
-                app.log.info({ commentId, result }, "agent comment");
+                app.log.info({ commentId, mediaId: media?.id, result }, "agent comment");
               }
             }
           }

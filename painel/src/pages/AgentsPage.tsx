@@ -80,26 +80,26 @@ export function AgentsPage() {
   return (
     <div className="animate-rise max-w-2xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold">Agente comentário / Direct</h1>
+        <h1 className="font-display text-3xl font-bold">Agente SDR Instagram</h1>
         <p className="text-white/55 mt-1">
-          Responde sozinho quando alguém comenta ou manda DM. Roda <strong>dentro da API</strong> — não
-          depende de n8n.
+          Mesmo espírito do Agente-Instagram no n8n: humanizado, com contexto do post e push no Direct.
         </p>
       </div>
 
       <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/65 space-y-2">
         <p>
-          <strong className="text-white/90">Fluxo:</strong> Instagram → webhook Meta → Vende247 → LLM →
-          resposta no Graph.
+          <strong className="text-white/90">Comentário:</strong> lê a legenda do post → responde no
+          público → manda Direct privado (notificação/push) chamando pelo @.
         </p>
         <p>
-          Configure o callback em{" "}
+          <strong className="text-white/90">Direct:</strong> se veio de comentário, usa esse contexto;
+          se for DM frio, fala de produto/oferta do workspace sem soar robô. Quebra objeção + CTA.
+        </p>
+        <p>
+          Produto/tom vêm do workspace. Os campos abaixo são só <em>refinamentos</em> (vazio = prompt
+          SDR padrão). Webhook em{" "}
           <Link className="text-signal underline" to="/integracoes">
             Integrações
-          </Link>
-          . Credenciais do perfil em{" "}
-          <Link className="text-signal underline" to="/config">
-            Contas Instagram
           </Link>
           .
         </p>
@@ -149,17 +149,19 @@ export function AgentsPage() {
               />
             </label>
             <label className="block">
-              <span className="label">Prompt — respostas a comentários</span>
+              <span className="label">Refinamento — comentários (opcional)</span>
               <textarea
-                className="field min-h-[120px]"
+                className="field min-h-[100px]"
+                placeholder="Ex.: nunca falar de preço no público; mencionar catálogo X…"
                 value={form.agent_prompt_comentarios}
                 onChange={(e) => setForm((f) => ({ ...f, agent_prompt_comentarios: e.target.value }))}
               />
             </label>
             <label className="block">
-              <span className="label">Prompt — Direct</span>
+              <span className="label">Refinamento — Direct (opcional)</span>
               <textarea
-                className="field min-h-[120px]"
+                className="field min-h-[100px]"
+                placeholder="Ex.: CTA preferido é WhatsApp; objeção comum é prazo…"
                 value={form.agent_prompt_direct}
                 onChange={(e) => setForm((f) => ({ ...f, agent_prompt_direct: e.target.value }))}
               />
