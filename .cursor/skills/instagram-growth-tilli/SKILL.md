@@ -28,11 +28,13 @@ Transcrição completa: Agente-Instagram `docs/PROMPTS-MATHEUS-TILLI-INSTAGRAM.m
 
 ## Fluxo no Vende247
 
-1. Conta IG ativa em Conta / Integrações  
-2. Research (system TILLI_SYSTEM_RESEARCH)  
-3. Estratégia (system TILLI_SYSTEM_STRATEGY)  
-4. Criativos / agente comentário→Direct com prompts da conta  
-5. Claude MCP por conta (`POST /mcp`)
+A skill roda na API ao clicar Research ou Estratégia. Não depende do Claude.
+
+1. Empresa preenchida (missão, produtos, objeções)
+2. Research executa diagnóstico + posicionamento + funil (`TILLI_SKILL_RESEARCH`)
+3. Estratégia executa calendário + hooks + retenção + reunião (`TILLI_SKILL_STRATEGY`)
+4. Criativos e landing usam a mesma base da Empresa
+5. MCP só expõe o mesmo texto, se alguém quiser chamar de fora
 
 ## Não faz
 

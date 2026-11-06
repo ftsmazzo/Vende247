@@ -27,6 +27,8 @@ export type ImageGenOpts = {
   hook?: string;
   identityPositive?: string;
   identityNegative?: string;
+  /** Fatos da Empresa para a cena não inventar outro produto */
+  productFacts?: string;
   /**
    * URLs públicas de banco/referência.
    * No provider kairogen ativa modo Editar (img2img) em vez de criar do zero.
@@ -216,6 +218,7 @@ export async function gerarImagemComModelo(
     hook: opts?.hook,
     identityPositive: opts?.identityPositive,
     identityNegative: opts?.identityNegative,
+    productFacts: opts?.productFacts,
   });
   const resolution =
     opts?.purpose === "draft"
@@ -340,6 +343,7 @@ function buildPrompt(
     identityPositive?: string;
     identityNegative?: string;
     hasReferenceImages?: boolean;
+    productFacts?: string;
   }
 ): string {
   const shot = diversityShot(extras?.diversityIndex ?? 0);
@@ -361,6 +365,9 @@ function buildPrompt(
   const neg = extras?.identityNegative?.trim()
     ? `NEGATIVE / DO NOT: ${extras.identityNegative.trim().slice(0, 700)}.`
     : "";
+  const facts = extras?.productFacts?.trim()
+    ? `PRODUCT TRUTH (depict this, not another brand): ${extras.productFacts.trim().slice(0, 400)}.`
+    : "";
 
   const industrial = extras?.niche
     ? /\b(epi|sst|prontepi|seguran|industrial|f[aá]brica)\b/i.test(
@@ -379,6 +386,7 @@ function buildPrompt(
         ? "REQUIRED mood: industrial SST/EPI workplace. FORBIDDEN: Bible, planner journal, faith quiet-time, beige terracotta cozy morning."
         : "FORBIDDEN unless niche is industrial safety: hard hats, EPI/PPE factories as default filler. FORBIDDEN: Bible/faith props unless niche is faith.",
       brandPromptBits(brand),
+      facts,
       pos,
       neg,
       cue,
@@ -402,7 +410,9 @@ function buildPrompt(
     hookLine ? `- Exact hook text to render: \"${hookLine}\"` : "- Use the Portuguese hook implied by the brief.",
     "- Optional one tiny subline under the hook (max 8 words) OR none — never paragraphs.",
     "- Photoreal cinematic scene is 70% of the frame; typography is 30% graphic design, not a document.",
-    "- Dark navy / deep teal industrial grade when SST/EPI; crisp edges, magazine ad finish.",
+    industrial
+      ? "- Industrial workplace of THIS product; crisp edges, magazine ad finish."
+      : "- Match this product's world; crisp edges, magazine ad finish.",
     `Camera / mood: ${shot}.`,
     "FORBIDDEN (causes cheap AI ads):",
     "- multi-card grids, numbered feature boxes (01/02/03), list layouts, FAQ blocks,",
@@ -415,6 +425,7 @@ function buildPrompt(
       ? "REQUIRED authenticity: real SST/EPI workplace people + gear. FORBIDDEN: Bible, planner, faith lifestyle, beige cozy."
       : "Match the product niche; do not default to hard hats unless niche is industrial safety.",
     brandPromptBits(brand),
+    facts,
     pos,
     neg,
     cue,
@@ -445,6 +456,7 @@ export async function gerarImagemViral(
     identityPositive: opts?.identityPositive,
     identityNegative: opts?.identityNegative,
     hasReferenceImages: Boolean(opts?.referenceImageUrls?.length),
+    productFacts: opts?.productFacts,
   });
 
   let buffer: Buffer;

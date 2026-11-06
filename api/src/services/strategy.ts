@@ -6,7 +6,8 @@ import {
   lockVisualToNiche,
   looksIndustrialVisual,
 } from "./nicheVisual.js";
-import { TILLI_SYSTEM_STRATEGY } from "../data/tilliPrompts.js";
+import { TILLI_SKILL_STRATEGY } from "../data/tilliPrompts.js";
+import type { CompanyFacts } from "./companyKnowledge.js";
 
 export type CarouselSlide = {
   titulo: string;
@@ -28,6 +29,10 @@ export type CreativeBrief = {
   visual_prompt: string;
   /** Slides do carrossel (3–5). Obrigatório se formato=carrossel */
   slides?: CarouselSlide[];
+  /** Mecanismo de retenção (skill) */
+  retencao?: string;
+  /** Métrica principal da peça, sem número inventado */
+  metrica?: string;
   /** Tipo de cena para diversidade */
   cena_tipo:
     | "hero_pessoa"
@@ -43,6 +48,12 @@ export type StrategyPlan = {
   resumo: string;
   dias: number;
   pilares: string[];
+  proporcao?: string;
+  parar?: string[];
+  manter?: string[];
+  dobrar?: string[];
+  testar?: string[];
+  hooks_cirurgiao?: string[];
   posts: CreativeBrief[];
 };
 
@@ -60,38 +71,37 @@ export async function generateStrategy(
   ctx: WorkspaceContext,
   report: ResearchReport,
   days = 7,
-  brand?: BrandKit | null
+  brand?: BrandKit | null,
+  company?: CompanyFacts | null
 ): Promise<StrategyPlan> {
   const n = Math.min(Math.max(days, 7), 14);
 
   const plan = await chatJson<StrategyPlan>(
-    `${TILLI_SYSTEM_STRATEGY}
+    `${TILLI_SKILL_STRATEGY}
 
-Você é diretor de conteúdo Instagram (Brasil). A identidade visual AINDA NÃO EXISTE — planeje MENSAGEM e CENAS do produto, não paleta de outra campanha.
+Execute a skill para a campanha ${ctx.name || ctx.produto}. Janela: exatamente ${n} dias.
+Empresa é a verdade do produto. Research (diagnóstico, posicionamento, funil, cenas) é a evidência. Não copie paleta nem outro produto.
+Tom: ${ctx.tom_voz || "o tom da empresa"}.
 
-Campanha: tipo=${ctx.type || "?"} nome=${ctx.name || ctx.produto}. Nicho: ${ctx.nicho}. Tom: ${ctx.tom_voz}.
-Use research (hooks, oportunidades, direcao_visual). Plano de exatamente ${n} dias, cada post diferente.
+PROIBIDO: mockup de celular, platitude sem a dor desta empresa, EPI se a empresa não for EPI, número de métrica inventado, post genérico.
 
-PROIBIDO:
-- mockup de celular / dashboard
-- "transforme sua vida" sem dor do nicho
-- copiar arte de concorrente
-- EPI/fábrica se o nicho não for isso
-- falar de identidade visual oficial, numeral 22, Gotham, conflito de brand
-
-OBRIGATÓRIO:
-- hook concreto no tom_voz
-- caption ≤ 320 chars
-- visual_prompt = cena realista de direcao_visual + local + câmera + hora; texto PT 3–6 palavras
-- cena_tipo variado
-- mix ~40% feed, 30% carrossel (slides[] 4–5), 30% reels (imagem estática)
-
-JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, hook, estrutura, caption, cta, visual_prompt, slides?, cena_tipo }] }`,
+JSON:
+resumo (6–10 frases: proporção e tese da janela),
+proporcao (frase),
+parar[], manter[], dobrar[], testar[] (hipótese se não houver métrica),
+hooks_cirurgiao[] (5 hooks vencedores, cada um com o porquê na mesma string),
+pilares[],
+posts[${n}] { day, titulo, pilar, objetivo (atracao|autoridade|prova|oferta|engajamento), formato (feed|carrossel|reels), hook, promessa, retencao, metrica, estrutura, caption (400–700 caracteres, um fato da empresa), cta, visual_prompt (cena real, local, câmera, hora; texto PT de 3–6 palavras), cena_tipo, slides? (só carrossel, 4 itens {titulo, texto, visual_prompt}) }.
+Mix aproximado: 40% feed, 30% carrossel, 30% reels.`,
     JSON.stringify(
       {
         campanha: ctx,
+        empresa: company || null,
         research: {
           resumo: report.resumo,
+          diagnostico: report.diagnostico,
+          posicionamento: report.posicionamento,
+          funil: report.funil,
           oportunidades_unicas: report.oportunidades_unicas,
           o_que_concorrentes_fazem_bem: report.o_que_concorrentes_fazem_bem,
           hooks_vencedores: report.hooks_vencedores,
@@ -103,7 +113,8 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
       },
       null,
       2
-    )
+    ),
+    8000
   );
 
   plan.dias = n;
@@ -116,6 +127,12 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
     plan.pilares = plan.pilares.map((x) => (typeof x === "string" ? x : String(x)));
   }
   plan.resumo = typeof plan.resumo === "string" ? plan.resumo : String(plan.resumo ?? "");
+  plan.parar = asList(plan.parar);
+  plan.manter = asList(plan.manter);
+  plan.dobrar = asList(plan.dobrar);
+  plan.testar = asList(plan.testar);
+  plan.hooks_cirurgiao = asList(plan.hooks_cirurgiao);
+  plan.proporcao = coerceText(plan.proporcao);
   const safeCues = filterResearchCues(report.direcao_visual || [], ctx);
   plan.posts = plan.posts.slice(0, n).map((p, i) => {
     const cena = normalizeCena(p.cena_tipo) || CENA_ROTATION[i % CENA_ROTATION.length];
@@ -190,6 +207,8 @@ JSON: { resumo, dias, pilares[], posts[{ day, titulo, pilar, objetivo, formato, 
       pilar: coerceText(p.pilar),
       objetivo: p.objetivo,
       estrutura: coerceText(p.estrutura),
+      retencao: coerceText(p.retencao),
+      metrica: coerceText(p.metrica),
       caption,
       cta: coerceText(p.cta) || ctx.cta,
       formato,
@@ -219,6 +238,12 @@ function normalizeCena(raw: unknown): CreativeBrief["cena_tipo"] | null {
     gestor_alerta: "emocao",
   };
   return map[s] ?? null;
+}
+
+function asList(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => coerceText(x)).filter(Boolean);
+  const one = coerceText(v);
+  return one ? [one] : [];
 }
 
 function coerceText(v: unknown): string {

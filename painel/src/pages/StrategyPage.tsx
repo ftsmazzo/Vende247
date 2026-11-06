@@ -40,6 +40,8 @@ type PostView = {
   objetivo: string;
   hook: string;
   estrutura: string;
+  retencao: string;
+  metrica: string;
   caption: string;
   cta: string;
   slides: SlideView[];
@@ -87,6 +89,8 @@ export function normalizePlan(raw: unknown): StrategyPlan | null {
         formato: asText(p.formato, "feed").toLowerCase(),
         hook: asText(p.hook),
         estrutura: asText(p.estrutura),
+        retencao: asText(p.retencao),
+        metrica: asText(p.metrica),
         caption: asText(p.caption),
         cta: asText(p.cta),
         visual_prompt: asText(p.visual_prompt),
@@ -99,6 +103,12 @@ export function normalizePlan(raw: unknown): StrategyPlan | null {
     resumo: asText(o.resumo),
     dias: Number(o.dias) || posts.length || 0,
     pilares: asStringList(o.pilares),
+    proporcao: asText(o.proporcao),
+    parar: asStringList(o.parar),
+    manter: asStringList(o.manter),
+    dobrar: asStringList(o.dobrar),
+    testar: asStringList(o.testar),
+    hooks_cirurgiao: asStringList(o.hooks_cirurgiao),
     posts,
   };
 }
@@ -112,6 +122,8 @@ function toPostViews(plan: StrategyPlan): PostView[] {
     objetivo: asText(p.objetivo),
     hook: asText(p.hook),
     estrutura: asText(p.estrutura),
+    retencao: asText(p.retencao),
+    metrica: asText(p.metrica),
     caption: asText(p.caption),
     cta: asText(p.cta),
     slides: asSlides(p.slides),
@@ -205,10 +217,16 @@ export function StrategyPage() {
         <div className="space-y-4">
           <div className="card">
             <p className="text-white/75 whitespace-pre-wrap">{asText(plan.resumo, "Sem resumo.")}</p>
+            {plan.proporcao && <p className="mt-3 text-sm text-white/70">{plan.proporcao}</p>}
             {pilares.length > 0 && (
               <p className="mt-3 text-sm text-white/50">Pilares: {pilares.join(" · ")}</p>
             )}
           </div>
+          <ListCard title="Parar" items={plan.parar} />
+          <ListCard title="Manter" items={plan.manter} />
+          <ListCard title="Dobrar" items={plan.dobrar} />
+          <ListCard title="Testar" items={plan.testar} />
+          <ListCard title="Hooks vencedores" items={plan.hooks_cirurgiao} />
 
           {posts.length === 0 && (
             <div className="card text-white/55">
@@ -235,6 +253,8 @@ export function StrategyPage() {
                   {p.pilar} · {p.objetivo}
                 </p>
                 <p className="text-signal font-medium mb-1">Hook: {p.hook}</p>
+                {p.retencao && <p className="text-sm text-white/60 mb-1">Retenção: {p.retencao}</p>}
+                {p.metrica && <p className="text-xs text-white/40 mb-2">Métrica: {p.metrica}</p>}
                 <p className="text-sm text-white/70 mb-2 whitespace-pre-wrap">{p.estrutura}</p>
                 {p.formato === "carrossel" && p.slides.length > 0 && (
                   <ol className="text-sm text-white/55 list-decimal pl-5 space-y-1 mb-2">
@@ -263,6 +283,22 @@ export function StrategyPage() {
           </Link>
         </div>
       )}
+    </div>
+  );
+}
+
+function ListCard({ title, items }: { title: string; items?: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <div className="card">
+      <h2 className="font-display text-lg font-semibold mb-2">{title}</h2>
+      <ul className="space-y-1.5">
+        {items.map((item) => (
+          <li key={item} className="text-white/75 text-sm">
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

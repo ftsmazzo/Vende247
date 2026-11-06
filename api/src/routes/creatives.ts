@@ -5,6 +5,7 @@ import { campaignCtx, resolveCampaignScope, type CampaignScope } from "../servic
 import { gerarImagemViral, gerarImagemComModelo, openRouterCompareModels } from "../services/imageGen.js";
 import { identityGenerationHints, identityReferenceImageUrls } from "../services/identityContract.js";
 import { publishCarousel, publishImage } from "../services/instagram.js";
+import { companyFactsLine, loadCompanyBriefing, toCompanyFacts } from "../services/companyKnowledge.js";
 import { filterResearchCues, lockVisualToNiche } from "../services/nicheVisual.js";
 import type { ResearchReport } from "../services/research.js";
 import {
@@ -38,9 +39,13 @@ function nicheFromCampaign(scope: CampaignScope) {
   };
 }
 
+async function companyLine(workspaceId: number): Promise<string> {
+  return companyFactsLine(toCompanyFacts(await loadCompanyBriefing(workspaceId)));
+}
+
 function identityImageOpts(
   scope: CampaignScope,
-  opts?: { diversityIndex?: number; allowRefs?: boolean }
+  opts?: { diversityIndex?: number; allowRefs?: boolean; productFacts?: string }
 ) {
   const h = identityGenerationHints(scope.identity?.model);
   // Refs iguais em todo post → banana-edit clona a mesma foto (lote “tudo igual”).
@@ -59,6 +64,7 @@ function identityImageOpts(
   return {
     identityPositive: h.positive || undefined,
     identityNegative: h.negative || undefined,
+    productFacts: opts?.productFacts || undefined,
     ...(refs.length ? { referenceImageUrls: refs } : {}),
   };
 }
@@ -100,7 +106,9 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
 
     const brand = scope.brand;
     const niche = nicheFromCampaign(scope);
-    const idOpts = identityImageOpts(scope);
+    const idOpts = identityImageOpts(scope, {
+      productFacts: await companyLine(scope.workspace.id),
+    });
     let prompt = (req.body?.prompt || "").trim();
     let hook = (req.body?.hook || "").trim();
 
@@ -162,7 +170,6 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
     const ws = scope.workspace;
     const ctx = campaignCtx(scope.campaign, ws.ig_username);
-    const idOpts = identityImageOpts(scope);
 
     let strategyId = req.body?.strategy_id;
     let plan: StrategyPlan | null = null;
@@ -204,6 +211,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
 
     const brand = scope.brand;
     const niche = nicheFromCampaign(scope);
+    const productFacts = await companyLine(ws.id);
     const researchCues = await latestResearchCues(
       ws.id,
       scope.campaign.id,
@@ -264,7 +272,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
                 researchCue,
               niche,
               hook: slides[i].texto || post.hook,
-              ...identityImageOpts(scope, { diversityIndex: dayIdx * 5 + i }),
+              ...identityImageOpts(scope, { diversityIndex: dayIdx * 5 + i, productFacts }),
             });
             mediaUrls.push(url);
           }
@@ -278,7 +286,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             researchCue,
             niche,
             hook: post.hook,
-            ...identityImageOpts(scope, { diversityIndex: dayIdx }),
+            ...identityImageOpts(scope, { diversityIndex: dayIdx, productFacts }),
           });
           mediaUrls = mediaUrl ? [mediaUrl] : [];
         }
@@ -354,7 +362,8 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
     const scope = await resolveCampaignScope(getUserId(req), req);
     if ("error" in scope) return reply.status(scope.status).send({ error: scope.error });
     const ws = scope.workspace;
-    const idOpts = identityImageOpts(scope);
+    const productFacts = await companyLine(ws.id);
+    const idOpts = identityImageOpts(scope, { productFacts });
     const id = Number(req.params.id);
     const cur = await query<{
       id: number;
@@ -405,7 +414,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
               researchCue: researchCues[i % Math.max(researchCues.length, 1)],
               niche,
               hook: row.hook,
-              ...identityImageOpts(scope, { diversityIndex: div }),
+              ...identityImageOpts(scope, { diversityIndex: div, productFacts }),
             })
           );
         }
@@ -423,7 +432,7 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
             researchCue: researchCues[0],
             niche,
             hook: row.hook,
-            ...identityImageOpts(scope, { diversityIndex: div }),
+            ...identityImageOpts(scope, { diversityIndex: div, productFacts }),
           }
         );
         mediaUrls = [mediaUrl];
@@ -497,7 +506,10 @@ export const creativesRoutes: FastifyPluginAsync = async (app) => {
           researchCue: researchCues[slideIndex % Math.max(researchCues.length, 1)],
           niche,
           hook: cur.rows[0].hook,
-          ...identityImageOpts(scope, { diversityIndex: div }),
+          ...identityImageOpts(scope, {
+            diversityIndex: div,
+            productFacts: await companyLine(ws.id),
+          }),
         });
         const next = [...urls];
         if (next.length === 0) next.push(newUrl);

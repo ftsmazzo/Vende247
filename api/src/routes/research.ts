@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { query } from "../db/index.js";
 import { getUserId, requireAuth } from "../services/authHelpers.js";
 import { campaignCtx, resolveCampaignScope } from "../services/campaignHelpers.js";
+import { loadCompanyBriefing, toCompanyFacts } from "../services/companyKnowledge.js";
 import { runResearchPipeline } from "../services/research.js";
 
 export const researchRoutes: FastifyPluginAsync = async (app) => {
@@ -42,9 +43,10 @@ export const researchRoutes: FastifyPluginAsync = async (app) => {
     );
     const runId = inserted.rows[0].id;
     const ctx = campaignCtx(scope.campaign, scope.workspace.ig_username);
+    const company = toCompanyFacts(await loadCompanyBriefing(scope.workspace.id));
 
     try {
-      const { raw, report } = await runResearchPipeline(ctx);
+      const { raw, report } = await runResearchPipeline(ctx, company);
 
       await query(
         `UPDATE research_runs SET status = 'done', raw_data = $2::jsonb, report = $3::jsonb,

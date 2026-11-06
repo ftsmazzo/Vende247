@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { query } from "../db/index.js";
 import { getUserId, requireAuth } from "../services/authHelpers.js";
 import { campaignCtx, resolveCampaignScope } from "../services/campaignHelpers.js";
+import { loadCompanyBriefing, toCompanyFacts } from "../services/companyKnowledge.js";
 import { generateLanding } from "../services/landingGen.js";
 import type { ResearchReport } from "../services/research.js";
 import type { StrategyPlan } from "../services/strategy.js";
@@ -48,6 +49,7 @@ export const landingRoutes: FastifyPluginAsync = async (app) => {
     try {
       const result = await generateLanding({
         ctx: campaignCtx(scope.campaign, scope.workspace.ig_username),
+        company: toCompanyFacts(await loadCompanyBriefing(scope.workspace.id)),
         report: research.rows[0]?.report ?? null,
         strategy: strategy.rows[0]?.plan ?? null,
         brand: scope.brand,

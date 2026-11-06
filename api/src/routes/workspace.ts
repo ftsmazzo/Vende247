@@ -35,7 +35,8 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Body: { preset_id?: string } }>("/apply-preset", async (req, reply) => {
     const ws = await getWorkspaceForUser(getUserId(req));
     if (!ws) return reply.status(404).send({ error: "Workspace não encontrado." });
-    const id = (req.body?.preset_id || "planner-mulher").trim();
+    const id = (req.body?.preset_id || "").trim();
+    if (!id) return reply.status(400).send({ error: "Informe preset_id." });
     const preset = getProductPreset(id);
     if (!preset) return reply.status(400).send({ error: "Preset não encontrado." });
 

@@ -357,6 +357,76 @@ export async function loadCompanyBriefing(workspaceId: number): Promise<CompanyB
   };
 }
 
+export type CompanyFacts = {
+  marca: string;
+  missao: string;
+  publico: string;
+  diferenciais: string;
+  objecoes: string;
+  prova: string;
+  politicas: string;
+  produtos: Array<{
+    nome: string;
+    descricao: string;
+    beneficios: string;
+    para_quem: string;
+    preco: string;
+    cta: string;
+    objecoes: string;
+  }>;
+  faq: Array<{ titulo: string; resposta: string }>;
+};
+
+/** Recorte da Empresa para research, estratégia, criativos e landing. */
+export function toCompanyFacts(b: CompanyBriefing | null): CompanyFacts | null {
+  if (!b) return null;
+  const produtos = b.products
+    .filter((p) => p.ativo && (p.nome || p.descricao))
+    .slice(0, 6)
+    .map((p) => ({
+      nome: p.nome,
+      descricao: p.descricao,
+      beneficios: p.beneficios,
+      para_quem: p.para_quem,
+      preco: p.preco_hint,
+      cta: p.cta,
+      objecoes: p.objecoes,
+    }));
+  const faq = b.knowledge
+    .filter((k) => k.ativo && (k.title || k.body))
+    .slice(0, 8)
+    .map((k) => ({ titulo: k.title, resposta: k.body }));
+  const has =
+    b.missao ||
+    b.publico_alvo ||
+    b.diferenciais ||
+    b.objecoes ||
+    b.prova_social ||
+    produtos.length ||
+    faq.length;
+  if (!has) return null;
+  return {
+    marca: b.marca,
+    missao: b.missao,
+    publico: b.publico_alvo,
+    diferenciais: b.diferenciais,
+    objecoes: b.objecoes,
+    prova: b.prova_social,
+    politicas: b.politicas,
+    produtos,
+    faq,
+  };
+}
+
+export function companyFactsLine(f: CompanyFacts | null): string {
+  if (!f) return "";
+  const p = f.produtos[0];
+  return [f.marca, f.missao, p ? `${p.nome}: ${p.descricao}` : "", f.diferenciais]
+    .filter(Boolean)
+    .join(". ")
+    .slice(0, 480);
+}
+
 export async function loadCompanyBriefingForOwner(ownerUserId: number): Promise<CompanyBriefing | null> {
   const r = await query<{ id: number }>(
     `SELECT id FROM workspaces WHERE owner_user_id = $1 ORDER BY id ASC LIMIT 1`,

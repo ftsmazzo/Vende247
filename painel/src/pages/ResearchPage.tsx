@@ -46,8 +46,8 @@ export function ResearchPage() {
         <div>
           <h1 className="font-display text-3xl font-bold">Research</h1>
           <p className="text-white/55 mt-1 max-w-xl">
-            Primeira etapa após o briefing: mercado e concorrentes desta campanha. Sem identidade visual
-            ainda. Concorrentes vêm do briefing da campanha.
+            Diagnóstico, posicionamento e funil desta campanha, com a base da Empresa. A skill roda aqui
+            no servidor quando você clica em rodar.
           </p>
         </div>
         <button type="button" className="btn-primary" disabled={running} onClick={() => void runResearch()}>
@@ -74,6 +74,34 @@ export function ResearchPage() {
             <h2 className="font-display text-lg font-semibold mb-2">Resumo</h2>
             <p className="text-white/75 whitespace-pre-wrap">{report.resumo}</p>
           </div>
+          {report.diagnostico?.maior_impacto && (
+            <div className="card">
+              <h2 className="font-display text-lg font-semibold mb-2">Maior impacto em 7 dias</h2>
+              <p className="text-white/80">{report.diagnostico.maior_impacto}</p>
+            </div>
+          )}
+          <ListCard title="Crítico" items={report.diagnostico?.critico} />
+          <ListCard title="Alto impacto" items={report.diagnostico?.alto_impacto} />
+          <ListCard title="3 mudanças primeiro" items={report.diagnostico?.tres_mudancas_7_dias} />
+          <ListCard title="Otimização" items={report.diagnostico?.otimizacao} />
+          <ListCard title="Ignorar por enquanto" items={report.diagnostico?.ignorar} />
+          {report.posicionamento?.frase && (
+            <div className="card">
+              <h2 className="font-display text-lg font-semibold mb-2">Posicionamento</h2>
+              <p className="text-white/85">{report.posicionamento.frase}</p>
+              {report.posicionamento.promessa && (
+                <p className="text-white/60 mt-2">{report.posicionamento.promessa}</p>
+              )}
+              {report.posicionamento.bio && (
+                <p className="text-sm text-white/70 whitespace-pre-wrap mt-3">{report.posicionamento.bio}</p>
+              )}
+            </div>
+          )}
+          <ListCard title="Mensagens saturadas" items={report.posicionamento?.mensagens_saturadas} />
+          <ListCard title="Posts fixados" items={report.posicionamento?.posts_fixados} />
+          <ListCard title="Funil" items={report.funil?.etapas} />
+          <ListCard title="CTAs de Direct" items={report.funil?.ctas_direct} />
+          <ListCard title="Perguntas de qualificação" items={report.funil?.perguntas_qualificacao} />
           <ListCard title="O que concorrentes fazem bem" items={report.o_que_concorrentes_fazem_bem} />
           <ListCard title="Oportunidades únicas (seu ângulo)" items={report.oportunidades_unicas} />
           <ListCard title="Direção visual (cenas)" items={report.direcao_visual} />

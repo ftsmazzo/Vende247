@@ -270,7 +270,7 @@ export async function handleMcpRpc(
           role: "user",
           content: {
             type: "text",
-            text: `# ${p.title}\n${p.description}\nUse tools v247_* / ig_* desta conta (@${acc.ig_username || acc.id}).`,
+            text: `# ${p.title}\n${p.body}\nConta: @${acc.ig_username || acc.id}. Use os tools desta conta. Não invente métrica ausente.`,
           },
         },
       ],

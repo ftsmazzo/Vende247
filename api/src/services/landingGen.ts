@@ -2,6 +2,7 @@ import { chatJson } from "./llm.js";
 import type { BrandKit } from "./brandFromUrl.js";
 import type { ResearchReport, WorkspaceContext } from "./research.js";
 import type { StrategyPlan } from "./strategy.js";
+import type { CompanyFacts } from "./companyKnowledge.js";
 import { gerarImagemViral } from "./imageGen.js";
 import { isStorageConfigured } from "./storage.js";
 import {
@@ -360,6 +361,7 @@ export function renderLandingHtml(
     colors: LandingPalette;
     logoUrl?: string;
     heroUrl?: string;
+    sceneUrl?: string;
     ctaUrl: string;
     concorrentes: string[];
     identityLayout?: boolean;
@@ -595,8 +597,12 @@ export function renderLandingHtml(
     steps: steps
       ? `<section class="section" id="como">
   <div class="wrap">
-    <p class="section-kicker">Como funciona</p>
-    <h2 class="display">${esc(cleanPublicText(copy.how_title) || "Do caos ao controle")}</h2>
+    ${
+      opts.sceneUrl
+        ? `<figure class="scene-photo"><img src="${esc(opts.sceneUrl)}" alt="${esc(copy.brand_name)} em uso" /></figure>`
+        : ""
+    }
+    <h2 class="display">${esc(cleanPublicText(copy.how_title) || "Como funciona")}</h2>
     <ol class="steps">${steps}</ol>
   </div>
 </section>`
@@ -858,6 +864,10 @@ footer{padding:1.5rem 0 2rem;border-top:1px solid var(--line);color:var(--muted)
 .nav-cta{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 70%,var(--deep)))!important;box-shadow:0 8px 24px color-mix(in srgb,var(--accent) 28%,transparent)}
 .card{background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 10%,transparent),transparent 42%),var(--card-bg)!important}
 .logo{height:36px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25))}
+.scene-photo{margin:0 0 1.75rem;border-radius:var(--radius);overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.28)}
+.scene-photo img{width:100%;height:min(460px,58vw);object-fit:cover;display:block}
+::selection{background:var(--accent);color:var(--cta-ink)}
+.btn:focus-visible,.nav-cta:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media (prefers-reduced-motion:reduce){*,.blob,.section{animation:none!important;transition:none!important}}
 
 </style>
@@ -871,8 +881,17 @@ ${bodySections}
 </html>`;
 }
 
+function splitBits(text: string, max: number): string[] {
+  return text
+    .split(/\n+|(?<=[.!;])\s+/)
+    .map((s) => cleanPublicText(s))
+    .filter((s) => s.length > 16)
+    .slice(0, max);
+}
+
 export async function generateLanding(opts: {
   ctx: WorkspaceContext;
+  company?: CompanyFacts | null;
   report?: ResearchReport | null;
   strategy?: StrategyPlan | null;
   brand?: BrandKit | null;
@@ -880,7 +899,7 @@ export async function generateLanding(opts: {
   identityCss?: string;
   withHeroImage?: boolean;
 }): Promise<LandingResult> {
-  const { ctx, report, strategy, brand, identityModel } = opts;
+  const { ctx, report, strategy, brand, identityModel, company } = opts;
   const colors = pickColors(brand, identityModel);
   const identity = identityContextForLlm(identityModel);
   const identityLayout = identityLooksCampaignLayout(identityModel);
@@ -914,16 +933,16 @@ Tom: use tom_voz da campanha + page_personality da identidade. Se a identidade f
 PROIBIDO ABSOLUTO:
 - perfil vazio, falta de conteúdo, engajamento, posts, reels, carrossel, bio, seguidores
 - copy genérica: "tecnologia de ponta", "otimize seus gastos", "transforme sua gestão", "feito para você", "comece hoje" sem substantivo do produto
-- "ritual de fé" / planner cristão se a identidade não for esse universo
+- universo de outro produto que não esteja na Empresa
 - métricas inventadas, telefone inventado, emoji, markdown
 
 OBRIGATÓRIO:
 - brand_name = nome da campanha/produto real
 - headline concreta (máx 6 palavras) + accent com benefício tangível
 - subheadline = 1 frase com mecanismo do produto
-- pains = 4 dores reais DESTE público (máx 110 chars), com substantivos (não "falta de clareza" vago)
-- benefits/pillars/how_steps com resultado concreto citado no briefing
-- faq: objeções reais de compra
+- pains = 4 dores reais DESTE público, com substantivos tirados da Empresa
+- benefits/pillars/how_steps com o produto, o diferencial e a prova da Empresa
+- faq: objeções e políticas da Empresa, sem inventar preço
 - hero_cta ≤ 32 caracteres; offer_title ≤ 8 palavras
 - Preencha TODOS os arrays
 
@@ -939,6 +958,7 @@ JSON estrito.`,
           cta: ctx.cta,
           tom_voz: ctx.tom_voz,
         },
+        empresa: company || null,
         sinais_de_mercado_somente_produto: productSignals,
         identidade_ativa: identity,
         lembrete:
@@ -949,51 +969,44 @@ JSON estrito.`,
     )
   );
 
-  const brandName = cleanPublicText(copy.brand_name) || clipBrief(ctx.produto, 40) || "Produto";
+  const brandName =
+    cleanPublicText(copy.brand_name) ||
+    cleanPublicText(company?.produtos[0]?.nome) ||
+    clipBrief(ctx.produto, 40) ||
+    "Produto";
   const shortProduct = brandName;
-  const nicheShort = clipBrief(ctx.nicho, 72) || "operações de SST";
+  const nicheShort = clipBrief(company?.publico || ctx.nicho, 90) || clipBrief(ctx.nicho, 72) || shortProduct;
   const offerShort =
-    clipBrief(ctx.oferta, 160) ||
-    `${shortProduct}: gestão operacional com evidência rastreável.`;
-
-  const defaultBenefits = [
-    {
-      title: "Um cadastro, vários fluxos",
-      body: "Admissão, integração, treinamentos e EPI no mesmo registro — sem retrabalho.",
-    },
-    {
-      title: "Evidência na entrega",
-      body: "Confirmação rastreável de quem recebeu o EPI, quando e qual equipamento.",
-    },
-    {
-      title: "Pronto para auditoria",
-      body: "Fichas, certificados e histórico organizados quando a fiscalização chega.",
-    },
-    {
-      title: "Escala multi-cliente",
-      body: `Feito para ${nicheShort} — várias empresas sem planilha paralela.`,
-    },
-  ];
-  const defaultSteps = [
-    { title: "Cadastre a operação", body: `Empresas, unidades e trabalhadores entram uma vez no ${shortProduct}.` },
-    { title: "Automatize documentos", body: "Ficha SST, OS e integração saem do mesmo fluxo." },
-    { title: "Entregue com prova", body: "EPI com histórico e evidência — pronto para auditoria." },
-  ];
+    clipBrief(ctx.oferta, 180) ||
+    clipBrief(company?.produtos[0]?.descricao, 180) ||
+    `${shortProduct}.`;
+  const product = company?.produtos[0];
+  const benefitBits = splitBits(product?.beneficios || company?.diferenciais || "", 4);
+  const defaultBenefits = (benefitBits.length ? benefitBits : splitBits(offerShort, 3)).map((body, i) => ({
+    title: clipBrief(body, 42) || `Ponto ${i + 1}`,
+    body: clipBrief(body, 180) || body,
+  }));
+  const stepBits = splitBits(product?.descricao || company?.missao || offerShort, 3);
+  const defaultSteps = (stepBits.length ? stepBits : [offerShort]).slice(0, 3).map((body, i) => ({
+    title: ["Entenda o cenário", "Implante com o time", "Opere com prova"][i] || `Passo ${i + 1}`,
+    body: clipBrief(body, 160) || body,
+  }));
+  const faqFromCompany = (company?.faq || []).slice(0, 4).map((f) => ({
+    q: clipBrief(f.titulo, 80) || "Pergunta",
+    a: clipBrief(f.resposta, 220) || f.resposta,
+  }));
+  const objectionBits = splitBits(company?.objecoes || "", 3).map((a) => ({
+    q: clipBrief(a, 72) || "Como funciona na prática?",
+    a: clipBrief(a, 220) || a,
+  }));
   const defaultFaq = [
-    { q: "O que o sistema cobre?", a: offerShort },
-    {
-      q: "Serve para consultoria multi-cliente?",
-      a: "Sim — uma plataforma para gerir várias empresas e seus trabalhadores.",
-    },
-    {
-      q: "Como comprovo a entrega de EPI?",
-      a: "A entrega gera evidência rastreável (quem, o quê e quando).",
-    },
+    ...faqFromCompany,
+    ...objectionBits,
     {
       q: "Como começo?",
-      a: clipBrief(ctx.cta, 80) || "Agende uma demonstração pelo botão desta página.",
+      a: clipBrief(company?.politicas || ctx.cta, 180) || "Fale com o time pelo botão desta página.",
     },
-  ];
+  ].slice(0, 4);
 
   copy.brand_name = brandName;
   copy.pains = filterProductLines(normalizeStrings(copy.pains)).filter((p) => !isDumpText(p, 130));
@@ -1015,12 +1028,10 @@ JSON estrito.`,
     .filter((f) => !isIgOrInternalNoise(`${f.q} ${f.a}`) && !isDumpText(f.a, 280))
     .map((f) => ({ q: shortTitle(f.q, 72), a: clipBrief(f.a, 220) || f.a.slice(0, 220) }));
 
-  const defaultPains = [
-    "Processos de SST ainda dependem de planilha e papel",
-    "Falta evidência rastreável quando a auditoria chega",
-    "Cadastros repetidos geram erro e retrabalho",
-    "O time perde tempo em tarefa que deveria ser sistema",
-  ];
+  const defaultPains = splitBits(
+    [company?.objecoes, company?.publico, ctx.nicho, ctx.oferta].filter(Boolean).join(". "),
+    4
+  );
 
   if (copy.pains.length < 3) {
     copy.pains = [...copy.pains, ...defaultPains]
@@ -1034,38 +1045,24 @@ JSON estrito.`,
   if (!copy.faq.length) copy.faq = defaultFaq;
 
   if (!copy.pillars.length) {
-    copy.pillars = [
-      { title: "Evidência", body: "Histórico e comprovação no processo — não só promessa." },
-      { title: "Operação", body: "Fluxo pensado para quem executa no campo e no escritório." },
-      { title: "Escala", body: "Padronize multi-unidade ou multi-cliente sem copiar planilha." },
-    ];
+    copy.pillars = splitBits(company?.diferenciais || company?.missao || offerShort, 3).map((body) => ({
+      title: clipBrief(body, 36) || shortProduct,
+      body: clipBrief(body, 140) || body,
+    }));
   }
 
   if (copy.angles.length < 3) {
     copy.angles = filterProductLines([
       ...copy.angles,
-      ...normalizeStrings(report?.hooks_vencedores).filter((h) => !isDumpText(h, 110)),
-      "Menos papel, mais evidência rastreável",
-      "Feito para consultoria, indústria e agro",
-      "Do cadastro à evidência — em um fluxo",
-      "Auditoria não espera planilha desatualizada",
+      ...normalizeStrings(report?.hooks_vencedores).filter((h) => !isDumpText(h, 140)),
+      ...splitBits(company?.diferenciais || "", 3),
     ]).slice(0, 6);
   }
 
   if (!copy.proof_items.length) {
-    copy.proof_items = [
-      "Ficha SST, OS e integração no mesmo cadastro",
-      "Entrega de EPI com evidência e histórico",
-      "Feito para operações de SST com multi-cliente",
-    ];
+    copy.proof_items = splitBits(company?.prova || "", 3);
   }
-  if (!copy.metrics.length) {
-    copy.metrics = [
-      { value: "SST", label: "operação rastreável" },
-      { value: "EPI", label: "entrega com evidência" },
-      { value: "1x", label: "cadastro, vários fluxos" },
-    ];
-  }
+  if (!copy.metrics.length) copy.metrics = [];
 
   const weakHeadline =
     !copy.headline ||
@@ -1074,9 +1071,9 @@ JSON estrito.`,
     cleanPublicText(copy.headline).split(/\s+/).length < 2;
 
   const head = splitHeadline(
-    weakHeadline ? "Operação sem evidência?" : copy.headline,
+    weakHeadline ? shortProduct : copy.headline,
     weakHeadline || !copy.headline_accent
-      ? "Evidência, não promessa."
+      ? clipBrief(company?.missao || ctx.oferta, 42) || "Veja o sistema operando."
       : copy.headline_accent
   );
   copy.headline = head.main;
@@ -1108,7 +1105,7 @@ JSON estrito.`,
     copy.differentiator = "";
   }
   if (!copy.differentiator) {
-    copy.differentiator = "Proteção comprovável — processo e histórico.";
+    copy.differentiator = clipBrief(company?.diferenciais || company?.missao, 80) || shortProduct;
   } else {
     copy.differentiator = clipBrief(copy.differentiator, 80);
   }
@@ -1147,36 +1144,40 @@ JSON estrito.`,
     : undefined;
   copy.seo_title =
     cleanPublicText(copy.seo_title) ||
-    `${brandName} — gestão operacional de SST`;
+    `${brandName}`;
   copy.seo_description =
     cleanPublicText(copy.seo_description) || copy.subheadline.slice(0, 155);
 
   let heroUrl: string | undefined;
+  let sceneUrl: string | undefined;
+  const productTruth = [company?.marca, product?.nome, product?.descricao, company?.missao]
+    .filter(Boolean)
+    .join(". ")
+    .slice(0, 420);
   if (opts.withHeroImage !== false && isStorageConfigured()) {
     const industrial = /\b(epi|sst|prontepi|seguran|industrial)\b/i.test(
-      `${ctx.nicho} ${ctx.produto}`
+      `${ctx.nicho} ${ctx.produto} ${product?.nome || ""} ${product?.descricao || ""}`
     );
     const kairogenRefs =
       (process.env.IMAGE_PROVIDER ?? "").toLowerCase() === "kairogen"
         ? identityReferenceImageUrls(identityModel)
         : [];
+    const niche = { nicho: ctx.nicho, produto: ctx.produto, oferta: ctx.oferta };
+    const photoBase = [
+      productTruth || `Premium photograph of "${shortProduct}" in real use`,
+      industrial
+        ? "Real workplace, people and gear of this exact product. No Bible, no journal, no cozy faith morning."
+        : "Photography of this exact product in use. No hard-hat filler unless the product is industrial safety.",
+      brand?.visual_summary ? `Brand mood: ${brand.visual_summary.slice(0, 180)}` : "",
+    ].filter(Boolean);
     try {
       heroUrl = await gerarImagemViral(
         [
-          brand?.product_ui_notes ||
-            (industrial
-              ? "Safety technician in industrial workplace using tablet with SST / EPI dashboard, navy and deep teal lighting, authoritative technical photo"
-              : `Premium product hero for "${shortProduct}" in authentic use, modern brand photography`),
-          industrial
-            ? "Dark navy and teal industrial brand mood, high contrast. FORBIDDEN: Bible, planner journal, faith lifestyle, beige terracotta cozy morning"
-            : "Modern brand photography matching the product niche. FORBIDDEN: Bible, faith props, random industrial PPE unless product is SST/EPI",
-          "Empty visual space on the left third for website text overlay.",
+          ...photoBase,
+          "Hero photograph, empty space on the left third, no text, no logo, no UI stickers.",
           kairogenRefs.length
-            ? "EDIT the provided reference photo(s): keep product/brand recognizability, improve lighting and composition for a landing hero, no text overlays."
+            ? "EDIT the provided reference photo(s): keep recognizability, improve light, no text overlays."
             : "",
-          `Product: ${ctx.produto.slice(0, 140)}`,
-          `Niche: ${ctx.nicho.slice(0, 100)}`,
-          brand?.visual_summary ? `Brand mood: ${brand.visual_summary.slice(0, 180)}` : "",
         ]
           .filter(Boolean)
           .join(" "),
@@ -1186,12 +1187,33 @@ JSON estrito.`,
           purpose: "photo",
           overlayLogo: false,
           aspectRatio: "4:5",
-          niche: { nicho: ctx.nicho, produto: ctx.produto, oferta: ctx.oferta },
+          niche,
+          productFacts: productTruth,
           ...(kairogenRefs.length ? { referenceImageUrls: kairogenRefs } : {}),
         }
       );
     } catch {
       heroUrl = brand?.og_image_url || undefined;
+    }
+    try {
+      sceneUrl = await gerarImagemViral(
+        [
+          ...photoBase,
+          "A second, different photograph: wider documentary frame of the same operation, no text, no logo.",
+        ].join(" "),
+        brand,
+        {
+          mode: "photo",
+          purpose: "photo",
+          overlayLogo: false,
+          aspectRatio: "1:1",
+          diversityIndex: 3,
+          niche,
+          productFacts: productTruth,
+        }
+      );
+    } catch {
+      sceneUrl = undefined;
     }
   } else {
     heroUrl = brand?.og_image_url || undefined;
@@ -1201,6 +1223,7 @@ JSON estrito.`,
     colors,
     logoUrl: identityLogoUrl(identityModel, brand?.logo_url),
     heroUrl,
+    sceneUrl,
     ctaUrl: resolveCtaUrl(ctx, copy),
     concorrentes: [],
     identityLayout,

@@ -7,7 +7,7 @@ export type NicheCtx = {
 };
 
 const INDUSTRIAL_RE =
-  /\b(epi|ppe|sst|nr\b|ca\b|biometria|capacete|protetor|f[aá]brica|factory|warehouse|industrial|seguran[cç]a do trabalho|gest[aã]o de epi|hard\s*hat|prontepi|pront\s*epi|sa[uú]de no trabalho|ordem de servi[cç]o|trabalhador|auditoria)\b/i;
+  /\b(epi|ppe|sst|nr-?\d|biometria|capacete|protetor auricular|warehouse|industrial|seguran[cç]a do trabalho|gest[aã]o de epi|hard\s*hat|prontepi|pront\s*epi|sa[uú]de no trabalho|ordem de servi[cç]o)\b/i;
 
 /** Fé explícita — NÃO incluir "mulher" ou "planner" sozinhos (contaminava SST). */
 const FAITH_RE =

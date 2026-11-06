@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { query } from "../db/index.js";
 import { getUserId, requireAuth } from "../services/authHelpers.js";
 import { campaignCtx, resolveCampaignScope } from "../services/campaignHelpers.js";
+import { loadCompanyBriefing, toCompanyFacts } from "../services/companyKnowledge.js";
 import type { ResearchReport } from "../services/research.js";
 import { generateStrategy } from "../services/strategy.js";
 
@@ -52,11 +53,13 @@ export const strategyRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const days = Number(req.body?.days ?? 7);
+    const company = toCompanyFacts(await loadCompanyBriefing(scope.workspace.id));
     const plan = await generateStrategy(
       campaignCtx(scope.campaign, scope.workspace.ig_username),
       report!,
       days,
-      {}
+      scope.brand,
+      company
     );
 
     const inserted = await query<{ id: number }>(

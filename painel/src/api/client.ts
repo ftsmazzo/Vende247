@@ -396,6 +396,29 @@ export type ResearchReport = {
   };
   gaps_do_seu_perfil: string[];
   insights_ads: string[];
+  diagnostico?: {
+    critico?: string[];
+    alto_impacto?: string[];
+    otimizacao?: string[];
+    ignorar?: string[];
+    tres_mudancas_7_dias?: string[];
+    maior_impacto?: string;
+  };
+  posicionamento?: {
+    frase?: string;
+    promessa?: string;
+    bio?: string;
+    cta_bio?: string;
+    destaques?: string[];
+    posts_fixados?: string[];
+    mensagens_saturadas?: string[];
+  };
+  funil?: {
+    etapas?: string[];
+    ctas_direct?: string[];
+    mensagem_inicial?: string;
+    perguntas_qualificacao?: string[];
+  };
   fontes: { apify: boolean; ad_library: boolean; modo_degradado: boolean };
 };
 
@@ -411,6 +434,12 @@ export type StrategyPlan = {
   resumo: string;
   dias: number;
   pilares: string[];
+  proporcao?: string;
+  parar?: string[];
+  manter?: string[];
+  dobrar?: string[];
+  testar?: string[];
+  hooks_cirurgiao?: string[];
   posts: Array<{
     day: number;
     titulo: string;
@@ -422,6 +451,8 @@ export type StrategyPlan = {
     caption: string;
     cta: string;
     visual_prompt: string;
+    retencao?: string;
+    metrica?: string;
     slides?: Array<{ titulo?: string; texto?: string; visual_prompt?: string }>;
   }>;
 };

@@ -1,7 +1,8 @@
 import { scrapeCompetitors, type CompetitorProfile } from "./apify.js";
 import { searchAdsForResearch, type AdSnippet } from "./adLibrary.js";
 import { chatJson } from "./llm.js";
-import { TILLI_SYSTEM_RESEARCH } from "../data/tilliPrompts.js";
+import { TILLI_SKILL_RESEARCH } from "../data/tilliPrompts.js";
+import type { CompanyFacts } from "./companyKnowledge.js";
 
 export type ResearchReport = {
   resumo: string;
@@ -23,6 +24,29 @@ export type ResearchReport = {
   };
   gaps_do_seu_perfil: string[];
   insights_ads: string[];
+  diagnostico?: {
+    critico?: string[];
+    alto_impacto?: string[];
+    otimizacao?: string[];
+    ignorar?: string[];
+    tres_mudancas_7_dias?: string[];
+    maior_impacto?: string;
+  };
+  posicionamento?: {
+    frase?: string;
+    promessa?: string;
+    bio?: string;
+    cta_bio?: string;
+    destaques?: string[];
+    posts_fixados?: string[];
+    mensagens_saturadas?: string[];
+  };
+  funil?: {
+    etapas?: string[];
+    ctas_direct?: string[];
+    mensagem_inicial?: string;
+    perguntas_qualificacao?: string[];
+  };
   fontes: {
     apify: boolean;
     ad_library: boolean;
@@ -44,7 +68,10 @@ export type WorkspaceContext = {
   name?: string;
 };
 
-export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
+export async function runResearchPipeline(
+  ctx: WorkspaceContext,
+  company?: CompanyFacts | null
+): Promise<{
   raw: { competitors: CompetitorProfile[]; ads: AdSnippet[] };
   report: ResearchReport;
 }> {
@@ -92,33 +119,24 @@ export async function runResearchPipeline(ctx: WorkspaceContext): Promise<{
   }));
 
   const report = await chatJson<ResearchReport>(
-    `${TILLI_SYSTEM_RESEARCH}
+    `${TILLI_SKILL_RESEARCH}
 
-Você é pesquisador de mercado para Instagram (Brasil). NÃO há identidade visual ainda — NÃO fale de paleta, contrato de marca, conflito de identidade, Gotham, numeral 22, brand_kit.
+Você executa essa skill agora, dentro do Vende247, para a campanha ${ctx.name || ctx.produto} (${ctx.type || "produto"}).
+A Empresa no JSON é a fonte do produto, do público, das objeções e da prova. A campanha é o recorte comercial. Concorrentes e ads são a evidência.
+Não há identidade visual nesta etapa: não fale de paleta, Gotham, numeral 22 nem de outro produto que não esteja na Empresa.
 
-Missão: o que o MERCADO (concorrentes + ads) faz, e o que ESTE produto pode ganhar. Campanha tipo=${ctx.type || "produto"} nome=${ctx.name || ctx.produto}.
-Inclua no JSON campos extras se couber: prioridade_critica[], prioridade_alto_impacto[], vazamentos_funil[].
+PROIBIDO: platitude, número inventado, assumir EPI/SaaS se a Empresa não for isso, dizer que o mercado não anuncia se ads_nicho veio vazio (diga que a coleta não retornou ads).
 
-PROIBIDO:
-- abrir o resumo com "CONFLITO" / "identidade incompatível" / "skill campaign-design-apply"
-- platitudes ("segurança e compromisso", "vídeos e imagens")
-- assumir EPI/SaaS se o produto não for isso
-- inventar likes, % ou ads que não estão nos dados
-
-OBRIGATÓRIO:
-- resumo: 4–8 frases factuais sobre o que viu nos perfis (temas de caption, provas, CTAs)
-- o_que_concorrentes_fazem_bem: itens concretos citando @ ou tema de post
-- oportunidades_unicas: lacunas vs o produto informado
-- hooks_vencedores: frases no tom_voz do briefing (${ctx.tom_voz || "o tom declarado"})
-- direcao_visual: 8–12 CENAS do nicho/produto em uso (pessoa, objeto, lugar, hora). Sem mockup de celular. Sem paleta de outra campanha.
-- pilares_conteudo específicos deste produto
-
-Ads: se ads_nicho vazio, diga que a coleta não retornou ads — não que o mercado não anuncia.
-
-JSON: resumo, o_que_concorrentes_fazem_bem[], oportunidades_unicas[], formatos_que_performam[],
-hooks_vencedores[], ctas_comuns[], pilares_conteudo[], direcao_visual[],
+JSON obrigatório:
+resumo (8–12 frases: o que os perfis fazem e o que esta empresa pode ganhar),
+diagnostico { critico[], alto_impacto[], otimizacao[], ignorar[], tres_mudancas_7_dias[], maior_impacto },
+posicionamento { frase, promessa, bio, cta_bio, destaques[], posts_fixados[], mensagens_saturadas[] },
+funil { etapas[] (uma frase por etapa do caminho), ctas_direct[], mensagem_inicial, perguntas_qualificacao[] },
+o_que_concorrentes_fazem_bem[], oportunidades_unicas[], formatos_que_performam[],
+hooks_vencedores[] (no tom ${ctx.tom_voz || "da empresa"}), ctas_comuns[], pilares_conteudo[],
+direcao_visual[] (8–12 cenas reais: pessoa, objeto, lugar, hora; sem mockup de celular),
 padrao_perfil_engajador { bio_sugerida, destaques[], ritmo_posts_semana, mix_formatos {feed,carrossel,reels} },
-gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado }.`,
+gaps_do_seu_perfil[], insights_ads[].`,
     JSON.stringify(
       {
         campanha: {
@@ -131,6 +149,7 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
           tom_voz: ctx.tom_voz,
           meu_ig: ctx.ig_username || "(ainda sem perfil)",
         },
+        empresa: company || null,
         concorrentes_analisados: compactCompetitors,
         ads_nicho: ads.slice(0, 15),
         flags: {
@@ -143,7 +162,8 @@ gaps_do_seu_perfil[], insights_ads[], fontes { apify, ad_library, modo_degradado
       },
       null,
       2
-    )
+    ),
+    7500
   );
 
   report.fontes = {
